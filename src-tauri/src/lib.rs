@@ -1,4 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+mod native_shortcuts;
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -165,16 +167,45 @@ fn launch_program(target: String, arguments: String, start_in: String) -> Result
     }
 }
 
+#[tauri::command]
+fn open_shortcut_path(app: tauri::AppHandle, target: String) -> Result<(), String> {
+    use std::path::Path;
+    use tauri_plugin_opener::OpenerExt;
+
+    let target = target.trim().trim_matches('"');
+    let path = Path::new(target);
+
+    if !path.is_absolute() {
+        return Err("Enter the full path to a file or folder.".into());
+    }
+
+    if !path.exists() {
+        return Err(format!("File or folder not found: {}", path.display()));
+    }
+
+    app.opener()
+        .open_path(target, None::<&str>)
+        .map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             set_dock_bounds,
             set_dock_region,
-            launch_program
+            launch_program,
+            open_shortcut_path,
+            native_shortcuts::pick_shortcut_path,
+            native_shortcuts::read_shortcut_icon,
+            native_shortcuts::inspect_shortcut_drops,
+            native_shortcuts::exit_stack_dock,
+            native_shortcuts::stack_dock_layout_backup
         ])
+        .on_window_event(native_shortcuts::keep_dock_open)
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

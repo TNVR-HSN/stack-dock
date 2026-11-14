@@ -798,6 +798,10 @@ async function launch(t) {
       await core.invoke('plugin:opener|open_url', {
         url: t.target.trim()
       });
+    } else if (kind === 'local') {
+      await core.invoke('open_shortcut_path', {
+        target: t.target
+      });
     } else {
       throw new Error('This shortcut type is not supported yet.');
     }
@@ -1335,5 +1339,6 @@ async function startNative(){
 }
 startNative();
 </script>
+<script src="/stack-dock-native.js"></script>
 </body>
 </html>
