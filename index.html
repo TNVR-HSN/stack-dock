@@ -1,0 +1,1339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Dynamic Island Stack Dock — Customization Demo</title>
+<style>
+:root{color-scheme:dark;font:14px/1.45 "Segoe UI",system-ui,sans-serif;color:#f2eaf6;background:#100a14;--soft:#bdb0c5;--line:#ffffff23;--accent:#efb7ff;--panel:#211725}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{margin:0;overflow:hidden}button,input,select{font:inherit}button{cursor:pointer;color:inherit}button:disabled{cursor:default;opacity:.38}:focus-visible{outline:2px solid var(--accent);outline-offset:2px}[hidden]{display:none!important}[inert]{pointer-events:none!important}svg{display:block}button svg{pointer-events:none}
+.desktop{position:fixed;inset:0;overflow:hidden;background:radial-gradient(ellipse at 50% 38%,#7a2b4355,transparent 62%),radial-gradient(ellipse at 16% 78%,#551e7347,transparent 52%),radial-gradient(ellipse at 85% 77%,#6d23435c,transparent 52%),linear-gradient(160deg,#160d19,#0c0912 67%,#100913);isolation:isolate}
+.desktop::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(112deg,transparent 34%,#c9608820 47%,transparent 59%),linear-gradient(246deg,transparent 33%,#ac78f014 49%,transparent 62%),radial-gradient(ellipse at 50% 52%,transparent 38%,#050309b3 100%);pointer-events:none}
+.guide{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);width:min(386px,calc(100% - 34px));padding:17px 19px;border:1px solid #e5b3f52b;border-radius:16px;background:#110b18ae;box-shadow:0 15px 50px #07030b37;transition:opacity .19s}.guide strong{font-weight:700}.guide h1{font-size:16px;margin:4px 0 9px;letter-spacing:.01em}.guide p{font-size:12px;color:#d4c5dc;margin:0 0 7px}.guide .micro{font-size:10px;color:#ba9ecc;letter-spacing:.12em;font-weight:650;text-transform:uppercase}.guidebottom{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding-top:10px;margin-top:11px}.guidebottom span{font:11px Consolas,monospace;color:#c6a8d5}.desktop.has-stack .guide{opacity:0}.desktop-tag{position:absolute;top:17px;left:19px;pointer-events:none;color:#ceafcb86;letter-spacing:.18em;font-size:10px;text-transform:uppercase}.quiet,.primary{border:1px solid var(--line);border-radius:8px;padding:7px 11px;min-height:34px;background:#ffffff0b}.quiet:hover{background:#ffffff18}.primary{background:#dca6ef;color:#291232;font-weight:750;border-color:#f3c6ff}.primary:hover{background:#efbdfc}
+.island{position:absolute;z-index:4;isolation:isolate;overflow:hidden;touch-action:auto}.glass{position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:var(--fill);border:var(--border-w,1px) solid var(--edge);box-shadow:inset 0 1px 0 var(--shine);backdrop-filter:blur(var(--blur));-webkit-backdrop-filter:blur(var(--blur))}.dock-view,.gs-view{position:absolute;inset:0;min-width:0;min-height:0}.dock-view{display:flex;align-items:center;justify-content:center}.gs-view{padding:var(--pad);display:flex;flex-direction:column;align-items:stretch}
+.gs-heading{display:flex;align-items:flex-start;justify-content:center;flex:0 0 var(--heading-h);min-width:0;pointer-events:none}
+.gs-heading-inner{height:28px;max-width:100%;display:flex;align-items:center;gap:8px}
+.gs-heading h2{min-width:0;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.25;font-weight:650;letter-spacing:.015em;text-shadow:0 1px 6px #000a}
+.gs-view .scroll{flex:1 1 0;height:auto}
+.folder-flight{position:fixed;z-index:6;pointer-events:none;transform-origin:center;will-change:transform}
+.flight-endpoint{visibility:hidden}.folders{display:flex;min-width:0;min-height:0;gap:var(--gap);padding:var(--pad);max-width:100%;max-height:100%;overflow:auto;scrollbar-width:none}.folders.vertical{flex-direction:column}.folders::-webkit-scrollbar{display:none}.folder-btn{border:none;background:none;flex:none;border-radius:15px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;padding:3px;width:var(--bw);height:var(--bh);transition:background .15s}.folder-btn:hover{background:#fff1}.folder-btn span:not(.art){font-size:10px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.art{display:block;flex:none;width:var(--size);height:var(--size);border-radius:var(--ir,25%);overflow:hidden;filter:drop-shadow(0 2px 4px #0007)}.art svg,.art img{width:100%;height:100%;display:block;object-fit:contain;pointer-events:none}
+.scroll{width:100%;height:100%;overflow:auto;scrollbar-width:thin;scrollbar-color:#b17dc07d transparent;overscroll-behavior:contain}.grid{display:grid;width:max-content;min-height:100%;grid-template-columns:repeat(var(--cols),var(--cellw));grid-auto-rows:var(--cellh);gap:var(--gap);align-content:start}.cell{display:grid;place-items:center;position:relative;border:1px solid transparent;border-radius:11px;min-width:0;min-height:0}.cell.spacer.guides{border-color:#e5bfe84d;border-style:dashed;background:#ffffff06}.cell.spacer.guides::after{content:"";width:13px;height:1px;background:#e4c5e28a}.cell.drop-target{border:1px dashed #efb3ff;background:#df9bf031;box-shadow:inset 0 0 0 2px #5f2e728c}.tile{width:100%;height:100%;border:0;background:none;min-width:0;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:2px;border-radius:10px;touch-action:none;user-select:none;-webkit-user-select:none}.tile:hover,.tile:focus-visible{background:#ffffff14}.tile.dragging{opacity:.32}.tile .caption{max-width:100%;flex:none;max-height:2.36em;font-size:11px;line-height:1.18;text-align:center;overflow-wrap:anywhere;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;text-shadow:0 1px 3px #000}.reflect{display:block;flex:none;width:var(--size);height:10px;overflow:hidden;mask-image:linear-gradient(#0008,transparent);opacity:.55;pointer-events:none}.reflect .art{transform:scaleY(-1);transform-origin:50% 0;position:relative;top:var(--size);filter:none}.drag-ghost{position:fixed;z-index:50;pointer-events:none;transform:translate(-50%,-50%);opacity:.83}
+.menu{position:fixed;z-index:15;min-width:218px;max-width:calc(100vw - 14px);max-height:calc(100dvh - 14px);overflow:auto;padding:5px;border:1px solid #e5b4ef40;border-radius:11px;background:#211726f7;box-shadow:0 16px 48px #08030ccf}.menu-title{padding:6px 9px;color:#d4acde;font-size:11px;font-weight:650;letter-spacing:.02em;overflow-wrap:anywhere}.menu button{width:100%;border:0;background:none;border-radius:7px;text-align:left;min-height:34px;padding:6px 9px;display:flex;justify-content:space-between;align-items:center;gap:8px}.menu button:not(:disabled):hover,.menu button:focus-visible{background:#ebaeff22}.menu small{font-size:10px;color:#c5abc9}.menu hr{border:0;border-top:1px solid var(--line);margin:4px}.menu .danger{color:#ffb4c8}.menu.position{min-width:min(278px,calc(100vw - 14px))}.posrow{display:grid;grid-template-columns:45px repeat(3,1fr);align-items:center;gap:4px;margin:4px}.posrow span{font-size:11px;color:#d8c6dd}.posrow button{justify-content:center;padding:4px;font-size:11px;border:1px solid #ffffff16}.posrow button[aria-pressed=true]{background:#ebaeff38;border-color:#edb7fc6f}
+dialog{width:min(524px,calc(100% - 20px));max-height:calc(100dvh - 20px);padding:0;border-radius:17px;border:1px solid #d9a5e350;background:var(--panel);box-shadow:0 20px 80px #07020bd5;color:#f2eaf6}dialog.settings-dialog{width:min(664px,calc(100% - 20px));overflow:hidden}
+.settings-dialog form{max-height:calc(100dvh - 24px);display:flex;flex-direction:column}
+.settings-dialog .dialogbody{display:flex;flex-direction:column;gap:0;min-height:0;padding:0}
+.settings-dialog .dialogtop,.settings-dialog .dialogfoot{flex:none}
+.settings-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;padding:10px 18px 8px;border-bottom:1px solid var(--line);flex:none}
+.settings-tabs button{font-weight:650;border:1px solid transparent;background:transparent;color:var(--soft);border-radius:8px;min-height:36px;padding:5px 8px;white-space:nowrap}
+.settings-tabs button:hover{background:#ffffff10}
+.settings-tabs button[aria-selected=true]{color:#fae7ff;border-color:#e4afe54d;background:#c987dc24}
+.settings-target{padding:9px 18px;flex:none;border-bottom:1px solid #ffffff16}
+.settings-target .field{grid-template-columns:auto minmax(110px,220px);align-items:center;justify-content:space-between;gap:9px}
+.settings-body{overflow:auto;min-height:0;scrollbar-color:#b482bb75 transparent;padding:13px 18px 16px}
+.settings-pane{display:grid;gap:12px}
+.settings-pane>.note{margin:0}
+.settings-dialog .dialogbody>.err{padding:4px 18px 8px}
+.settings-preview{position:relative;min-height:110px;display:flex;align-items:center;justify-content:center;padding:23px 10px 13px;overflow:hidden;border:1px solid #d8a6e33d;border-radius:10px;background:radial-gradient(ellipse at 30% 70%,#793660,transparent 60%),linear-gradient(120deg,#38254a,#31182f 70%,#21142e)}
+.settings-preview::before{content:"Preview";position:absolute;top:6px;left:8px;color:#f3c5f1a6;font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.sample-shell{isolation:isolate;position:relative;max-width:100%;display:grid;justify-items:center}
+.sample-shell .glass{z-index:-1}
+.sample-row,.sample-item{display:flex;align-items:center;justify-content:center}
+.settings-preview[data-edge=top]{align-items:flex-start}.settings-preview[data-edge=bottom]{align-items:flex-end}
+.settings-preview[data-edge=left],.settings-preview[data-edge=right]{min-height:145px}
+.settings-preview[data-edge=left]{justify-content:flex-start}.settings-preview[data-edge=right]{justify-content:flex-end}
+.settings-preview[data-edge=top][data-align=start],.settings-preview[data-edge=bottom][data-align=start]{justify-content:flex-start}
+.settings-preview[data-edge=top][data-align=end],.settings-preview[data-edge=bottom][data-align=end]{justify-content:flex-end}
+.settings-preview[data-edge=left][data-align=start],.settings-preview[data-edge=right][data-align=start]{align-items:flex-start}
+.settings-preview[data-edge=left][data-align=end],.settings-preview[data-edge=right][data-align=end]{align-items:flex-end}
+.sample-item{flex-direction:column;gap:3px;min-width:0}
+.sample-item small{font-size:10px;max-width:75px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sample-name{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;margin-bottom:6px}
+@media(max-width:460px){.settings-tabs,.settings-target,.settings-body{padding-left:12px;padding-right:12px}.settings-tabs button{font-size:12px}}
+dialog::backdrop{background:#09050bc0;backdrop-filter:blur(3px)}.dialogtop{padding:15px 18px 11px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.dialogtop h2{font-size:19px;margin:0 0 2px}.dialogtop p{font-size:12px;color:var(--soft);margin:0}.close{border:1px solid var(--line);background:#ffffff09;border-radius:7px;width:32px;height:32px;flex:none}.close:hover{background:#ffdae326}.dialogbody{padding:13px 18px 16px;display:grid;gap:13px}.dialogfoot{padding:11px 18px 14px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}.section{border:1px solid #ffffff1b;border-radius:11px;margin:0;padding:8px 11px 11px;min-width:0}.section legend{color:#ecbdf9;font-size:12px;padding:0 5px}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 13px}.field{display:grid;gap:5px;min-width:0;font-size:12px;color:#e4d4e9;align-content:start}.field input:not([type=range]):not([type=color]),.field select{width:100%;border:1px solid #ffffff28;background:#140d18;color:#f4ebf8;border-radius:8px;padding:7px 8px;min-width:0}.field input[type=color]{width:100%;min-height:34px;border:1px solid #ffffff28;background:#140d18;border-radius:8px;padding:3px}.field input[type=range]{width:100%;margin:3px 0;accent-color:#d78eeb}.field label,.field output{color:var(--soft)}.field .rangeLabel{display:flex;justify-content:space-between;gap:3px}.check{display:flex;align-items:center;gap:7px;font-size:12px;min-height:30px}.check input{accent-color:#d78eeb}.inline{display:flex;align-items:center;gap:8px;min-width:0}.filewrap{position:relative;overflow:hidden;cursor:pointer;font-size:12px}.filewrap:focus-within{outline:2px solid var(--accent)}.filewrap input{position:absolute;width:1px!important;height:1px;opacity:0;left:0}.asset-name{font-size:11px;color:var(--soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(39px,1fr));gap:5px;max-height:119px;overflow:auto;padding:5px;border-radius:9px;background:#ffffff06}.gallery button{height:39px;border:1px solid transparent;border-radius:8px;background:none;display:grid;place-items:center;padding:2px}.gallery button:hover,.gallery button[aria-pressed=true]{border-color:#dfa8f4;background:#daa2e62e}.err{color:#ffc1cf;font-size:12px}.note{color:var(--soft);font-size:11px}.toast{position:fixed;z-index:20;max-width:min(390px,calc(100vw - 20px));top:12px;right:12px;background:#271a2e;border:1px solid #e9b2f550;border-radius:9px;color:#f9eefd;box-shadow:0 8px 30px #10081797;padding:9px 12px;font-size:12px;pointer-events:none;overflow-wrap:anywhere}
+@media(max-width:460px){.guide{padding:14px 16px}.desktop-tag{left:14px}.dialogtop,.dialogbody{padding-left:13px;padding-right:13px}.dialogfoot{padding-right:13px}.fields{gap:8px}.field input[type=text]{font-size:16px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:0s!important}}
+/* The web preview stays intact if this file is opened outside Tauri. */
+html.native-dock,html.native-dock body,html.native-dock #desktop{background:transparent}
+.native-dock #desktop::before,.native-dock .desktop-tag,.native-dock .guide{display:none}
+#island[data-phase="opening"] .scroll,#island[data-phase="closing"] .scroll{overflow:hidden}
+</style>
+</head>
+<body>
+<main class="desktop" id="desktop" aria-label="Desktop preview">
+<div class="desktop-tag">Interactive desktop demo</div>
+<section class="guide" id="guide"><div class="micro">Windows dock concept</div><h1>Dynamic Island Stack Dock</h1><p><strong>Click a folder</strong> to turn the dock into its grid stack.</p><p><strong>Right-click the grid background</strong> to add a shortcut where you clicked. Drop a file or link there, or drag a tile to move it.</p><p><strong>Esc or click outside</strong> to return to the dock. On touch screens, press and hold for options.</p><div class="guidebottom"><span id="positionLabel"></span><button id="setup" class="quiet" type="button">Settings</button></div></section>
+<section id="island" class="island" data-phase="closed" aria-label="Stack dock">
+  <div id="dockGlass" class="glass"></div><div id="gsGlass" class="glass" style="opacity:0"></div>
+  <div id="dockView" class="dock-view"></div><div id="gsView" class="gs-view" inert aria-hidden="true"></div>
+</section>
+</main>
+<div class="menu" id="menu" hidden></div>
+<dialog id="dialog"><form id="form"></form></dialog>
+<div class="toast" id="toast" role="status" hidden></div>
+<script>
+'use strict';
+      const FOLDER_ICONS = {
+        'gamepad-purple': {
+          label: 'Gamepad Violet',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="gpGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#c026d3"/>
+                <stop offset="50%" stop-color="#9333ea"/>
+                <stop offset="100%" stop-color="#6b21a8"/>
+              </linearGradient>
+            </defs>
+            <circle cx="32" cy="32" r="30" fill="url(#gpGrad)"/>
+            <circle cx="32" cy="32" r="29" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
+            <path d="M21 25h22c4.4 0 7.5 3.6 8.2 8l1.2 7.5c.5 3.2-1.8 5.5-4.6 5.5-1.9 0-3.5-1-4.6-2.5l-2.6-3.5H23.4l-2.6 3.5c-1.1 1.5-2.7 2.5-4.6 2.5-2.8 0-5.1-2.3-4.6-5.5l1.2-7.5c.7-4.4 3.8-8 8.2-8z" fill="#13091f"/>
+            <path d="M21 29v6M18 32h6" stroke="#e879f9" stroke-width="2.4" stroke-linecap="round"/>
+            <circle cx="43" cy="30" r="1.6" fill="#e879f9"/>
+            <circle cx="46" cy="33" r="1.6" fill="#c084fc"/>
+            <circle cx="40" cy="33" r="1.6" fill="#c084fc"/>
+            <circle cx="43" cy="36" r="1.6" fill="#e879f9"/>
+          </svg>`
+        },
+        'dev-cyan': {
+          label: 'Dev Terminal',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="devGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#06b6d4"/>
+                <stop offset="100%" stop-color="#2563eb"/>
+              </linearGradient>
+            </defs>
+            <circle cx="32" cy="32" r="30" fill="url(#devGrad)"/>
+            <circle cx="32" cy="32" r="29" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
+            <rect x="16" y="19" width="32" height="26" rx="6" fill="#091326"/>
+            <path d="M22 27l5 5-5 5M31 37h10" stroke="#38bdf8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>`
+        },
+        'media-amber': {
+          label: 'Web & Media',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="medGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#f97316"/>
+                <stop offset="100%" stop-color="#e11d48"/>
+              </linearGradient>
+            </defs>
+            <circle cx="32" cy="32" r="30" fill="url(#medGrad)"/>
+            <circle cx="32" cy="32" r="29" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
+            <circle cx="32" cy="32" r="15" fill="#1c0a12"/>
+            <polygon points="29,25 40,32 29,39" fill="#fb923c"/>
+          </svg>`
+        },
+        'folder-emerald': {
+          label: 'Emerald Stack',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="emGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#10b981"/>
+                <stop offset="100%" stop-color="#047857"/>
+              </linearGradient>
+            </defs>
+            <circle cx="32" cy="32" r="30" fill="url(#emGrad)"/>
+            <path d="M17 24c0-2.2 1.8-4 4-4h8l3 3h11c2.2 0 4 1.8 4 4v14c0 2.2-1.8 4-4 4H21c-2.2 0-4-1.8-4-4V24z" fill="#052018"/>
+            <rect x="21" y="28" width="22" height="3" rx="1.5" fill="#34d399"/>
+          </svg>`
+        },
+        'star-indigo': {
+          label: 'Favorites',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="stGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#6366f1"/>
+                <stop offset="100%" stop-color="#4338ca"/>
+              </linearGradient>
+            </defs>
+            <circle cx="32" cy="32" r="30" fill="url(#stGrad)"/>
+            <polygon points="32,16 36.8,26.2 48,27.6 39.8,35.4 41.9,46.5 32,41.1 22.1,46.5 24.2,35.4 16,27.6 27.2,26.2" fill="#eef2ff"/>
+          </svg>`
+        },
+        'apps-slate': {
+          label: 'Apps Grid',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="apGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#475569"/>
+                <stop offset="100%" stop-color="#1e293b"/>
+              </linearGradient>
+            </defs>
+            <circle cx="32" cy="32" r="30" fill="url(#apGrad)"/>
+            <rect x="20" y="20" width="10" height="10" rx="2.5" fill="#f8fafc"/>
+            <rect x="34" y="20" width="10" height="10" rx="2.5" fill="#94a3b8"/>
+            <rect x="20" y="34" width="10" height="10" rx="2.5" fill="#94a3b8"/>
+            <rect x="34" y="34" width="10" height="10" rx="2.5" fill="#38bdf8"/>
+          </svg>`
+        }
+      };
+
+      /* Helper to generate crisp custom SVG app/game tiles */
+      function makeBadgeSvg(bg1, bg2, accent, text, subShape = '') {
+        return `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g_${text.replace(/[^a-zA-Z0-9]/g, '')}_${bg1.replace('#', '')}" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="${bg1}"/>
+              <stop offset="100%" stop-color="${bg2}"/>
+            </linearGradient>
+          </defs>
+          <rect width="64" height="64" rx="14" fill="url(#g_${text.replace(/[^a-zA-Z0-9]/g, '')}_${bg1.replace('#', '')})"/>
+          <rect x="1" y="1" width="62" height="62" rx="13" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
+          ${subShape}
+          <text x="32" y="39" text-anchor="middle" font-family="Inter, Segoe UI, sans-serif" font-weight="800" font-size="${text.length > 3 ? '15' : text.length === 3 ? '18' : '22'}" fill="${accent}" letter-spacing="-0.5">${text}</text>
+        </svg>`;
+      }
+
+      const APP_ICONS = {
+        'nfs-gold': {
+          label: 'NFS Gold',
+          svg: makeBadgeSvg('#292012', '#120e07', '#facc15', 'NFS', '<path d="M8 46L56 18" stroke="rgba(250,204,21,0.25)" stroke-width="6"/>')
+        },
+        'nfs-cyan': {
+          label: 'NFS Neon',
+          svg: makeBadgeSvg('#0c2438', '#08121e', '#38bdf8', 'NFS', '<circle cx="48" cy="16" r="14" fill="rgba(56,189,248,0.18)"/>')
+        },
+        'blur': {
+          label: 'Blur Racing',
+          svg: makeBadgeSvg('#065f46', '#064e3b', '#ffffff', 'blur', '<circle cx="32" cy="32" r="22" fill="none" stroke="#34d399" stroke-width="3" stroke-dasharray="10 6"/>')
+        },
+        'forza': {
+          label: 'Forza',
+          svg: makeBadgeSvg('#be123c', '#4c0519', '#fda4af', 'FH5', '<polygon points="10,50 26,14 34,14 18,50" fill="rgba(255,255,255,0.14)"/>')
+        },
+        'trackmania': {
+          label: 'Trackmania',
+          svg: makeBadgeSvg('#15803d', '#052e16', '#bef264', 'TM', '<path d="M12 44c12-18 28-18 40 0" stroke="#84cc16" stroke-width="3" fill="none"/>')
+        },
+        'cyberpunk': {
+          label: 'Cyberpunk',
+          svg: makeBadgeSvg('#facc15', '#ca8a04', '#09090b', '2077', '<rect x="6" y="6" width="52" height="8" fill="#06b6d4"/>')
+        },
+        'valorant': {
+          label: 'Valorant',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="64" rx="14" fill="#dc2626"/>
+            <path d="M16 20l15 24h7L23 20h-7zm32 0L37 37h7l4-6.5V20z" fill="#fff"/>
+          </svg>`
+        },
+        'elden': {
+          label: 'Elden Ring',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="64" rx="14" fill="#1c1917"/>
+            <circle cx="32" cy="28" r="11" fill="none" stroke="#eab308" stroke-width="2.5"/>
+            <circle cx="25" cy="36" r="10" fill="none" stroke="#ca8a04" stroke-width="2.2"/>
+            <circle cx="39" cy="36" r="10" fill="none" stroke="#ca8a04" stroke-width="2.2"/>
+            <line x1="32" y1="14" x2="32" y2="50" stroke="#fde047" stroke-width="2"/>
+          </svg>`
+        },
+        'ghostrunner': {
+          label: 'Ghostrunner',
+          svg: makeBadgeSvg('#991b1b', '#18181b', '#f87171', 'GR2', '<path d="M14 48L50 16" stroke="#ef4444" stroke-width="3"/>')
+        },
+        'control': {
+          label: 'Control',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="64" rx="14" fill="#111827"/>
+            <polygon points="32,48 16,20 48,20" fill="#dc2626"/>
+            <circle cx="32" cy="30" r="5" fill="#111827"/>
+          </svg>`
+        },
+        'rdr2': {
+          label: 'RDR2',
+          svg: makeBadgeSvg('#b91c1c', '#450a0a', '#fef2f2', 'RDR2', '<circle cx="32" cy="32" r="24" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>')
+        },
+        'genshin': {
+          label: 'Genshin',
+          svg: makeBadgeSvg('#3b82f6', '#1d4ed8', '#ffffff', 'GI', '<polygon points="32,12 37,27 52,32 37,37 32,52 27,37 12,32 27,27" fill="rgba(255,255,255,0.24)"/>')
+        },
+        'hollow': {
+          label: 'Hollow Knight',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="64" rx="14" fill="#0f172a"/>
+            <path d="M22 14c-2 6-1 12 2 16-3 3-4 7-4 11 0 6 5 10 12 10s12-4 12-10c0-4-1-8-4-11 3-4 4-10 2-16-3 4-5 8-5 11h-10c0-3-2-7-5-11z" fill="#f8fafc"/>
+            <ellipse cx="27" cy="39" rx="2.6" ry="3.6" fill="#0f172a"/>
+            <ellipse cx="37" cy="39" rx="2.6" ry="3.6" fill="#0f172a"/>
+          </svg>`
+        },
+        'silksong': {
+          label: 'Silksong',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="64" rx="14" fill="#450a0a"/>
+            <path d="M20 13l7 18c-3 2-5 6-5 10 0 6 4 10 10 10s10-4 10-10c0-4-2-8-5-10l7-18-12 13-12-13z" fill="#fff1f2"/>
+            <ellipse cx="28" cy="40" rx="2.4" ry="3.5" fill="#450a0a"/>
+            <ellipse cx="36" cy="40" rx="2.4" ry="3.5" fill="#450a0a"/>
+          </svg>`
+        },
+        'celeste': {
+          label: 'Celeste',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="64" rx="14" fill="#1e1b4b"/>
+            <polygon points="10,50 28,22 42,50" fill="#38bdf8"/>
+            <polygon points="26,50 40,26 54,50" fill="#f43f5e"/>
+          </svg>`
+        },
+        'deadcells': {
+          label: 'Dead Cells',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="64" rx="14" fill="#18181b"/>
+            <path d="M32 13c7 9 13 15 13 24a13 13 0 01-26 0c0-6 4-11 7-15 0 4 2 6 4 6-1-5 0-10 2-15z" fill="#f97316"/>
+            <circle cx="32" cy="39" r="5" fill="#fde047"/>
+          </svg>`
+        },
+        'hades': {
+          label: 'Hades II',
+          svg: makeBadgeSvg('#065f46', '#022c22', '#6ee7b7', 'H2', '<path d="M32 12v40M20 24h24" stroke="rgba(110,231,183,0.3)" stroke-width="3"/>')
+        },
+        'ori': {
+          label: 'Ori',
+          svg: makeBadgeSvg('#0284c7', '#1e3a8a', '#e0f2fe', 'ORI', '<circle cx="32" cy="32" r="20" fill="none" stroke="rgba(224,242,254,0.35)" stroke-width="2"/>')
+        },
+        'vscode': {
+          label: 'VS Code',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="64" rx="14" fill="#0f172a"/>
+            <path d="M44 15l-20 18-9-7-4 3 10 9-10 9 4 3 9-7 20 18 8-4V19l-8-4zm0 11v24L31 38l13-12z" fill="#38bdf8"/>
+          </svg>`
+        },
+        'terminal': {
+          label: 'Terminal',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="64" rx="14" fill="#1e293b"/>
+            <path d="M18 23l10 9-10 9M32 41h14" stroke="#e2e8f0" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>`
+        },
+        'docker': {
+          label: 'Docker',
+          svg: makeBadgeSvg('#0284c7', '#0369a1', '#ffffff', 'DKR', '<rect x="16" y="18" width="8" height="6" rx="1" fill="rgba(255,255,255,0.35)"/><rect x="26" y="18" width="8" height="6" rx="1" fill="rgba(255,255,255,0.35)"/>')
+        },
+        'git': {
+          label: 'GitKraken',
+          svg: makeBadgeSvg('#14b8a6', '#0f766e', '#ffffff', 'GIT', '')
+        },
+        'x64dbg': {
+          label: 'x64dbg',
+          svg: makeBadgeSvg('#334155', '#0f172a', '#38bdf8', 'x64', '')
+        },
+        'postman': {
+          label: 'Postman',
+          svg: makeBadgeSvg('#f97316', '#c2410c', '#ffffff', 'API', '')
+        },
+        'figma': {
+          label: 'Figma',
+          svg: makeBadgeSvg('#7c3aed', '#4c1d95', '#f5d0fe', 'FIG', '')
+        },
+        'web': {
+          label: 'Web / Globe',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="64" rx="14" fill="#2563eb"/>
+            <circle cx="32" cy="32" r="17" fill="none" stroke="#fff" stroke-width="2.5"/>
+            <ellipse cx="32" cy="32" rx="8" ry="17" fill="none" stroke="#fff" stroke-width="2"/>
+            <line x1="15" y1="32" x2="49" y2="32" stroke="#fff" stroke-width="2"/>
+          </svg>`
+        },
+        'github': {
+          label: 'GitHub',
+          svg: makeBadgeSvg('#27272a', '#09090b', '#ffffff', 'GH', '')
+        },
+        'youtube': {
+          label: 'YouTube',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="64" rx="14" fill="#dc2626"/>
+            <polygon points="26,21 44,32 26,43" fill="#ffffff"/>
+          </svg>`
+        },
+        'spotify': {
+          label: 'Spotify',
+          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="64" rx="14" fill="#16a34a"/>
+            <path d="M20 26c9-3 18-2 25 2M22 33c7-2 15-1 20 2M24 40c5-1.5 11-1 15 1.5" stroke="#052e16" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+          </svg>`
+        },
+        'obs': {
+          label: 'OBS Studio',
+          svg: makeBadgeSvg('#1e1b4b', '#09090b', '#a5b4fc', 'OBS', '<circle cx="32" cy="32" r="20" fill="none" stroke="#6366f1" stroke-width="2.5"/>')
+        },
+        'discord': {
+          label: 'Discord',
+          svg: makeBadgeSvg('#4f46e5', '#312e81', '#ffffff', 'DSC', '')
+        },
+        'blender': {
+          label: 'Blender',
+          svg: makeBadgeSvg('#ea580c', '#9a3412', '#ffffff', '3D', '')
+        }
+      };
+
+      function createDefaultState() {
+        return {
+          positionId: 'bottom-center',
+          showSpacers: true,
+          folders: [
+            {
+              id: 'folder-games',
+              name: 'Games',
+              icon: 'gamepad-purple',
+              gridMode: 'row_wise',
+              columns: 7,
+              rows: [
+                [
+                  { id: 'g1', type: 'item', name: 'NFS Most Wanted', target: 'D:\\Games\\NFSMW\\speed.exe', args: '-windowed', icon: 'nfs-gold' },
+                  { id: 'g2', type: 'item', name: 'NFS Heat', target: 'D:\\Games\\NFSHeat\\NeedForSpeedHeat.exe', args: '', icon: 'nfs-cyan' },
+                  { id: 'g3', type: 'item', name: 'Blur', target: 'D:\\Games\\Blur\\Blur.exe', args: '', icon: 'blur' },
+                  { id: 'g4', type: 'item', name: 'Forza Horizon 5', target: 'steam://rungameid/1551360', args: '', icon: 'forza' },
+                  { id: 'g5', type: 'item', name: 'Trackmania', target: 'D:\\Games\\Trackmania\\Trackmania.exe', args: '', icon: 'trackmania' }
+                ],
+                [
+                  { id: 'g6', type: 'item', name: 'Cyberpunk 2077', target: 'D:\\Games\\Cyberpunk2077\\bin\\x64\\Cyberpunk2077.exe', args: '--launcher-skip', icon: 'cyberpunk' },
+                  { id: 'g7', type: 'item', name: 'Valorant', target: 'C:\\Riot Games\\Riot Client\\RiotClientServices.exe', args: '--launch-product=valorant', icon: 'valorant' },
+                  { id: 'g8', type: 'item', name: 'Elden Ring', target: 'steam://rungameid/1245620', args: '', icon: 'elden' },
+                  { id: 'g9', type: 'item', name: 'Ghostrunner 2', target: 'D:\\Games\\Ghostrunner2\\Ghostrunner2.exe', args: '', icon: 'ghostrunner' },
+                  { id: 'g10', type: 'item', name: 'Control', target: 'D:\\Games\\Control\\Control_DX12.exe', args: '', icon: 'control' },
+                  { id: 'g11', type: 'item', name: 'Red Dead 2', target: 'D:\\Games\\RDR2\\RDR2.exe', args: '', icon: 'rdr2' },
+                  { id: 'g12', type: 'item', name: 'Genshin Impact', target: 'D:\\Games\\Genshin Impact\\GenshinImpact.exe', args: '', icon: 'genshin' }
+                ],
+                [
+                  { id: 'g13', type: 'item', name: 'Hollow Knight', target: 'steam://rungameid/367520', args: '', icon: 'hollow' },
+                  { id: 'g14', type: 'item', name: 'Silksong', target: 'D:\\Games\\Silksong\\Hollow Knight Silksong.exe', args: '', icon: 'silksong' },
+                  { id: 'g15', type: 'item', name: 'Celeste', target: 'D:\\Games\\Celeste\\Celeste.exe', args: '', icon: 'celeste' },
+                  { id: 'g16', type: 'item', name: 'Dead Cells', target: 'steam://rungameid/588650', args: '', icon: 'deadcells' },
+                  { id: 'g17', type: 'item', name: 'Hades II', target: 'steam://rungameid/1145350', args: '', icon: 'hades' },
+                  { id: 'g18', type: 'item', name: 'Ori & Will', target: 'D:\\Games\\OriWotW\\oriwotw.exe', args: '', icon: 'ori' }
+                ]
+              ],
+              items: []
+            },
+            {
+              id: 'folder-dev',
+              name: 'Dev & Tools',
+              icon: 'dev-cyan',
+              gridMode: 'auto_fill',
+              columns: 5,
+              rows: [],
+              items: [
+                { id: 'd1', type: 'item', name: 'VS Code', target: 'C:\\Users\\Dev\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe', args: '--new-window', icon: 'vscode' },
+                { id: 'd2', type: 'item', name: 'Terminal', target: 'wt.exe', args: '-p "PowerShell"', icon: 'terminal' },
+                { id: 'd3', type: 'item', name: 'Docker', target: 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe', args: '', icon: 'docker' },
+                { id: 'sp1', type: 'spacer' },
+                { id: 'd4', type: 'item', name: 'GitKraken', target: 'C:\\Users\\Dev\\AppData\\Local\\gitkraken\\gitkraken.exe', args: '', icon: 'git' },
+                { id: 'd5', type: 'item', name: 'x64dbg', target: 'D:\\Tools\\x64dbg\\release\\x64\\x64dbg.exe', args: '', icon: 'x64dbg' },
+                { id: 'd6', type: 'item', name: 'Postman', target: 'C:\\Users\\Dev\\AppData\\Local\\Postman\\Postman.exe', args: '', icon: 'postman' },
+                { id: 'sp2', type: 'spacer' },
+                { id: 'd7', type: 'item', name: 'Figma', target: 'https://www.figma.com', args: '', icon: 'figma' },
+                { id: 'd8', type: 'item', name: 'Localhost', target: 'http://localhost:3000', args: '', icon: 'web' }
+              ]
+            },
+            {
+              id: 'folder-media',
+              name: 'Web & Media',
+              icon: 'media-amber',
+              gridMode: 'auto_fill',
+              columns: 4,
+              rows: [],
+              items: [
+                { id: 'm1', type: 'item', name: 'GitHub', target: 'https://github.com', args: '', icon: 'github' },
+                { id: 'm2', type: 'item', name: 'YouTube', target: 'https://www.youtube.com', args: '', icon: 'youtube' },
+                { id: 'm3', type: 'item', name: 'Spotify', target: 'C:\\Users\\Dev\\AppData\\Roaming\\Spotify\\Spotify.exe', args: '', icon: 'spotify' },
+                { id: 'm4', type: 'item', name: 'OBS Studio', target: 'C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe', args: '--startreplaybuffer', icon: 'obs' },
+                { id: 'm5', type: 'item', name: 'Discord', target: 'C:\\Users\\Dev\\AppData\\Local\\Discord\\Update.exe', args: '--processStart Discord.exe', icon: 'discord' },
+                { id: 'm6', type: 'item', name: 'Blender 4.3', target: 'C:\\Program Files\\Blender Foundation\\Blender 4.3\\blender.exe', args: '', icon: 'blender' }
+              ]
+            }
+          ]
+        };
+      }
+
+const $=id=>document.getElementById(id), E=(tag,cls='',text='')=>{const x=document.createElement(tag);if(cls)x.className=cls;if(text)x.textContent=text;return x};
+const B=(label,cls='',fn)=>{const b=E('button',cls,label);b.type='button';if(fn)b.onclick=fn;return b};
+const cap=s=>s[0].toUpperCase()+s.slice(1), clamp=(x,a,b)=>Math.max(a,Math.min(x,b));
+const uid=()=>Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+const dockDefaults={opacity:76,blur:23,border:true,shadow:true,radius:26,icon:40,gap:6,pad:8,labels:false,color:'#101019',motion:true,borderColor:'#ffffff',borderOpacity:23,borderWidth:1};
+const gsDefaults={opacity:84,blur:24,border:true,shadow:true,radius:22,icon:52,gap:7,pad:15,labels:true,reflections:true,color:'#0e0e16',guides:false,borderColor:'#ffffff',borderOpacity:23,borderWidth:1,titleIcon:25};
+const storageKey='dynamic-island-stack-dock-custom-v1';
+const headingHeight=42,headingIconSize=25;
+const triggerSize=(f,d=state.dock)=>f.triggerSize||d.icon;
+const headingSize=s=>s.titleIcon||headingIconSize;
+const headingSpace=s=>Math.max(headingHeight,headingSize(s)+15);
+function fresh(){
+ const data=createDefaultState();
+ return {edge:'bottom',align:'center',dock:{...dockDefaults},folders:data.folders.map(f=>{
+   const cols=f.columns, rows=f.gridMode==='row_wise'?f.rows.length:Math.max(2,Math.ceil(f.items.length/cols));
+   const slots=f.gridMode==='row_wise'?f.rows.flatMap((row,r)=>row.map((entry,c)=>({...entry,r,c}))):f.items.map((entry,i)=>({...entry,r:Math.floor(i/cols),c:i%cols}));
+   return {id:f.id,name:f.name,icon:f.icon,image:'',mode:f.gridMode==='row_wise'?'rows':'auto',cols,rows,slots,style:{...gsDefaults}};
+ })};
+}
+let state=fresh();
+try{const x=JSON.parse(localStorage.getItem(storageKey));if(x?.folders?.length&&x.dock&&['top','bottom','left','right'].includes(x.edge))state=x}catch{}
+const desktop=$('desktop'), island=$('island'), dockView=$('dockView'), gsView=$('gsView'), dockGlass=$('dockGlass'), gsGlass=$('gsGlass'), menu=$('menu'), dialog=$('dialog'), form=$('form');
+const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+const nativeAPI=window.__TAURI__?.window;
+const nativeCore=window.__TAURI__?.core;
+let nativeWindow=null,nativeArea=null,nativeHost={x:0,y:0},nativeQueue=Promise.resolve(),nativeBusy=false;
+let fixedHost=false,nativeRegion=null;
+let surfaceWanted=false,surfaceRequest=0;
+let nativeBlurPending=false,nativeBlurTimer=0;
+const nativeMargin=5;
+function nativeFailure(error){
+ console.error('Stack Dock window:',error);
+ notify('Window sizing unavailable. Check Tauri permissions and the developer console.');
+}
+function nativeFull(){return {x:0,y:0,w:nativeArea.w,h:nativeArea.h}}
+function nativeCover(...boxes){
+ const x=Math.max(0,Math.floor(Math.min(...boxes.map(b=>b.x))-nativeMargin));
+ const y=Math.max(0,Math.floor(Math.min(...boxes.map(b=>b.y))-nativeMargin));
+ const right=Math.min(nativeArea.w,Math.ceil(Math.max(...boxes.map(b=>b.x+b.w))+nativeMargin));
+ const bottom=Math.min(nativeArea.h,Math.ceil(Math.max(...boxes.map(b=>b.y+b.h))+nativeMargin));
+ return {x,y,w:right-x,h:bottom-y};
+}
+const sameNativeBox=(a,b)=>a&&['x','y','w','h'].every(k=>a[k]===b[k]);
+async function setNativeRegion(target){
+ if(sameNativeBox(nativeRegion,target))return;
+ // Region coordinates are physical pixels relative to the fixed window.
+ const px=value=>Math.round(value*nativeArea.scale);
+ const x=px(target.x),y=px(target.y);
+ await nativeCore.invoke('set_dock_region',{x,y,width:px(target.x+target.w)-x,height:px(target.y+target.h)-y});
+ nativeRegion=target;
+}
+function moveHost(target){
+ if(!nativeWindow)return Promise.resolve(true);
+ const job=nativeQueue.then(async()=>{
+  // Once the host is pinned, never reposition or resize it for UI transitions.
+  if(fixedHost){await setNativeRegion(target);return true}
+  if(sameNativeBox(nativeHost,target))return true;
+  const shown=readBox(),a=nativeArea;
+  const pos=new nativeAPI.PhysicalPosition(a.px+Math.round(target.x*a.scale),a.py+Math.round(target.y*a.scale));
+  const size=new nativeAPI.PhysicalSize(Math.round(target.w*a.scale),Math.round(target.h*a.scale));
+  const old=nativeHost;
+  const moved=old.x!==target.x||old.y!==target.y||!old.w;
+  const sized=old.w!==target.w||old.h!==target.h;
+  const reposition=async()=>{
+   await nativeWindow.setPosition(pos);
+   nativeHost={...nativeHost,x:target.x,y:target.y};
+   applyBox(shown);
+  };
+  const resize=async()=>{
+   await nativeWindow.setSize(size);
+   nativeHost={...nativeHost,w:target.w,h:target.h};
+  };
+  if(target.w>old.w||target.h>old.h||!old.w){
+   if(moved)await reposition();
+   if(sized)await resize();
+  }else{
+   if(sized)await resize();
+   if(moved)await reposition();
+  }
+  if(sized)await settleViewport(target);
+  return true;
+ }).catch(error=>{nativeFailure(error);return false});
+ nativeQueue=job;
+ return job;
+}
+function settleViewport(target){
+ // Commands can return before WebView2 has updated its layout viewport.
+ return new Promise(resolve=>{
+  let done=false,timer;
+  function finish(){if(done)return;done=true;clearTimeout(timer);resolve()}
+  function check(){
+   if(done)return;
+   if(Math.abs(desktop.clientWidth-target.w)<=2&&Math.abs(desktop.clientHeight-target.h)<=2){
+    requestAnimationFrame(finish);return;
+   }
+   requestAnimationFrame(check);
+  }
+  timer=setTimeout(finish,140);
+  requestAnimationFrame(check);
+ });
+}
+function queueNativeBlur(){
+ nativeBlurPending=true;clearTimeout(nativeBlurTimer);
+ nativeBlurTimer=setTimeout(async()=>{
+  if(!nativeBlurPending||nativeBusy||surfaceWanted||dialog.open||phase==='opening')return;
+  const focused=await nativeWindow?.isFocused?.().catch(()=>undefined);
+  if(!nativeBlurPending||nativeBusy||surfaceWanted||dialog.open||phase==='opening')return;
+  nativeBlurPending=false;
+  if(focused===true)return;
+  if(!menu.hidden)closeMenu();
+  if(phase==='open')closeStack(false);
+ },65);
+}
+function fitNative(){
+ if(!nativeWindow||nativeBusy||surfaceWanted||!menu.hidden||dialog.open||!['closed','open'].includes(phase))return;
+ moveHost(phase==='open'&&active()?(fixedHost?nativeCover(gridBox(active())):nativeCover(dockBox(),gridBox(active()))):nativeCover(dockBox()));
+}
+function expandForControls(callback){
+ if(!nativeWindow){callback(0,0);return}
+ const old=nativeHost,request=++surfaceRequest;
+ surfaceWanted=true;
+ moveHost(nativeFull()).then(()=>{
+   if(request!==surfaceRequest)return;
+   surfaceWanted=false;callback(old.x-nativeHost.x,old.y-nativeHost.y);
+ });
+}
+let phase='closed', activeId=null, lastId=null, serial=0, tracks=[], currentMetrics=null, menuFocus=null, savedFocus=null, toastTimer=0;
+let drag=null, dropCell=null, suppressClick=0, press=null, ignoreNativeMenuUntil=0, flight=null;
+const active=()=>state.folders.find(f=>f.id===activeId);
+function persist(){try{localStorage.setItem(storageKey,JSON.stringify(state));return true}catch{notify('Saved for this session only. Browser storage is unavailable or full.');return false}}
+function notify(message){const t=$('toast');t.textContent=message;t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.hidden=true,3100)}
+function art(key,source,size,image='',round=false){
+ const n=E('span','art');n.style.setProperty('--size',size+'px');if(round)n.style.setProperty('--ir','50%');n.setAttribute('aria-hidden','true');
+ if(/^data:image\/(png|jpeg|gif|webp);base64,/i.test(image)){const img=E('img');img.src=image;img.alt='';img.draggable=false;n.append(img)}
+ else{n.innerHTML=(Object.hasOwn(source,key)?source[key]:Object.values(source)[0]).svg}
+ return n;
+}
+function dims(){
+ const w=nativeArea?.w??desktop.clientWidth,h=nativeArea?.h??desktop.clientHeight;
+ return {w,h,p:Math.min(14,Math.floor(w/40)+4)};
+}
+function vertical(){return state.edge==='left'||state.edge==='right'}
+function metrics(f){
+ const s=f.style, cols=f.cols, rows=f.rows;
+ return {cols,rows,cw:Math.max(s.icon+16,s.labels?76:45),ch:s.icon+(s.labels?36:12)+(s.reflections?13:0),gap:s.gap,pad:s.pad};
+}
+function box(w,h,r){
+ const d=dims(), a=state.align==='start'?0:state.align==='end'?1:.5;
+ w=Math.max(1,Math.min(w,d.w-2*d.p));h=Math.max(1,Math.min(h,d.h-2*d.p));
+ const x=vertical()?(state.edge==='left'?d.p:d.w-d.p-w):d.p+a*(d.w-2*d.p-w);
+ const y=vertical()?d.p+a*(d.h-2*d.p-h):(state.edge==='top'?d.p:d.h-d.p-h);
+ return {x,y,w,h,r:Math.min(r,w/2,h/2)};
+}
+function dockBox(){
+ const s=state.dock,sizes=state.folders.map(f=>triggerSize(f)),n=sizes.length,gap=(n-1)*s.gap,pad=s.pad*2;
+ const max=Math.max(...sizes),sum=sizes.reduce((a,b)=>a+b,0),hExtra=s.labels?29:14;
+ return box(vertical()?max+14+pad:sum+n*14+gap+pad,vertical()?sum+n*hExtra+gap+pad:max+hExtra+pad,s.radius);
+}
+function gridBox(f){
+ const m=metrics(f);
+ return box(m.cols*m.cw+(m.cols-1)*m.gap+2*m.pad,m.rows*m.ch+(m.rows-1)*m.gap+2*m.pad+headingSpace(f.style),f.style.radius);
+}
+function boxFrame(b){return {left:(b.x-nativeHost.x)+'px',top:(b.y-nativeHost.y)+'px',width:b.w+'px',height:b.h+'px',borderRadius:b.r+'px'}}
+function applyBox(b){Object.assign(island.style,boxFrame(b))}
+function readBox(){const p=island.getBoundingClientRect();return {x:p.left+nativeHost.x,y:p.top+nativeHost.y,w:p.width,h:p.height,r:parseFloat(getComputedStyle(island).borderTopLeftRadius)||0}}
+function hexRgb(h){const v=/^#[0-9a-f]{6}$/i.test(h)?h.slice(1):'101019';return [0,2,4].map(i=>parseInt(v.slice(i,i+2),16)).join(',')}
+function styleGlass(g,s){
+ g.style.setProperty('--fill','rgba('+hexRgb(s.color)+','+s.opacity/100+')');
+ const alpha=(s.borderOpacity??23)/100,stroke=hexRgb(s.borderColor||'#ffffff'),width=s.border?(s.borderWidth??1):0;
+ g.style.setProperty('--edge','rgba('+stroke+','+alpha+')');
+ g.style.setProperty('--border-w',width+'px');
+ g.style.setProperty('--shine',width?'rgba('+stroke+','+alpha*.52+')':'transparent');
+ // A fully clear background really is clear, even if blur is configured.
+ g.style.setProperty('--blur',s.opacity?s.blur+'px':'0px');
+}
+function shadow(s){
+ if(!s.shadow||s.opacity<=0)return 'none';
+ // In the compact Windows host, an external shadow would be cropped to a rectangle.
+ return nativeWindow?'inset 0 -5px 14px rgba(0,0,0,'+(.33*s.opacity/100)+')':'0 15px 40px rgba(0,0,0,'+(.56*s.opacity/100)+')';
+}
+function clearFlight(){
+ if(!flight)return;
+ flight.source?.classList.remove('flight-endpoint');
+ flight.destination?.classList.remove('flight-endpoint');
+ flight.node.remove();flight=null;
+}
+function stopMotion(){++serial;tracks.forEach(x=>x.cancel());tracks=[];clearFlight();return serial}
+function dockIcon(id){
+ return [...dockView.querySelectorAll('.folder-btn')].find(b=>b.dataset.folder===id)?.querySelector('.art');
+}
+function startFlight(f,from,destination,source,duration,easing){
+ const to=destination?.getBoundingClientRect();
+ if(!f||!from?.width||!to?.width)return null;
+ const node=E('div','folder-flight');
+ node.setAttribute('aria-hidden','true');node.style.left=from.left+'px';node.style.top=from.top+'px';
+ node.append(art(f.icon,FOLDER_ICONS,from.width,f.image,true));desktop.append(node);
+ source?.classList.add('flight-endpoint');destination.classList.add('flight-endpoint');
+ flight={node,source,destination};
+ const dx=to.left+to.width/2-from.left-from.width/2,dy=to.top+to.height/2-from.top-from.height/2;
+ const scale=to.width/from.width;
+ const bend=dx&&dy?Math.min(12,Math.hypot(dx,dy)*.04):0;
+ const transform=(x,y,k)=>'translate('+x+'px,'+y+'px) scale('+k+')';
+ return node.animate([
+  {transform:transform(0,0,1),offset:0},
+  {transform:transform(dx*.54+Math.sign(dx)*bend,dy*.54,1+(scale-1)*.54),offset:.54},
+  {transform:transform(dx,dy,scale),offset:1},
+ ],{duration,easing,fill:'forwards'});
+}
+function setPhase(next){
+ phase=next;island.dataset.phase=next;
+ const closed=next==='closed',open=next==='open';
+ dockView.inert=!closed;dockView.setAttribute('aria-hidden',String(!closed));
+ gsView.inert=!open;gsView.setAttribute('aria-hidden',String(!open));
+ $('guide').inert=!closed;desktop.classList.toggle('has-stack',!closed);
+}
+function renderDock(){
+ const previous=dockView.querySelector('.folders');
+ const sx=previous?.scrollLeft||0,sy=previous?.scrollTop||0;
+ const s=state.dock, fs=E('div','folders'+(vertical()?' vertical':''));
+ for(const [key,val] of Object.entries({gap:s.gap,pad:s.pad}))fs.style.setProperty('--'+key,val+'px');
+ for(const f of state.folders){
+  const b=B('','folder-btn',ev=>{if(performance.now()<suppressClick)return;openStack(f.id,ev.detail===0)});
+  const size=triggerSize(f);
+  b.style.setProperty('--bw',(size+14)+'px');b.style.setProperty('--bh',(size+(s.labels?29:14))+'px');
+  b.dataset.folder=f.id;b.setAttribute('aria-label',f.name);b.setAttribute('aria-controls','gsView');b.title=f.name;b.append(art(f.icon,FOLDER_ICONS,size,f.image,true));
+  if(s.labels)b.append(E('span','',f.name));fs.append(b)
+ }
+ dockView.replaceChildren(fs);fs.scrollLeft=sx;fs.scrollTop=sy;
+ $('positionLabel').textContent=positionName(state.edge,state.align);
+ styleGlass(dockGlass,s);
+}
+function renderGrid(f,retain=true){
+ const before=gsView.querySelector('.scroll'),sx=retain?before?.scrollLeft||0:0,sy=retain?before?.scrollTop||0:0;
+ const m=currentMetrics=metrics(f),s=f.style;
+ gsView.style.setProperty('--pad',m.pad+'px');gsView.style.setProperty('--heading-h',headingSpace(s)+'px');
+ const heading=E('header','gs-heading'),badge=E('div','gs-heading-inner'),name=E('h2','',f.name);
+ name.title=f.name;badge.style.height=(headingSize(s)+3)+'px';
+ badge.append(art(f.icon,FOLDER_ICONS,headingSize(s),f.image,true),name);heading.append(badge);
+ const sc=E('div','scroll'),grid=E('div','grid');
+ sc.setAttribute('aria-label',f.name+' grid stack');gsView.setAttribute('aria-label',f.name+' grid stack');
+ for(const [k,v] of Object.entries({cols:m.cols,cellw:m.cw+'px',cellh:m.ch+'px',gap:m.gap+'px'}))grid.style.setProperty('--'+k,v);
+ const map=new Map(f.slots.map(t=>[t.r+':'+t.c,t]));
+ for(let r=0;r<m.rows;r++)for(let c=0;c<m.cols;c++){
+  const cell=E('div','cell'),t=map.get(r+':'+c);cell.dataset.r=r;cell.dataset.c=c;
+  if(t?.type==='spacer'){cell.classList.add('spacer');if(s.guides)cell.classList.add('guides');cell.title='Empty spacer'}
+  else if(t){
+   const b=B('','tile',ev=>{if(phase==='open'&&performance.now()>=suppressClick)launch(t)});
+   b.dataset.tile=t.id;b.setAttribute('aria-label',t.name);b.title=t.name;
+   b.append(art(t.icon,APP_ICONS,s.icon,t.image));
+   if(s.reflections){const refl=E('span','reflect');refl.style.setProperty('--size',s.icon+'px');refl.setAttribute('aria-hidden','true');refl.append(art(t.icon,APP_ICONS,s.icon,t.image));b.append(refl)}
+   if(s.labels)b.append(E('span','caption',t.name));cell.append(b);
+  }
+  grid.append(cell);
+ }
+ sc.append(grid);gsView.replaceChildren(heading,sc);sc.scrollLeft=sx;sc.scrollTop=sy;
+ styleGlass(gsGlass,s);
+}
+function views(open){
+ dockGlass.style.opacity=dockView.style.opacity=open?'0':'1';
+ gsGlass.style.opacity=gsView.style.opacity=open?'1':'0';
+ island.style.boxShadow=shadow(open?active().style:state.dock);
+}
+function morph(target,opening,finish){
+ const f=active(),source=opening?dockIcon(f?.id):gsView.querySelector('.gs-heading .art');
+ const fromIcon=(flight?.node||source)?.getBoundingClientRect();
+ const from=readBox(), previousShadow=getComputedStyle(island).boxShadow, gg=Number(getComputedStyle(gsGlass).opacity),dg=Number(getComputedStyle(dockGlass).opacity),
+       gv=Number(getComputedStyle(gsView).opacity),dv=Number(getComputedStyle(dockView).opacity);
+ const ticket=stopMotion();
+ applyBox(target);views(opening);
+ if(!state.dock.motion||reduced.matches||!island.animate){finish();return}
+ const duration=opening?420:325, easing=opening?'cubic-bezier(.19,.84,.26,1)':'cubic-bezier(.38,.03,.32,1)';
+ const destination=opening?gsView.querySelector('.gs-heading .art'):dockIcon(f?.id);
+ const iconMotion=startFlight(f,fromIcon,destination,source,duration,opening?'cubic-bezier(.24,.74,.2,1)':easing);
+ const hull=island.animate([{...boxFrame(from),boxShadow:previousShadow},{...boxFrame(target),boxShadow:island.style.boxShadow}],{duration,easing});
+ const a=(node,start,end,options)=>node.animate([{opacity:start},{opacity:end}],{fill:'backwards',easing:'ease-out',...options});
+ // Surface and content crossfade independently. The GS fill never uses dock opacity.
+ const fadeG=a(gsGlass,gg,opening?1:0,{duration:opening?305:235,delay:opening?28:0});
+ const fadeD=a(dockGlass,dg,opening?0:1,{duration:opening?225:200,delay:opening?0:95});
+ const fadeV=a(gsView,gv,opening?1:0,{duration:opening?180:140,delay:opening?114:0});
+ const fadeDock=a(dockView,dv,opening?0:1,{duration:opening?145:145,delay:opening?0:135});
+ tracks=[hull,fadeG,fadeD,fadeV,fadeDock];
+ if(iconMotion)tracks.push(iconMotion);
+ Promise.allSettled(tracks.map(x=>x.finished)).then(()=>{if(serial===ticket){clearFlight();tracks=[];finish()}});
+}
+function finishClose(refocus){
+ activeId=null;setPhase('closed');gsView.replaceChildren();currentMetrics=null;renderDock();applyBox(dockBox());views(false);
+ if(refocus)[...dockView.querySelectorAll('.folder-btn')].find(b=>b.dataset.folder===lastId)?.focus({preventScroll:true});
+ fitNative();
+}
+function openStack(id,keyboard=false){
+ if(phase!=='closed'||nativeBusy||dialog.open)return;
+ const f=state.folders.find(x=>x.id===id);if(!f)return;
+ closeMenu();lastId=activeId=id;gsView.style.opacity='0';gsGlass.style.opacity='0';renderGrid(f,false);
+ const goal=gridBox(f);
+ nativeBlurPending=false;
+ const begin=()=>{
+   setPhase('opening');
+   morph(goal,true,()=>{setPhase('open');if(keyboard)(gsView.querySelector('.tile')||gsView).focus({preventScroll:true});fitNative();if(nativeBlurPending)queueNativeBlur()});
+ };
+ if(!nativeWindow){begin();return}
+ // Reserve the whole animation path before moving the icon or fading in the grid.
+ nativeBusy=true;
+ // Explicitly focus on this user-initiated open so a desktop click can take focus away.
+ const focus=async()=>{
+  try{if(await nativeWindow.isFocused()===false)await nativeWindow.setFocus()}
+  catch(error){console.warn('Could not request dock focus:',error)}
+ };
+ focus().then(()=>moveHost(nativeCover(dockBox(),goal))).then(ok=>{
+   nativeBusy=false;
+   if(ok)begin();
+   else{activeId=null;gsView.replaceChildren();currentMetrics=null}
+ });
+}
+function closeStack(refocus=true){
+ if(!['opening','open'].includes(phase)||nativeBusy)return;
+ closeMenu();clearPointer();
+ const goal=dockBox();
+ const begin=()=>{setPhase('closing');morph(goal,false,()=>finishClose(refocus))};
+ if(!nativeWindow){begin();return}
+ const next=nativeCover(readBox(),goal),h=nativeHost;
+ if(!fixedHost&&h.x<=next.x&&h.y<=next.y&&h.x+h.w>=next.x+next.w&&h.y+h.h>=next.y+next.h){begin();return}
+ nativeBusy=true;
+ moveHost(next).then(ok=>{nativeBusy=false;if(ok)begin()});
+}
+function refresh(){
+ if(phase==='closed'){renderDock();applyBox(dockBox());views(false)}
+ else if(phase==='open'&&active()){renderGrid(active());applyBox(gridBox(active()));views(true)}
+ fitNative();
+}
+let launchingShortcut = false;
+
+async function launch(t) {
+  if (phase !== 'open' || launch.pending) return;
+
+  const core = window.__TAURI__?.core;
+  const kind = t.kind || guess(t.target);
+
+  if (!core?.invoke) {
+    dialogBuild('Desktop app required',
+      'Open the Stack Dock window started by npm run tauri dev, not the browser preview.',
+      'OK', () => {}, () => {});
+    return;
+  }
+
+  launch.pending = true;
+  try {
+    if (kind === 'program') {
+      await core.invoke('launch_program', {
+        target: t.target,
+        arguments: t.args || '',
+        startIn: t.cwd || ''
+      });
+    } else if (kind === 'url' || kind === 'uri') {
+      await core.invoke('plugin:opener|open_url', {
+        url: t.target.trim()
+      });
+    } else {
+      throw new Error('This shortcut type is not supported yet.');
+    }
+
+    closeStack(false);
+  } catch (error) {
+    dialogBuild('Could not open ' + t.name, String(error), 'OK', () => {}, () => {});
+  } finally {
+    launch.pending = false;
+  }
+}
+function positionName(edge,a){const side=a==='center'?'Center':a==='start'?(verticalEdge(edge)?'Top':'Left'):(verticalEdge(edge)?'Bottom':'Right');return cap(edge)+' · '+side}
+function verticalEdge(edge){return edge==='left'||edge==='right'}
+function entryAt(f,p){return f.slots.find(t=>t.r===p.r&&t.c===p.c)}
+function occupiedMap(f){return new Map(f.slots.map(t=>[t.r*f.cols+t.c,t]))}
+function locate(x,y){
+ const f=active(),m=currentMetrics,sc=gsView.querySelector('.scroll');if(!f||!m||!sc)return null;
+ const hit=document.elementFromPoint(x,y);
+ const cell=hit?.closest('.cell');
+ if(cell&&gsView.contains(cell))return {r:+cell.dataset.r,c:+cell.dataset.c};
+ const r=sc.getBoundingClientRect();
+ return {r:clamp(Math.floor((y-r.top+sc.scrollTop+m.gap/2)/(m.ch+m.gap)),0,f.rows-1),c:clamp(Math.floor((x-r.left+sc.scrollLeft+m.gap/2)/(m.cw+m.gap)),0,f.cols-1)};
+}
+function assignIndex(t,i,f){t.r=Math.floor(i/f.cols);t.c=i%f.cols}
+const MAX_ROWS=80;
+function placeEntries(f,where,entries){
+ const map=occupiedMap(f),base=where.r*f.cols+where.c, limit=MAX_ROWS*f.cols;
+ let i=base;
+ for(const entry of entries){
+   if(i>=limit)break;
+   if(map.has(i)&&map.get(i).type==='spacer'){map.delete(i)}
+   if(map.has(i)){
+     let free=i;
+     const rowEnd=(Math.floor(i/f.cols)+1)*f.cols;
+     const end=f.mode==='rows'?rowEnd:limit;
+     while(free<end&&map.has(free))free++;
+     if(free===limit)break;
+     if(f.mode==='rows'&&free===rowEnd){
+       // An occupied, full shelf grows into a continuation row without displacing later shelves.
+       if(f.rows>=MAX_ROWS)break;
+       for(const j of [...map.keys()].filter(j=>j>=rowEnd).sort((a,b)=>b-a)){
+         map.set(j+f.cols,map.get(j));map.delete(j);
+       }
+       f.rows++;
+     }
+     for(let j=free;j>i;j--)map.set(j,map.get(j-1));
+   }
+   map.set(i++,entry);
+ }
+ f.slots=[...map].map(([idx,t])=>{assignIndex(t,idx,f);return t});
+ f.rows=Math.min(MAX_ROWS,Math.max(f.rows,1+Math.max(0,...f.slots.map(t=>t.r))));
+ return i-base;
+}
+function reposition(f,t,where){
+ if(t.r===where.r&&t.c===where.c)return;
+ const swap=entryAt(f,where);
+ if(swap){swap.r=t.r;swap.c=t.c}
+ t.r=where.r;t.c=where.c;persist();refresh();
+}
+function erase(f,t){f.slots=f.slots.filter(x=>x!==t);persist();refresh()}
+function reflow(f,n,mode){
+ if(n!==f.cols){
+  if(mode==='auto'){
+   const old=f.cols;for(const t of f.slots){const i=t.r*old+t.c;t.r=Math.floor(i/n);t.c=i%n}
+  }else{
+   // Keep explicit row boundaries. Narrow rows spill to their own continuation rows.
+   const source=new Map();for(const t of f.slots){if(!source.has(t.r))source.set(t.r,[]);source.get(t.r).push(t)}
+   let write=0;for(let r=0;r<f.rows;r++){const items=source.get(r)||[],m=Math.max(0,...items.map(t=>t.c));for(const t of items){t.r=write+Math.floor(t.c/n);t.c%=n}write+=1+Math.floor(m/n)}
+   f.rows=write;
+  }
+  f.cols=n;f.rows=Math.max(1,f.rows,1+Math.max(0,...f.slots.map(t=>t.r)));
+ }
+ f.mode=mode;
+}
+function addRow(f,where){
+ const next=Math.min(f.rows,where.r+1);
+ if(f.rows>=MAX_ROWS){notify('This stack already has '+MAX_ROWS+' rows.');return}
+ f.slots.forEach(t=>{if(t.r>=next)t.r++});f.rows++;persist();refresh();
+}
+function closeMenu(restore=false){
+ if(menu.hidden)return;menu.hidden=true;
+ if(restore&&menuFocus?.isConnected)menuFocus.focus({preventScroll:true});menuFocus=null;
+ queueMicrotask(fitNative);
+}
+function showMenu(x,y,build,position=false){
+ expandForControls((dx,dy)=>showMenuHere(x+dx,y+dy,build,position));
+}
+function showMenuHere(x,y,build,position=false){
+ const focus=menu.hidden?document.activeElement:menuFocus;closeMenu();menuFocus=focus;
+ menu.classList.toggle('position',position);menu.replaceChildren();build();menu.hidden=false;
+ const r=menu.getBoundingClientRect();menu.style.left=clamp(x,7,Math.max(7,innerWidth-r.width-7))+'px';menu.style.top=clamp(y,7,Math.max(7,innerHeight-r.height-7))+'px';
+ menu.querySelector('button:not(:disabled)')?.focus({preventScroll:true});
+}
+function mt(s){menu.append(E('div','menu-title',s))}
+function sep(){menu.append(E('hr'))}
+function mi(label,fn,options={}){
+ const b=B(label,options.danger?'danger':'',()=>{closeMenu(true);fn()});b.setAttribute('aria-label',label);b.disabled=!!options.disabled;if(options.hint)b.append(E('small','',options.hint));menu.append(b);return b;
+}
+function showPositions(x,y){
+ showMenu(x,y,()=>{
+  mt('Dock position');
+  for(const edge of ['top','bottom','left','right']){
+   const row=E('div','posrow');row.append(E('span','',cap(edge)));
+   for(const a of ['start','center','end']){
+    const name=positionName(edge,a),b=B(name.split(' · ')[1],'',()=>{closeMenu(true);state.edge=edge;state.align=a;persist();refresh()});
+    b.setAttribute('aria-label',name);b.setAttribute('aria-pressed',String(edge===state.edge&&a===state.align));row.append(b);
+   }
+   menu.append(row);
+  }
+ },true)
+}
+function dockMenu(x,y,f){
+ if(phase!=='closed')return;
+ showMenu(x,y,()=>{
+  mt(f?f.name:'Dock');
+  mi('Settings…',()=>editSettings(f,f?'folder':'dock'));
+  if(f){mi('Move folder earlier',()=>moveFolder(f,-1),{disabled:state.folders.indexOf(f)===0});mi('Move folder later',()=>moveFolder(f,1),{disabled:state.folders.indexOf(f)===state.folders.length-1});sep()}
+  mi('Position',()=>{const r=menu.getBoundingClientRect();showPositions(r.left||12,r.top||12)},{hint:'›'});mi('New folder…',()=>editSettings(null,'folder',true));
+  if(f&&state.folders.length>1){sep();mi('Remove folder…',()=>confirm('Remove '+f.name+'?','This removes the folder and its shortcuts from the demo.',()=>{state.folders=state.folders.filter(a=>a!==f);persist();refresh()}),{danger:true})}
+  sep();mi('Reset demo…',()=>confirm('Reset demo?','This restores the starter folders and appearance. It only changes this demo.',()=>{state=fresh();persist();refresh()}),{danger:true});
+ });
+}
+function moveFolder(f,n){const i=state.folders.indexOf(f);state.folders.splice(i+n,0,state.folders.splice(i,1)[0]);persist();refresh()}
+function gridMenu(x,y,target,explicit=null){
+ if(phase!=='open'||!active())return;
+ const f=active(),where=explicit||locate(x,y),tile=target?.closest('.tile');
+ if(!where)return;
+ const existing=entryAt(f,where),t=tile&&f.slots.find(v=>v.id===tile.dataset.tile);
+ showMenu(x,y,()=>{
+   mt(t?t.name:f.name+' · Row '+(where.r+1)+', column '+(where.c+1));
+   if(t){
+    mi('Shortcut properties…',()=>editShortcut(f,where,t));
+    mi('Choose destination…',()=>moveDialog(f,t));
+    mi('Remove shortcut',()=>erase(f,t),{danger:true});sep();
+   }else{
+    mi('Add shortcut here…',()=>editShortcut(f,where));
+    if(existing?.type==='spacer')mi('Remove empty spacer',()=>erase(f,existing));
+    else if(f.mode==='auto'&&!existing)mi('Mark as empty spacer',()=>{placeEntries(f,where,[{id:uid(),type:'spacer'}]);persist();refresh()});
+    mi('Insert row below',()=>addRow(f,where),{disabled:f.rows>=MAX_ROWS});
+    if(f.mode==='auto')mi(f.style.guides?'Hide spacer guides':'Show spacer guides',()=>{f.style.guides=!f.style.guides;persist();refresh()});
+    if(f.rows>1&&!f.slots.some(v=>v.r===where.r&&v.type==='item'))mi('Remove empty row',()=>{f.slots=f.slots.filter(v=>v.r!==where.r);f.slots.forEach(v=>{if(v.r>where.r)v.r--});f.rows--;persist();refresh()});
+    sep();mi('Settings…',()=>editSettings(f,'gs'));mi('Close grid',()=>closeStack());
+   }
+ });
+}
+$('setup').onclick=()=>editSettings();
+function context(e){
+ if(performance.now()<ignoreNativeMenuUntil){e.preventDefault();return}
+ if(!island.contains(e.target))return;
+ e.preventDefault();clearPointer();
+ if(phase==='open')gridMenu(e.clientX,e.clientY,e.target);
+ else if(phase==='closed'){const id=e.target.closest('.folder-btn')?.dataset.folder;dockMenu(e.clientX,e.clientY,state.folders.find(f=>f.id===id))}
+}
+document.addEventListener('contextmenu',context);
+document.addEventListener('keydown',e=>{
+ if(dialog.open)return;
+ if(e.key==='Escape'){if(!menu.hidden){e.preventDefault();closeMenu(true)}else if(['open','opening'].includes(phase)){e.preventDefault();closeStack()}return}
+ if((e.key==='ContextMenu'||e.shiftKey&&e.key==='F10')&&island.contains(document.activeElement)){
+  e.preventDefault();const node=document.activeElement,r=node.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;
+  if(phase==='open')gridMenu(x,y,node);else if(phase==='closed')dockMenu(x,y,state.folders.find(f=>f.id===node.dataset.folder));
+ }
+ if(!menu.hidden&&menu.contains(document.activeElement)&&['ArrowUp','ArrowDown','Home','End'].includes(e.key)){
+  e.preventDefault();const all=[...menu.querySelectorAll('button:not(:disabled)')],i=all.indexOf(document.activeElement);
+  if(all.length)all[e.key==='Home'?0:e.key==='End'?all.length-1:(i+(e.key==='ArrowDown'?1:all.length-1))%all.length].focus({preventScroll:true});
+ }
+});
+gsView.tabIndex=0;
+document.addEventListener('pointerdown',e=>{
+ if(dialog.open)return;
+ if(!menu.hidden&&!menu.contains(e.target))closeMenu();
+ if(e.button===0&&['open','opening'].includes(phase)&&!island.contains(e.target)&&!menu.contains(e.target))closeStack(false);
+});
+function mark(p){
+ dropCell?.classList.remove('drop-target');dropCell=null;
+ if(p){dropCell=gsView.querySelector('.cell[data-r="'+p.r+'"][data-c="'+p.c+'"]');dropCell?.classList.add('drop-target')}
+}
+function clearPointer(){
+ if(press)clearTimeout(press.timer);press=null;
+ if(drag){drag.tile?.classList.remove('dragging');drag.ghost?.remove();drag=null}
+ mark(null);
+}
+function insideIsland(x,y){const r=island.getBoundingClientRect();return x>=r.left&&x<r.right&&y>=r.top&&y<r.bottom}
+island.addEventListener('pointerdown',e=>{
+ if(e.button!==0||!['open','closed'].includes(phase))return;
+ const tile=e.target.closest('.tile'),f=active();
+ const item=tile&&f?.slots.find(x=>x.id===tile.dataset.tile);
+ press={id:e.pointerId,x:e.clientX,y:e.clientY,target:e.target,tile,item,timer:null};
+ if(e.pointerType!=='mouse')press.timer=setTimeout(()=>{
+   if(!press)return;const p=press;clearPointer();p.target=document.elementFromPoint(p.x,p.y)||p.target;suppressClick=performance.now()+550;ignoreNativeMenuUntil=performance.now()+750;
+   if(phase==='open')gridMenu(p.x,p.y,p.target);
+   else if(phase==='closed')dockMenu(p.x,p.y,state.folders.find(f=>f.id===p.target.closest('.folder-btn')?.dataset.folder));
+ },520);
+});
+document.addEventListener('pointermove',e=>{
+ if(!press||e.pointerId!==press.id)return;
+ if(!drag&&Math.hypot(e.clientX-press.x,e.clientY-press.y)>7){
+   clearTimeout(press.timer);
+   if(phase==='open'&&press.item){const ghost=E('div','drag-ghost');ghost.append(art(press.item.icon,APP_ICONS,active().style.icon,press.item.image));document.body.append(ghost);press.tile.classList.add('dragging');drag={ghost,tile:press.tile,item:press.item}}
+   else{press=null;return}
+ }
+ if(drag){
+   e.preventDefault();drag.ghost.style.left=e.clientX+'px';drag.ghost.style.top=e.clientY+'px';
+   const sc=gsView.querySelector('.scroll'),r=sc.getBoundingClientRect();
+   if(e.clientX>r.right-22&&e.clientX<r.right)sc.scrollLeft+=11;
+   else if(e.clientX<r.left+22&&e.clientX>r.left)sc.scrollLeft-=11;
+   if(e.clientY>r.bottom-22&&e.clientY<r.bottom)sc.scrollTop+=11;
+   else if(e.clientY<r.top+22&&e.clientY>r.top)sc.scrollTop-=11;
+   mark(insideIsland(e.clientX,e.clientY)?locate(e.clientX,e.clientY):null);
+ }
+},{passive:false});
+document.addEventListener('pointerup',e=>{
+ if(!press||e.pointerId!==press.id)return;
+ if(drag){const item=drag.item,where=insideIsland(e.clientX,e.clientY)?locate(e.clientX,e.clientY):null;clearPointer();suppressClick=performance.now()+450;if(where&&active())reposition(active(),item,where)}
+ else clearPointer();
+});
+document.addEventListener('pointercancel',clearPointer);
+window.addEventListener('blur',clearPointer);
+function dropEntries(dt){
+ const files=[...dt.files];
+ if(files.length)return files.map(file=>({id:uid(),type:'item',name:file.name.replace(/\.[^.]+$/,''),target:file.name,kind:'local',args:'',cwd:'',icon:'web',image:''}));
+ const uri=dt.getData('text/uri-list').split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith('#'));
+ const txt=dt.getData('text/plain').trim(),links=uri.length?uri:[txt];
+ return links.map(l=>{try{const u=new URL(l);if(!['http:','https:'].includes(u.protocol))return null;return {id:uid(),type:'item',name:u.hostname,target:u.href,kind:'url',args:'',cwd:'',icon:'web',image:''}}catch{return null}}).filter(Boolean)
+}
+desktop.addEventListener('dragover',e=>{e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect='none'});
+gsView.addEventListener('dragover',e=>{
+ if(phase!=='open')return;e.preventDefault();e.stopPropagation();if(e.dataTransfer)e.dataTransfer.dropEffect='copy';mark(locate(e.clientX,e.clientY));
+});
+gsView.addEventListener('dragleave',e=>{if(!gsView.contains(e.relatedTarget))mark(null)});
+desktop.addEventListener('drop',e=>{e.preventDefault();mark(null)});
+gsView.addEventListener('drop',e=>{
+ e.preventDefault();e.stopPropagation();if(phase!=='open')return;
+ const f=active(),where=locate(e.clientX,e.clientY),entries=dropEntries(e.dataTransfer);
+ mark(null);if(!entries.length){notify('Drop a file or an HTTP(S) link.');return}
+ const n=placeEntries(f,where,entries);persist();refresh();
+ if(!n){notify('This grid is full.');return}
+ notify(n+' shortcut'+(n===1?'':'s')+' added'+(e.dataTransfer.files.length?' · browser stores file names, not full Windows paths':''));
+});
+function dialogBuild(title,desc,submit,build,save,settings=false){
+ expandForControls(()=>dialogBuildHere(title,desc,submit,build,save,settings));
+}
+function dialogBuildHere(title,desc,submit,build,save,settings=false){
+ savedFocus=document.activeElement;dialog.classList.toggle('settings-dialog',settings);form.noValidate=settings;
+ form.replaceChildren();
+ const head=E('div','dialogtop'),text=E('div'),h=E('h2','',title);h.id='dialogTitle';text.append(h,E('p','',desc));
+ const cancelX=B('×','close',()=>dialog.close());cancelX.setAttribute('aria-label','Cancel dialog');head.append(text,cancelX);
+ const body=E('div','dialogbody'),error=E('div','err');error.hidden=true;error.setAttribute('role','alert');
+ build(body,error);body.append(error);
+ const foot=E('div','dialogfoot'),cancel=B('Cancel','quiet',()=>dialog.close()),ok=B(submit,'primary');ok.type='submit';foot.append(cancel,ok);form.append(head,body,foot);
+ form.onsubmit=e=>{e.preventDefault();error.hidden=true;try{const after=save();dialog.close();if(typeof after==='function')after()}catch(err){error.textContent=err.message;error.hidden=false}};
+ dialog.setAttribute('aria-labelledby','dialogTitle');dialog.showModal();(body.querySelector(settings?'[role=tab][aria-selected=true]':'input:not([type=file]), select, button')||cancel).focus({preventScroll:true});
+}
+dialog.addEventListener('close',()=>{if(savedFocus?.isConnected)savedFocus.focus({preventScroll:true});else if(phase==='open')gsView.focus({preventScroll:true});savedFocus=null;fitNative()});
+function confirm(title,description,fn){dialogBuild(title,description,'Confirm',()=>{},()=>fn)}
+function section(body,title){
+ const fs=E('fieldset','section'),grid=E('div','fields');fs.append(E('legend','',title),grid);body.append(fs);return grid
+}
+function field(parent,label,type,value,opts={}){
+ const l=E('label','field'),title=E('span','',label),n=E('input');n.setAttribute('aria-label',label);n.type=type;n.value=value??'';
+ for(const [k,v] of Object.entries(opts))if(k!=='datasetUnit')n[k]=v;
+ if(type==='range'){
+  const bar=E('span','rangeLabel'),out=E('output','',n.value+('%'===opts.datasetUnit?'%':opts.datasetUnit||''));
+  bar.append(title,out);l.append(bar);n.oninput=()=>out.textContent=n.value+(opts.datasetUnit||'');
+ }else l.append(title);
+ l.append(n);parent.append(l);return n;
+}
+function select(parent,label,choices,value){
+ const l=E('label','field'),s=E('select');s.setAttribute('aria-label',label);l.append(E('span','',label),s);
+ for(const [v,t] of choices){const o=E('option','',t);o.value=v;s.append(o)}
+ s.value=value;parent.append(l);return s
+}
+function check(parent,label,value){const l=E('label','check'),n=E('input');n.type='checkbox';n.checked=!!value;l.append(n,E('span','',label));parent.append(l);return n}
+function appearance(body,s,isGrid){
+ const px=(p,n,v,min,max)=>field(p,n,'range',v,{min,max,datasetUnit:' px'});
+ const background=section(body,'Background and shape');
+ const color=field(background,'Background color','color',s.color);
+ const opacity=field(background,'Background opacity','range',s.opacity,{min:0,max:100,datasetUnit:'%'});
+ const blur=px(background,'Background blur',s.blur,0,32);
+ const radius=px(background,'Corner radius',s.radius,0,56);
+ const frame=section(body,'Border and shadow');
+ const border=check(frame,'Show border',s.border),shadow=check(frame,'Show shadow',s.shadow);
+ const borderColor=field(frame,'Border color','color',s.borderColor||'#ffffff');
+ const borderOpacity=field(frame,'Border opacity','range',s.borderOpacity??23,{min:0,max:100,datasetUnit:'%'});
+ const borderWidth=px(frame,'Border thickness',s.borderWidth??1,1,5);
+ const borderUI=()=>{for(const n of [borderColor,borderOpacity,borderWidth])n.disabled=!border.checked};
+ border.onchange=borderUI;borderUI();
+ const spacing=section(body,isGrid?'Grid icons and spacing':'Folder icons and spacing');
+ const icon=px(spacing,isGrid?'Shortcut icon size':'Folder icon size',s.icon,isGrid?26:24,isGrid?88:74);
+ const gap=px(spacing,'Icon spacing',s.gap,0,32);
+ const pad=px(spacing,'Inner padding',s.pad,isGrid?8:0,36);
+ const labels=check(spacing,'Show labels',s.labels);
+ const extra=isGrid?check(spacing,'Icon reflections',s.reflections):check(spacing,'Animate transitions',s.motion);
+ const titleIcon=isGrid?px(spacing,'Title icon size',headingSize(s),16,44):null;
+ const guides=isGrid?check(spacing,'Show spacer guides',s.guides):null;
+ return ()=>({...s,color:color.value,opacity:+opacity.value,blur:+blur.value,radius:+radius.value,icon:+icon.value,gap:+gap.value,pad:+pad.value,border:border.checked,shadow:shadow.checked,labels:labels.checked,borderColor:borderColor.value,borderOpacity:+borderOpacity.value,borderWidth:+borderWidth.value,...(isGrid?{reflections:extra.checked,titleIcon:+titleIcon.value,guides:guides.checked}:{motion:extra.checked})});
+}
+function iconPicker(body,source,initial,image,size,round,error,onChange=()=>{}){
+ let key=Object.hasOwn(source,initial)?initial:Object.keys(source)[0],picture=image||'',busy=false,token=0;
+ const preview=E('div','inline'),slot=E('span'),label=E('span','note','Choose a built-in icon or upload your own.');
+ preview.append(slot,label);
+ const gallery=E('div','gallery');
+ const show=()=>{slot.replaceChildren(art(key,source,size,picture,round));gallery.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(!picture&&b.dataset.icon===key)));onChange()};
+ for(const [id,def] of Object.entries(source)){
+  const b=B('','',()=>{token++;busy=false;picture='';file.value='';filename.textContent='Optional';clear.hidden=true;key=id;show()});
+  b.dataset.icon=id;b.setAttribute('aria-label',def.label);b.title=def.label;b.append(art(id,source,30,'',round));gallery.append(b)
+ }
+ const row=E('div','inline'),wrap=E('label','quiet filewrap','Upload icon'),file=E('input'),filename=E('span','asset-name',picture?'Custom icon set':'Optional');
+ file.type='file';file.accept='image/png,image/jpeg,image/gif,image/webp';file.setAttribute('aria-label','Upload custom icon');wrap.append(file);
+ const clear=B('Clear','quiet',()=>{token++;busy=false;picture='';file.value='';filename.textContent='Optional';clear.hidden=true;show()});clear.hidden=!picture;
+ file.onchange=()=>{
+  const blob=file.files[0];if(!blob)return;
+  if(!['image/png','image/jpeg','image/gif','image/webp'].includes(blob.type)||blob.size>360000){error.textContent='Choose a PNG, JPEG, GIF, or WebP under 360 KB.';error.hidden=false;file.value='';return}
+  error.hidden=true;busy=true;filename.textContent='Reading…';const t=++token,r=new FileReader();
+  r.onload=()=>{if(t!==token)return;busy=false;picture=String(r.result);filename.textContent=blob.name;clear.hidden=false;show()};
+  r.onerror=()=>{if(t!==token)return;busy=false;filename.textContent=picture?'Custom icon set':'Optional';error.textContent='Could not read that image.';error.hidden=false};r.readAsDataURL(blob);
+ };
+ row.append(wrap,filename,clear);body.append(preview,gallery,row);show();
+ return ()=>{if(busy)throw Error('Wait for the custom icon to load.');return {icon:key,image:picture}};
+}
+function editSettings(selected=null,initial='dock',creating=false){
+ const newFolder={id:uid(),name:'',mode:'auto',icon:'folder-emerald',image:'',cols:5,rows:3,slots:[],style:{...gsDefaults}};
+ const folders=creating?[newFolder]:state.folders;
+ let folder=selected||active()||folders[0],tab=initial,collectDock,edge,alignment,activate,targetWrap,tablist,scroll;
+ const cache=new Map(),previews=new Map(),labels={dock:'Dock',folder:'Folder',gs:'Grid Stack'};
+ const byTab=new Map();
+ function previewBox(pane){const node=E('div','settings-preview');node.setAttribute('aria-hidden','true');pane.append(node);return node}
+ function preview(draw,s,f,type){
+  if(!draw?.isConnected||draw.closest('[hidden]'))return;
+  const hull=E('div','sample-shell'),glass=E('div','glass'),row=E('div','sample-row');
+  if(type==='dock'){draw.dataset.edge=edge.value;draw.dataset.align=alignment.value;if(verticalEdge(edge.value))row.style.flexDirection='column'}
+  const k=type==='gs'?.53:type==='dock'&&verticalEdge(edge.value)?.4:.55, pad=Math.round(s.pad*k);
+  hull.style.borderRadius=Math.round(s.radius*k)+'px';hull.style.padding=pad+'px';
+  hull.style.boxShadow=shadow(s);styleGlass(glass,s);hull.append(glass);
+  row.style.gap=Math.round(s.gap*k)+'px';
+  const readIcon=entry=>{try{return cache.get(entry.id)?.icon()||entry}catch{return entry}};
+  if(type==='gs'){
+   const title=E('div','sample-row sample-name');
+   const ico=readIcon(f);
+   title.style.gap='5px';title.append(art(ico.icon,FOLDER_ICONS,Math.round(headingSize(s)*.66),ico.image,true),E('span','',cache.get(f.id)?.name.value||f.name||'New folder'));hull.append(title);
+   f.slots.filter(t=>t.type==='item').slice(0,3).forEach(t=>{
+    const item=E('div','sample-item');item.append(art(t.icon,APP_ICONS,Math.round(s.icon*k),t.image));
+    if(s.labels)item.append(E('small','',t.name));row.append(item);
+   });
+  }else{
+   (type==='folder'?[f]:state.folders.slice(0,3)).forEach(entry=>{
+    const controls=cache.get(entry.id),ico=readIcon(entry);
+    const size=controls?(controls.useSize.checked?+controls.size.value:s.icon):triggerSize(entry,s);
+    const item=E('div','sample-item');item.append(art(ico.icon,FOLDER_ICONS,Math.round(size*k),ico.image,true));
+    if(s.labels)item.append(E('small','',controls?.name.value||entry.name||'New folder'));row.append(item);
+   });
+  }
+  hull.append(row);draw.replaceChildren(hull);
+ }
+ function draw(){
+  if(!dialog.open||!collectDock)return;
+  const controls=cache.get(folder.id),d=collectDock();
+  if(tab==='dock')preview(previews.get('dock'),d,folder,'dock');
+  else if(tab==='folder')preview(controls.folderPreview,d,folder,'folder');
+  else preview(controls.gsPreview,controls.style(),folder,'gs');
+ }
+ dialogBuild(creating?'New folder':'Settings','Customize the collapsed dock and each folder’s grid stack independently.',creating?'Create folder':'Save settings',(body,error)=>{
+  tablist=E('div','settings-tabs');tablist.setAttribute('role','tablist');tablist.setAttribute('aria-label','Customization');
+  const targetRow=E('div','settings-target');targetWrap=targetRow;
+  const chooser=select(targetRow,'Editing folder',folders.map(f=>[f.id,f.name||'New folder']),folder.id);
+  chooser.onchange=()=>{folder=folders.find(f=>f.id===chooser.value);show(tab)};
+  scroll=E('div','settings-body');
+  for(const [key,label] of Object.entries(labels)){
+   const b=B(label,'',()=>show(key));b.id='settings-tab-'+key;b.setAttribute('role','tab');b.setAttribute('aria-controls','settings-pane-'+key);tablist.append(b);byTab.set(key,b);
+  }
+  tablist.onkeydown=e=>{
+   if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
+   e.preventDefault();const keys=Object.keys(labels),i=keys.indexOf(tab),j=e.key==='Home'?0:e.key==='End'?2:(i+(e.key==='ArrowRight'?1:2))%3;show(keys[j]);byTab.get(tab).focus();
+  };
+  function pane(){const n=E('section','settings-pane');n.setAttribute('role','tabpanel');return n}
+  const dock=pane();
+  dock.append(E('p','note','These settings apply only to the collapsed dock. Folder icons use the dock size unless you set a folder-specific override.'));
+  previews.set('dock',previewBox(dock));
+  const position=section(dock,'Screen position');
+  edge=select(position,'Screen edge',[['top','Top'],['bottom','Bottom'],['left','Left'],['right','Right']],state.edge);
+  const choices=()=>verticalEdge(edge.value)?[['start','Top'],['center','Center'],['end','Bottom']]:[['start','Left'],['center','Center'],['end','Right']];
+  alignment=select(position,'Alignment',choices(),state.align);
+  edge.onchange=()=>{const a=alignment.value;alignment.replaceChildren(...choices().map(([v,n])=>{const x=E('option','',n);x.value=v;return x}));alignment.value=a;draw()};
+  collectDock=appearance(dock,{...dockDefaults,...state.dock},false);
+  function ensure(f){
+   if(cache.has(f.id))return cache.get(f.id);
+   const folderPane=pane(),gs=pane();
+   folderPane.append(E('p','note','Set how this folder looks in the dock. Its name and icon also appear at the top of the grid stack.'));
+   const folderPreview=previewBox(folderPane);
+   const identity=section(folderPane,'Folder trigger');
+   const name=field(identity,'Folder name','text',f.name,{maxLength:40});
+   const useSize=check(identity,'Override dock icon size',f.triggerSize);
+   const size=field(identity,'Custom folder icon size','range',f.triggerSize||state.dock.icon,{min:24,max:74,datasetUnit:' px'});
+   size.disabled=!useSize.checked;useSize.onchange=()=>{size.disabled=!useSize.checked;if(useSize.checked&&size.value==state.dock.icon){size.value=collectDock().icon;size.dispatchEvent(new Event('input'))}};
+   const icon=iconPicker(folderPane,FOLDER_ICONS,f.icon,f.image,37,true,error,()=>queueMicrotask(draw));
+   gs.append(E('p','note','These settings apply only to this folder’s expanded grid. Its background remains independent from the dock.'));
+   const gsPreview=previewBox(gs),layout=section(gs,'Grid layout');
+   const mode=select(layout,'Layout',[['auto','Auto-fill'],['rows','Row-wise']],f.mode);
+   const cols=field(layout,'Columns','number',f.cols,{min:1,max:12});
+   const rows=field(layout,'Rows','number',f.rows,{min:1,max:MAX_ROWS});
+   gs.append(E('p','note','Right-click or drop onto an exact cell. Auto-fill wraps across columns. Row-wise keeps later rows grouped.'));
+   const style=appearance(gs,{...gsDefaults,...f.style},true);
+   const c={f,folderPane,gs,name,useSize,size,icon,mode,cols,rows,style,folderPreview,gsPreview};cache.set(f.id,c);return c;
+  }
+  function show(key){
+   tab=key;error.hidden=true;const c=key==='dock'?null:ensure(folder),node=key==='dock'?dock:key==='folder'?c.folderPane:c.gs;
+   for(const [t,b] of byTab){b.setAttribute('aria-selected',String(key===t));b.tabIndex=key===t?0:-1}
+   targetWrap.hidden=key==='dock'||creating;
+   node.id='settings-pane-'+key;node.setAttribute('aria-labelledby','settings-tab-'+key);
+   scroll.replaceChildren(node);scroll.scrollTop=0;draw();
+  }
+  activate=(f,key)=>{folder=f;chooser.value=f.id;show(key)};
+  body.append(tablist,targetWrap,scroll);
+  scroll.addEventListener('input',draw);scroll.addEventListener('change',draw);
+  if(creating)ensure(newFolder);
+  show(initial);queueMicrotask(draw);
+ },()=>{
+  const changes=[];
+  function invalid(c,key,input,message){activate(c.f,key);input?.focus();throw Error(message)}
+  for(const c of cache.values()){
+   const name=c.name.value.trim();if(!name)invalid(c,'folder',c.name,'Enter a folder name.');
+   let icon;try{icon=c.icon()}catch(e){invalid(c,'folder',null,e.message)}
+   const cols=+c.cols.value,rows=+c.rows.value;
+   if(!Number.isInteger(cols)||cols<1||cols>12)invalid(c,'gs',c.cols,'Enter a column count between 1 and 12.');
+   if(!Number.isInteger(rows)||rows<1||rows>MAX_ROWS)invalid(c,'gs',c.rows,'Enter a row count between 1 and '+MAX_ROWS+'.');
+   const shape={...c.f,slots:c.f.slots.map(t=>({...t}))};reflow(shape,cols,c.mode.value);
+   if(shape.slots.some(t=>t.r>=MAX_ROWS))invalid(c,'gs',c.cols,'This column count would exceed '+MAX_ROWS+' rows. Try more columns.');
+   const minimum=1+Math.max(0,...shape.slots.map(t=>t.r));
+   changes.push([c.f,{name,...icon,triggerSize:c.useSize.checked?+c.size.value:0,cols:shape.cols,rows:Math.max(rows,minimum),mode:shape.mode,slots:shape.slots,style:c.style()}]);
+  }
+  for(const [f,v] of changes)Object.assign(f,v);
+  if(creating)state.folders.push(newFolder);
+  state.dock=collectDock();state.edge=edge.value;state.align=alignment.value;
+  persist();return ()=>{renderDock();refresh()};
+ },true)
+}
+function guess(target){
+ if(/^https?:\/\//i.test(target))return 'url';
+ if(/^[a-z][a-z0-9+.-]+:\/\//i.test(target))return 'uri';
+ return /\.(exe|com)$/i.test(target)?'program':'local';
+}
+function editShortcut(f,where,t){
+ const base=t||{id:uid(),type:'item',name:'',target:'',kind:'program',args:'',cwd:'',icon:'web',image:''};
+ let name,kind,target,args,cwd,icon;
+ dialogBuild(t?'Shortcut properties':'Add shortcut here','Row '+(where.r+1)+', column '+(where.c+1)+' · Launches are simulated in the browser.','Save shortcut',(body,error)=>{
+  const p=section(body,'Shortcut target');
+  name=field(p,'Display name','text',base.name,{required:true,maxLength:65});
+  const savedKind = base.kind || guess(base.target);
+  kind = select(p, 'Target type', [
+  ['program', 'Program'],
+  ['local', 'File or folder'],
+  ['url', 'Web link']
+], savedKind === 'uri' ? 'url' : savedKind);
+  target=field(p,'Target location','text',base.target,{required:true});
+  args=field(p,'Arguments','text',base.args||'');
+  cwd=field(p,'Start in','text',base.cwd||'');
+  const update=()=>{args.closest('label').hidden=cwd.closest('label').hidden=kind.value!=='program';target.placeholder=kind.value==='url'?'https://example.com':kind.value==='uri'?'steam://rungameid/…':'C:\\Path\\To\\Shortcut'};
+  kind.onchange=update;update();
+  icon=iconPicker(body,APP_ICONS,base.icon,base.image,38,false,error);
+ },()=>{
+  const n=name.value.trim(),dest=target.value.trim(),pick=icon();if(!n||!dest)throw Error('Enter a name and target.');
+  if (kind.value === 'url') {
+  try {
+    new URL(dest);
+  } catch {
+    throw new Error('Enter a full URL, including its scheme.');
+  }
+}
+  Object.assign(base,{name:n,target:dest,kind:kind.value,args:kind.value==='program'?args.value.trim():'',cwd:kind.value==='program'?cwd.value.trim():'',...pick});
+  if(!t&&!placeEntries(f,where,[base]))throw Error('This grid is full.');
+  persist();return refresh;
+ });
+}
+function moveDialog(f,t){
+ let r,c;
+ dialogBuild('Move shortcut','Choose a grid cell. If it is occupied, the two items swap positions.','Move shortcut',body=>{
+  const p=section(body,'Destination');r=field(p,'Row','number',t.r+1,{min:1,max:f.rows,required:true});c=field(p,'Column','number',t.c+1,{min:1,max:f.cols,required:true});
+ },()=>()=>reposition(f,t,{r:+r.value-1,c:+c.value-1}));
+}
+let resized=0;
+window.addEventListener('resize',()=>{
+ if(nativeWindow)return;
+ clearTimeout(resized);resized=setTimeout(()=>{
+  closeMenu();clearPointer();
+  if(phase==='closing'){stopMotion();finishClose(false)}
+  else if(phase==='opening'){stopMotion();setPhase('open');refresh()}
+  else refresh();
+ },50)
+});
+setPhase('closed');refresh();
+async function startNative(){
+ if(!nativeAPI)return;
+ try{
+   const monitor=await nativeAPI.currentMonitor();
+   if(!monitor?.workArea)throw Error('No monitor work area returned');
+   const {position,size}=monitor.workArea,scale=monitor.scaleFactor;
+   const win=nativeAPI.getCurrentWindow();
+   const inset = Math.ceil(1 * scale);
+
+  nativeArea = {
+    px: position.x + inset,
+    py: position.y + inset,
+    w: Math.floor((size.width - 2 * inset) / scale),
+    h: Math.floor((size.height - 2 * inset) / scale),
+    scale
+  };
+   nativeWindow=win;
+   const root=document.documentElement;
+   nativeBusy=true;
+   try{
+    renderDock();applyBox(dockBox());views(false);
+    let regionAvailable=false;
+    if(nativeCore?.invoke){
+     try{await nativeCore.invoke('set_dock_region',{x:0,y:0,width:0,height:0});regionAvailable=true}
+     catch(error){console.warn('Fixed dock host unavailable. Register set_dock_region to enable it.',error)}
+    }
+    if(regionAvailable){
+     root.classList.add('native-dock');
+     if(await moveHost(nativeFull())){
+      try{await setNativeRegion(nativeCover(dockBox()));fixedHost=true}
+      catch(error){console.warn('Could not clip the fixed dock host:',error)}
+     }
+    }
+    if(!fixedHost&&!await moveHost(nativeCover(dockBox()))){
+     root.classList.remove('native-dock');nativeWindow=null;nativeArea=null;nativeHost={x:0,y:0};refresh();return;
+    }
+    root.classList.add('native-dock');
+   }finally{nativeBusy=false}
+   window.addEventListener('blur',()=>{if(!dialog.open)queueNativeBlur()});
+   window.addEventListener('focus',()=>{nativeBlurPending=false});
+   await win.onFocusChanged(({payload:focused})=>{
+    if(focused){nativeBlurPending=false;return}
+    if(!dialog.open)queueNativeBlur();
+   }).catch(error=>console.warn('Native focus listener unavailable:',error));
+ }catch(error){nativeFailure(error)}
+}
+startNative();
+</script>
+</body>
+</html>
