@@ -1,7 +1,8 @@
 // Native dialogs and embedded icon resources. This module never runs the selected file.
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use icoextract_rs::IconExtractor;
-use std::{fs::File, io::Read, path::Path};
+use image::{ImageFormat, ImageReader};
+use std::{fs::File, io::{Cursor, Read}, path::Path};
 use tauri::async_runtime::spawn_blocking;
 use tauri_plugin_dialog::DialogExt;
 
@@ -22,7 +23,7 @@ pub async fn pick_shortcut_path(
             "folder" => picker.set_title("Choose a folder").blocking_pick_folder(),
             "icon" => picker
                 .set_title("Choose an icon image or program")
-                .add_filter("Icons and programs", &["png", "jpg", "jpeg", "gif", "webp", "ico", "exe"])
+                .add_filter("Icons and programs", &["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "exe"])
                 .blocking_pick_file(),
             _ => return Err("Unknown picker type.".into()),
         };
@@ -54,39 +55,41 @@ pub async fn read_shortcut_icon(target: String, index: usize) -> Result<Shortcut
             return Err("Choose an existing icon image or EXE.".into());
         }
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-        let (mime, bytes, count) = match ext.as_str() {
-            "exe" => {
-                let extractor = IconExtractor::from_path(path)
-                    .map_err(|e| format!("Could not read embedded EXE icons: {e}"))?;
-                let count = extractor.list_group_icons().map_err(|e| e.to_string())?.len();
-                let bytes = extractor.icon_by_index(index)
-                    .and_then(|icon| icon.to_ico_bytes())
-                    .map_err(|e| format!("Could not extract icon {}: {e}", index + 1))?;
-                ("image/x-icon", bytes, count)
-            }
-            "png" | "jpg" | "jpeg" | "gif" | "webp" | "ico" => {
-                let mime = match ext.as_str() {
-                    "jpg" | "jpeg" => "image/jpeg",
-                    "ico" => "image/x-icon",
-                    "png" => "image/png",
-                    "gif" => "image/gif",
-                    _ => "image/webp",
-                };
-                let mut bytes = Vec::new();
-                File::open(path)
-                    .map_err(|e| e.to_string())?
-                    .take(2_097_153)
-                    .read_to_end(&mut bytes)
-                    .map_err(|e| e.to_string())?;
-                (mime, bytes, 1)
-            }
-            _ => return Err("Choose PNG, JPEG, GIF, WebP, ICO, or EXE.".into()),
+        // Decode on the worker and send only a small PNG across the bridge.
+        // There is no source-file size cutoff. The decoder's memory protections
+        // still apply to invalid or exceptionally large decoded images.
+        let (decoded, count) = if ext == "exe" {
+            let extractor = IconExtractor::from_path(path)
+                .map_err(|e| format!("Could not read program icons: {e}"))?;
+            let count = extractor.list_group_icons().map_err(|e| e.to_string())?.len();
+            let bytes = extractor.icon_by_index(index)
+                .and_then(|icon| icon.to_ico_bytes())
+                .map_err(|e| format!("Could not extract icon {}: {e}", index + 1))?;
+            (ImageReader::with_format(Cursor::new(bytes), ImageFormat::Ico).decode(), count)
+        } else {
+            let format = match ext.as_str() {
+                "png" => ImageFormat::Png,
+                "jpg" | "jpeg" => ImageFormat::Jpeg,
+                "gif" => ImageFormat::Gif,
+                "webp" => ImageFormat::WebP,
+                "bmp" => ImageFormat::Bmp,
+                "ico" => ImageFormat::Ico,
+                _ => return Err("Choose a PNG, JPEG, GIF, WebP, BMP, ICO, or EXE.".into()),
+            };
+            let mut reader = ImageReader::open(path).map_err(|e| e.to_string())?;
+            reader.set_format(format);
+            (reader.decode(), 1)
         };
-        if bytes.len() > 2_097_152 {
-            return Err("That icon image is larger than 2 MB.".into());
-        }
+        let decoded = decoded.map_err(|e| format!("Could not decode this icon: {e}"))?;
+        let icon = if decoded.width() > 256 || decoded.height() > 256 {
+            decoded.thumbnail(256, 256)
+        } else { decoded };
+        let mut buffer = Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(icon.into_rgba8())
+            .write_to(&mut buffer, ImageFormat::Png)
+            .map_err(|e| format!("Could not save the selected icon: {e}"))?;
         Ok(ShortcutIcon {
-            source: format!("data:{mime};base64,{}", STANDARD.encode(bytes)),
+            source: format!("data:image/png;base64,{}", STANDARD.encode(buffer.into_inner())),
             count,
         })
     })

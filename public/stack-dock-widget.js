@@ -5,29 +5,27 @@
   const style = document.createElement('style');
   style.textContent = `
 #dockView .folder-btn,#gsView .tile{position:relative;padding:0}
-#dockView .folder-btn{gap:3px}
-#dockView .folder-btn>span:not(.art){line-height:14px}
-#dockView .folder-btn:hover,#gsView .tile:hover{background:none}
-#dockView .folder-btn>.art,#gsView .tile>.art,.sample-item>.art{position:relative;overflow:visible}
+#dockView .folder-btn{gap:0}
+#dockView .folder-btn>.folder-label{line-height:14px;margin-top:3px}
+#dockView .folder-btn:hover,#gsView .tile:hover,.sample-item:hover{background:none;position:relative;z-index:1}
+#dockView .folder-btn>.art,#gsView .tile>.art,.sample-item>.art{position:relative;overflow:visible;z-index:1}
 #dockView .folder-btn>.art>img,#dockView .folder-btn>.art>svg,#gsView .tile>.art>img,#gsView .tile>.art>svg,.sample-item>.art>img,.sample-item>.art>svg{border-radius:inherit}
-#dockView .folder-btn>.art::after,#gsView .tile>.art::after,.sample-item>.art::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:var(--highlight-round,var(--ir,25%));opacity:0;box-shadow:inset 0 0 0 2px #fff;transition:opacity .12s}
-#dockView .folder-btn:hover>.art::after,#gsView .tile:hover>.art::after,.sample-item:hover>.art::after{opacity:var(--sd-hover,.14)}
+.sample-item>.art::after{content:"";position:absolute;inset:calc(-1 * var(--highlight-area,0px));pointer-events:none;border-radius:var(--highlight-round,var(--ir,25%));opacity:0;box-shadow:inset 0 0 0 2px #fff;transition:opacity .12s}
+.sample-item:hover>.art::after{opacity:var(--sd-hover,.14)}
 #gsView .tile{gap:0;justify-content:flex-start}
 #gsView.sd-labels .tile{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:var(--sd-icon-size) var(--sd-reflect) var(--sd-label-space);row-gap:2px;align-content:start;justify-items:center}
 #gsView.sd-labels .tile>.art{grid-row:1}
-#gsView.sd-labels .tile>.reflect{grid-row:2}
+#gsView.sd-labels .tile>.icon-effects{grid-row:2}
 #gsView.sd-labels .tile>.caption{grid-row:3;align-self:start;font-size:var(--sd-label-font);line-height:1.2;height:2.4em;max-height:2.4em;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;text-overflow:ellipsis}
+#iconHover{position:fixed;inset:0;z-index:12;pointer-events:none}
+.sd-hover-ring,.sd-hover-art,.sd-hover-label{position:fixed;pointer-events:none}
+.sd-hover-art{z-index:1}
+.sd-hover-original{visibility:hidden}
+.sd-hover-label{z-index:2;display:grid;gap:4px;width:max-content;text-align:center;padding:3px 8px;border-radius:5px;background:#130f19ed;color:#fff;overflow-wrap:anywhere;unicode-bidi:plaintext;text-shadow:0 1px 2px #000;font-size:12px;line-height:1.25;font-weight:650}
+.sd-hover-target{font-size:11px;font-weight:400;color:#eee1f4;white-space:pre-wrap;unicode-bidi:plaintext;max-height:40dvh;overflow:hidden}
+ .sample-item>.art{transition:transform var(--sd-hover-duration,0ms) var(--sd-hover-easing,ease-out)}
+.sample-item:hover>.art{transform:var(--sd-hover-transform,none)}
 .sd-edge-grow{position:fixed;z-index:51;pointer-events:none;background:#d99bff80;border:1px solid #ead1ff;border-radius:5px}
-dialog.sd-properties{width:min(670px,calc(100vw - 24px))}
-.sd-properties .sd-properties-hero{display:flex;align-items:center;justify-content:space-between;min-height:86px;background:#ffffff07;border:1px solid #ffffff13;border-radius:11px;padding:10px 14px;font-size:20px;font-weight:700;color:#e9b0ff;overflow-wrap:anywhere}
-.sd-properties .sd-properties-hero img,.sd-properties .sd-properties-hero svg{width:60px;height:60px;object-fit:contain}
-.sd-properties .sd-properties-rows{display:grid;grid-template-columns:1fr;gap:8px}
-.sd-properties .sd-properties-rows>label.field{grid-template-columns:112px minmax(0,1fr);align-items:center}
-.sd-properties .sd-properties-rows>.sd-path-row{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;min-width:0}
-.sd-properties .sd-path-row>label.field{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;min-width:0}
-.sd-properties .sd-native-icon .sd-icon-path{flex:0 0 100%;width:100%}
-.sd-properties .sd-native-icon{border-top:1px solid #ffffff18;padding-top:8px}
-.sd-properties .sd-native-icon .gallery{max-height:84px}
 .launch-view,.launch-sample{display:flex;align-items:center;gap:var(--launch-gap,12px);padding:0 var(--launch-pad,16px);color:var(--launch-text,#fff);min-width:0}
 .launch-view{position:absolute;inset:0;pointer-events:none}
 .launch-sample{justify-content:flex-start;background:var(--launch-fill);max-width:100%;overflow:hidden}
@@ -36,7 +34,6 @@ dialog.sd-properties{width:min(670px,calc(100vw - 24px))}
 .launch-title{font-size:var(--launch-font,19px);font-weight:650;letter-spacing:.03em}
 .launch-caption{font-size:11px;opacity:.76}
 .launch-settings .launch-sample{grid-column:1/-1}
-@media(max-width:450px){.sd-properties .sd-properties-rows>label.field{grid-template-columns:85px minmax(0,1fr)}}
 `;
   document.head.append(style);
 
@@ -63,27 +60,30 @@ dialog.sd-properties{width:min(670px,calc(100vw - 24px))}
     return {icon,copy};
   }
   function launchControls(body,s) {
-    const panel=section(body,'Launch indicator');
-    panel.classList.add('launch-settings');
+    const panel=settingsCard(body,'Launch indicator preview','launch');
+    panel.parentElement.classList.add('sd-preview-card');
     const enabled=check(panel,'Show launch indicator',s.launchEnabled);
     const label=check(panel,'Show Launched caption',s.launchLabel);
-    const preview=E('div','launch-sample');panel.append(preview);
-    const number=(key,label,min,max,unit)=>field(panel,label,'range',s[key],{min,max,datasetUnit:unit});
+    const preview=E('div','launch-sample');panel.classList.add('launch-settings');panel.append(preview);
+    const timing=settingsCard(body,'Motion and timing','launch');
+    const frame=settingsCard(body,'Panel dimensions','launch');
+    const style=settingsCard(body,'Typography and color','launch');
+    const number=(card,key,label,min,max,unit)=>field(card,label,'range',s[key],{min,max,datasetUnit:unit});
     const inputs={
-      launchWidth:number('launchWidth','Maximum width',140,680,' px'),
-      launchHeight:number('launchHeight','Height',42,120,' px'),
-      launchHold:number('launchHold','Time shown',0,8000,' ms'),
-      launchTravel:number('launchTravel','Icon glide duration',0,1000,' ms'),
-      launchReturn:number('launchReturn','Return to dock duration',0,700,' ms'),
-      launchIcon:number('launchIcon','Icon size',16,84,' px'),
-      launchFont:number('launchFont','Title size',11,34,' px'),
-      launchRadius:number('launchRadius','Panel corner radius',0,60,' px'),
-      launchOpacity:number('launchOpacity','Panel opacity',0,100,'%'),
-      launchGap:number('launchGap','Icon and text spacing',0,28,' px'),
-      launchPad:number('launchPad','Side padding',4,28,' px'),
+      launchWidth:number(frame,'launchWidth','Maximum width',140,680,' px'),
+      launchHeight:number(frame,'launchHeight','Height',42,120,' px'),
+      launchRadius:number(frame,'launchRadius','Panel corner radius',0,60,' px'),
+      launchPad:number(frame,'launchPad','Side padding',4,28,' px'),
+      launchHold:number(timing,'launchHold','Time shown',0,8000,' ms'),
+      launchTravel:number(timing,'launchTravel','Icon glide duration',0,1000,' ms'),
+      launchReturn:number(timing,'launchReturn','Return to dock duration',0,700,' ms'),
+      launchIcon:number(style,'launchIcon','Icon size',16,84,' px'),
+      launchFont:number(style,'launchFont','Title size',11,34,' px'),
+      launchOpacity:number(style,'launchOpacity','Panel opacity',0,100,'%'),
+      launchGap:number(style,'launchGap','Icon and text spacing',0,28,' px'),
     };
-    const background=field(panel,'Panel color','color',s.launchColor);
-    const text=field(panel,'Text color','color',s.launchText);
+    const background=field(style,'Panel color','color',s.launchColor);
+    const text=field(style,'Text color','color',s.launchText);
     const read=()=>({launchEnabled:enabled.checked,launchLabel:label.checked,
       launchColor:background.value,launchText:text.value,
       ...Object.fromEntries(Object.entries(inputs).map(([k,v])=>[k,+v.value]))});
@@ -95,18 +95,54 @@ dialog.sd-properties{width:min(670px,calc(100vw - 24px))}
       preview.style.borderRadius=c.launchRadius+'px';
       launchContent(preview,{icon:'terminal',name:'Example shortcut'},c,Math.min(c.launchIcon,c.launchHeight-10));
     };
-    panel.addEventListener('input',draw);panel.addEventListener('change',draw);draw();
+    for(const controls of [panel,timing,frame,style]){controls.addEventListener('input',draw);controls.addEventListener('change',draw);}
+    draw();
     return read;
   }
+  generalLaunchControls=(body,s)=>launchControls(body,launchStyle(s));
   Object.assign(gsDefaults, {labelFont:11, labelWidth:76, hoverOpacity:14});
   // New appearance keys are preserved by the matching layout backup script.
   const baseAppearance = appearance;
   appearance = function (body, s, isGrid) {
     const read = baseAppearance(body, s, isGrid);
-    const panel = section(body, isGrid ? 'Tile styling and label layout' : 'Icon shape, highlight and motion');
-    const slider = (key, name, min, max, unit, fallback) =>
-      field(panel, name, 'range', numeric(s[key],min,max,fallback), {min,max,datasetUnit:unit});
-    const hover = slider('hoverOpacity','Hover highlight',0,100,'%',14);
+    const panel = settingsCard(body,'Icon shape and hover highlight','effects');
+    const slider = (parent,key,name,min,max,unit,fallback) =>
+      field(parent,name,'range',numeric(s[key],min,max,fallback),{min,max,datasetUnit:unit});
+    const hover = slider(panel,'hoverOpacity','Highlight opacity',0,100,'%',14);
+    const area = slider(panel,'highlightArea','Highlight reach',0,32,' px',0);
+    const reflect = settingsCard(body,'Reflection','effects');
+    const reflected = check(reflect,'Show icon reflections',s.reflections);reflected.parentElement.classList.add('card-toggle');
+    const reflectionIntensity = slider(reflect,'reflectionIntensity','Reflection intensity',0,100,'%',55);
+    const reflectionArea = slider(reflect,'reflectionArea','Reflection height',0,64,' px',10);
+    const depth = settingsCard(body,'Ground shadow','effects');
+    const shadow = check(depth,'Show icon ground shadows',s.groundShadow);shadow.parentElement.classList.add('card-toggle');
+    const groundShadowIntensity = slider(depth,'groundShadowIntensity','Shadow opacity',0,100,'%',65);
+    const groundShadowOffset = slider(depth,'groundShadowOffset','Vertical shadow offset',-24,48,' px',0);
+    depth.append(E('p','note','Negative moves the shadow up. Positive moves it down.'));
+    const updateDepth = () => {
+      reflectionIntensity.disabled=reflectionArea.disabled=!reflected.checked;
+      groundShadowIntensity.disabled=groundShadowOffset.disabled=!shadow.checked;
+    };
+    reflected.addEventListener('change',updateDepth);shadow.addEventListener('change',updateDepth);updateDepth();
+    const motion=settingsCard(body,'Hover motion','effects');
+    const mode=select(motion,'Hover effect',[[0,'None'],[1,'Enlarge'],[2,'Lift'],[3,'Enlarge + lift'],
+      [4,'Tilt'],[5,'Enlarge + lift + tilt']],String(s.hoverMode??0));
+    const scale=slider(motion,'hoverScale','Enlarge to',100,200,'%',125);
+    const lift=slider(motion,'hoverLift','Lift distance',0,48,' px',10);
+    const angle=slider(motion,'hoverAngle','Tilt angle',-30,30,'°',10);
+    const duration=slider(motion,'hoverDuration','Duration',0,900,' ms',160);
+    const curve=select(motion,'Motion curve',[[0,'Linear'],[1,'Ease out'],[2,'Ease in/out'],[3,'Spring']],String(s.hoverCurve??1));
+    const syncMotion=()=>{
+      const m=+mode.value;
+      scale.disabled=![1,3,5].includes(m);lift.disabled=![2,3,5].includes(m);angle.disabled=![4,5].includes(m);
+      duration.disabled=curve.disabled=!m;
+    };
+    mode.addEventListener('change',syncMotion);syncMotion();
+    const effects = () => ({highlightArea:+area.value,reflections:reflected.checked,
+      reflectionIntensity:+reflectionIntensity.value,reflectionArea:+reflectionArea.value,
+      groundShadow:shadow.checked,groundShadowIntensity:+groundShadowIntensity.value,groundShadowOffset:+groundShadowOffset.value,
+      hoverMode:+mode.value,hoverScale:+scale.value,hoverLift:+lift.value,hoverAngle:+angle.value,
+      hoverDuration:+duration.value,hoverCurve:+curve.value});
     const initial = isGrid?gridRoundness(s):dockRoundness(s);
     const shape = (name,value) => {
       const input=field(panel,name,'range',value,{min:0,max:50,datasetUnit:'%'});
@@ -122,14 +158,156 @@ dialog.sd-properties{width:min(670px,calc(100vw - 24px))}
     corner.addEventListener('input',()=>{if(!separate){highlight.value=corner.value;highlight.oninput();}});
     const corners=()=>({iconCorner:+corner.value,highlightCorner:separate?+highlight.value:undefined,roundIcons:undefined});
     if (isGrid) {
-      const font = slider('labelFont','Label size',9,18,' px',11);
-      const width = slider('labelWidth','Minimum label width',64,200,' px',76);
-      return () => ({...read(),labelFont:+font.value,labelWidth:+width.value,hoverOpacity:+hover.value,...corners()});
+      const labels=settingsCard(body,'Label dimensions','layout');
+      const font=slider(labels,'labelFont','Label size',9,18,' px',11);
+      const width=slider(labels,'labelWidth','Minimum label width',64,200,' px',76);
+      return () => ({...read(),labelFont:+font.value,labelWidth:+width.value,hoverOpacity:+hover.value,...corners(),...effects()});
     }
-    const speed = slider('motionSpeed','Animation speed',25,250,'%',100);
-    const indicator=launchControls(body,launchStyle(s));
-    return () => ({...read(),motionSpeed:+speed.value,hoverOpacity:+hover.value,...corners(),...indicator()});
+    return () => ({...read(),hoverOpacity:+hover.value,...corners(),...effects()});
   };
+
+  // Detached hover layer avoids clipping at the edge of either scroll container.
+  const hoverLayer=$('iconHover');
+  const svgNS='http://www.w3.org/2000/svg',svgNode=name=>document.createElementNS(svgNS,name);
+  let hovered=null, hoverTimer=0, hoverAnimation=null, hoverLayout=null, hoveredArt=null;
+  const baseFitNative=fitNative;
+  fitNative=function(grid){
+    if(!hovered||hoverLayer.hidden||!fixedHost||!nativeArea||!hoverLayout||nativeBusy||surfaceWanted||!menu.hidden||dialog.open){
+      return baseFitNative(grid);
+    }
+    return moveHost(nativeCover(readBox(),hoverLayout));
+  };
+  clearHover=function(refit=true){
+    const wasVisible=!hoverLayer.hidden;
+    hovered=null;clearTimeout(hoverTimer);hoverTimer=0;hoverAnimation?.cancel();hoverAnimation=null;
+    hoveredArt?.classList.remove('sd-hover-original');hoveredArt=null;hoverLayout=null;
+    hoverLayer.hidden=true;hoverLayer.replaceChildren();
+    if(refit&&wasVisible)fitNative();
+  };
+  const hoverEasings=['linear','ease-out','ease-in-out','cubic-bezier(.2,1.27,.34,1)'];
+  function hoverMotion(s,k=1){
+    if(reduced.matches)return {scale:1,y:0,angle:0,time:0,easing:'linear'};
+    const mode=s.hoverMode??0;
+    return {
+      scale:[1,3,5].includes(mode)?(s.hoverScale??125)/100:1,
+      y:[2,3,5].includes(mode)?-(s.hoverLift??10)*k:0,
+      angle:[4,5].includes(mode)?(s.hoverAngle??10):0,
+      time:s.hoverDuration??160,easing:hoverEasings[s.hoverCurve??1]
+    };
+  }
+  const matrix=m=>`translateY(${m.y}px) rotate(${m.angle}deg) scale(${m.scale})`;
+  stylePreviewIcon=(item,s,k)=>{
+    const m=hoverMotion(s,k);
+    item.style.setProperty('--sd-hover-transform',matrix(m));
+    item.style.setProperty('--sd-hover-duration',m.time+'ms');
+    item.style.setProperty('--sd-hover-easing',m.easing);
+  };
+  const place=(el,x,y,w,h)=>{
+    el.style.left=x+'px';el.style.top=y+'px';
+    if(w!==undefined)el.style.width=w+'px';
+    if(h!==undefined)el.style.height=h+'px';
+  };
+  function showIconHover(button){
+    const onDock=phase==='closed'&&dockView.contains(button);
+    if(!onDock&&!(phase==='open'&&gsView.contains(button)))return;
+    if(dialog.open||!menu.hidden||surfaceWanted||drag||nativeBusy||hovered===button)return;
+    const entry=onDock?state.folders.find(f=>f.id===button.dataset.folder):active()?.slots.find(t=>t.id===button.dataset.tile);
+    const s=onDock?state.dock:active()?.style, source=button.querySelector(':scope > .art');
+    if(!entry||!s||!source)return;
+    const r=source.getBoundingClientRect();
+    if(!r.width||!r.height)return;
+    clearHover(false);
+    hovered=button;
+    const d=dims(), top=d.top-nativeHost.y, left=-nativeHost.x, right=d.w-nativeHost.x, bottom=top+d.h;
+    const m=hoverMotion(s);
+    const moved=m.scale!==1||m.y!==0||m.angle!==0;
+    const angle=Math.abs(m.angle)*Math.PI/180;
+    const extent=r.width*m.scale*(Math.cos(angle)+Math.sin(angle));
+    const growth=Math.max(0,(extent-r.width)/2);
+    const cx=clamp(r.left+r.width/2,left+extent/2,right-extent/2);
+    const cy=clamp(r.top+r.height/2+m.y,top+extent/2,bottom-extent/2);
+    const xShift=cx-r.left-r.width/2;
+    m.y=cy-r.top-r.height/2;
+    const area=s.highlightArea??0,alpha=(s.hoverOpacity??14)/100;
+    const ring=E('div','sd-hover-ring');
+    const x1=clamp(r.left-area,left,right), y1=clamp(r.top-area,top,bottom);
+    const x2=clamp(r.right+area,left,right), y2=clamp(r.bottom+area,top,bottom);
+    const w=x2-x1,h=y2-y1;
+    let lowX=Math.min(x1,r.left+xShift-growth),lowY=Math.min(y1,r.top+m.y-growth);
+    let highX=Math.max(x2,r.right+xShift+growth),highY=Math.max(y2,r.bottom+m.y+growth);
+    if(alpha>0&&w>0&&h>0){
+      place(ring,x1,y1,w,h);
+      const svg=svgNode('svg'),mask=svgNode('mask'),outline=svgNode('rect'),background=svgNode('rect');
+      const holes='sd-hover-outline-mask';
+      const attrs=(el,values)=>Object.entries(values).forEach(([k,v])=>el.setAttribute(k,v));
+      attrs(svg,{width:w,height:h,viewBox:`0 0 ${w} ${h}`});
+      attrs(mask,{id:holes,maskUnits:'userSpaceOnUse',x:0,y:0,width:w,height:h});
+      attrs(background,{width:w,height:h,fill:'white'});mask.append(background);
+      const siblings=(onDock?dockView:gsView).querySelectorAll('button > .art');
+      for(const sibling of siblings){
+        if(sibling===source)continue;
+        const b=sibling.getBoundingClientRect();
+        if(b.right<=x1||b.left>=x2||b.bottom<=y1||b.top>=y2)continue;
+        const cut=svgNode('rect');
+        const ownRadius=parseFloat(sibling.style.getPropertyValue('--ir'))||0;
+        attrs(cut,{x:b.left-x1,y:b.top-y1,width:b.width,height:b.height,rx:b.width*ownRadius/100,fill:'black'});
+        mask.append(cut);
+      }
+      const pc=parseFloat(source.style.getPropertyValue('--highlight-round'))||0;
+      attrs(outline,{x:1,y:1,width:Math.max(0,w-2),height:Math.max(0,h-2),rx:Math.min(w,h)*pc/100,
+        fill:'none',stroke:'white','stroke-opacity':alpha,'stroke-width':2,mask:'url(#'+holes+')'});
+      const defs=svgNode('defs');defs.append(mask);svg.append(defs,outline);ring.append(svg);hoverLayer.append(ring);
+    }
+    let clone;
+    if(moved){
+      clone=source.cloneNode(true);
+      clone.classList.add('sd-hover-art');
+      place(clone,r.left+xShift,r.top,r.width,r.height);
+      clone.style.transform=matrix(m);hoverLayer.append(clone);
+      source.classList.add('sd-hover-original');hoveredArt=source;
+    }
+    const general={...generalDefaults,...state.general};
+    const label=E('div','sd-hover-label'), title=E('span','sd-hover-name',entry.name);
+    const trail=E('span','sd-hover-target',entry.target||'');
+    trail.hidden=true;label.append(title,trail);
+    title.hidden=!general.hoverNames;
+    if(general.hoverNames||(!onDock&&general.hoverTargets&&entry.target))hoverLayer.append(label);
+    hoverLayer.hidden=false;
+    function layout(){
+      if(hovered!==button)return;
+      if(label.isConnected&&(!title.hidden||!trail.hidden)){
+        label.style.maxWidth=Math.min(540,d.w-12)+'px';
+        const bounds=label.getBoundingClientRect();
+        const x=clamp(r.left+(r.width-bounds.width)/2,left+6,Math.max(left+6,right-bounds.width-6));
+        const below=r.bottom+5;
+        // If there is no room below the icon, keep the entire caption above it.
+        const y=Math.max(top+4,below+bounds.height+4<=bottom?below:Math.min(r.top-5-bounds.height,bottom-bounds.height-4));
+        place(label,x,y);
+        lowX=Math.min(lowX,x);lowY=Math.min(lowY,y);highX=Math.max(highX,x+bounds.width);highY=Math.max(highY,y+bounds.height);
+      }else{label.style.visibility='hidden';}
+      if(!title.hidden||!trail.hidden)label.style.visibility='';
+      hoverLayout={x:lowX+nativeHost.x,y:lowY+nativeHost.y,w:highX-lowX,h:highY-lowY};
+      fitNative();
+    }
+    layout();
+    if(clone?.animate&&m.time){
+      hoverAnimation=clone.animate([{transform:'none'},{transform:matrix(m)}],{duration:m.time,easing:m.easing});
+    }
+    if(!onDock&&general.hoverTargets&&entry.target){
+      hoverTimer=setTimeout(()=>{if(hovered===button){trail.hidden=false;layout();}},general.hoverDelay);
+    }
+  }
+  const hitIcon=el=>el?.closest?.('.folder-btn,.tile');
+  island.addEventListener('pointerover',e=>{
+    const icon=hitIcon(e.target);
+    if(icon&&icon!==hitIcon(e.relatedTarget)&&e.pointerType!=='touch'&&!e.buttons)showIconHover(icon);
+  });
+  island.addEventListener('pointerout',e=>{
+    if(hovered&&hitIcon(e.target)===hovered&&hitIcon(e.relatedTarget)!==hovered)clearHover();
+  });
+  island.addEventListener('pointerdown',()=>clearHover(),true);
+  island.addEventListener('scroll',()=>clearHover(),true);
+  window.addEventListener('blur',()=>clearHover());
 
   const baseMetrics = metrics;
   let measuring;
@@ -137,8 +315,8 @@ dialog.sd-properties{width:min(670px,calc(100vw - 24px))}
     const m = baseMetrics(folder), s = folder.style;
     if (!s.labels) return m;
     const font = numeric(s.labelFont,9,18,11);
-    const height=s.icon+(s.reflections?10:0)+Math.ceil(font*2.4)+4;
-    if(m.gap===0)return {...m,ch:height};
+    const height=s.icon+effectsHeight(s,s.icon)+Math.ceil(font*2.4)+4;
+    if(m.gapX===0)return {...m,ch:height};
     const minWidth = Math.max(m.cw,numeric(s.labelWidth,64,200,76));
     try { measuring ||= document.createElement('canvas').getContext('2d'); } catch {}
     if(measuring)measuring.font=font+'px "Segoe UI",system-ui,sans-serif';
@@ -177,7 +355,7 @@ dialog.sd-properties{width:min(670px,calc(100vw - 24px))}
     const s = folder.style;
     gsView.classList.toggle('sd-labels',!!s.labels);
     gsView.style.setProperty('--sd-icon-size',s.icon+'px');
-    gsView.style.setProperty('--sd-reflect',(s.reflections?10:0)+'px');
+    gsView.style.setProperty('--sd-reflect',effectsHeight(s,s.icon)+'px');
     const font = numeric(s.labelFont,9,18,11);
     gsView.style.setProperty('--sd-label-font',font+'px');
     gsView.style.setProperty('--sd-label-space',Math.ceil(font*2.4)+'px');
@@ -252,38 +430,6 @@ dialog.sd-properties{width:min(670px,calc(100vw - 24px))}
       nativeBusy=false;finishClose(false);
     }
   };
-
-  const oldProperties = editShortcut;
-  editShortcut = function (...args) {
-    const oldDialog = dialogBuild;
-    dialogBuild = function (title,desc,submit,build,save,settings) {
-      return oldDialog(title,desc,submit,(body,error) => {
-        build(body,error);
-        dialog.classList.add('sd-properties');
-        const fields = body.querySelector('fieldset .fields');
-        if (!fields) return;
-        fields.classList.add('sd-properties-rows');
-        const label = body.querySelector('input[aria-label="Display name"]');
-        const hero = E('div','sd-properties-hero');
-        const name = E('span','',label?.value||'New shortcut');
-        const icon = E('div');
-        hero.append(name,icon);
-        body.prepend(hero);
-        for (const event of ['input','change']) label?.addEventListener(event,()=>name.textContent=label.value||'New shortcut');
-        const preview = body.querySelector('.sd-native-icon .inline > span');
-        if (preview) {
-          const update = () => icon.replaceChildren(...Array.from(preview.childNodes,n=>n.cloneNode(true)));
-          const observer = new MutationObserver(update);
-          observer.observe(preview,{childList:true,subtree:true});
-          dialog.addEventListener('close',()=>observer.disconnect(),{once:true});
-          update();
-        }
-      },save,settings);
-    };
-    try { return oldProperties(...args); }
-    finally { dialogBuild=oldDialog; }
-  };
-  dialog.addEventListener('close',()=>{if(!dialog.open) dialog.classList.remove('sd-properties');});
 
   const basePositions = showPositions;
   showPositions = function (x,y) {

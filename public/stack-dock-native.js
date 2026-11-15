@@ -15,15 +15,25 @@
   }
 
   const style = document.createElement('style');
-  style.textContent = '.sd-browse{display:flex;flex-wrap:wrap;gap:5px}.sd-browse button{min-height:29px;padding:3px 8px}.sd-icon-pager{display:flex;align-items:center;gap:6px}.sd-native-icon{display:grid;gap:6px;min-width:0}.sd-native-icon .inline{flex-wrap:wrap}.sd-icon-path{flex:1 1 190px;min-width:0;border:1px solid #ffffff28;background:#140d18;color:#f4ebf8;border-radius:8px;padding:7px 8px}.settings-dialog form{height:min(820px,calc(100dvh - 28px));max-height:none}.settings-dialog .dialogbody,.settings-dialog .settings-body{flex:1 1 0;min-height:0}#dockView:focus{outline:none}';
-  style.textContent += `
-.native-dock .settings-dialog form{height:min(820px,calc(100dvh - var(--sd-caption-gutter,0px) - 28px))}
-.settings-dialog .settings-pane{align-content:start;min-width:0}
-.settings-dialog .settings-preview{grid-row:1;position:sticky;top:0;z-index:2;align-self:start;background-color:#211725;box-shadow:0 8px 10px -6px #0f0915}
-.settings-dialog .settings-body{scroll-padding-top:160px;overscroll-behavior:contain}
-@media(max-height:650px){.settings-dialog .settings-preview{min-height:88px;max-height:112px}.settings-dialog .settings-body{scroll-padding-top:122px}}
+  style.textContent = `
+#dockView:focus{outline:none}
+dialog.sd-properties{width:min(720px,calc(100% - 24px));--sd-label-width:112px}
+.sd-properties .sd-properties-hero{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:112px;background:#ffffff07;border:1px solid #ffffff13;border-radius:11px;padding:8px 14px;font-size:20px;font-weight:700;color:#e9b0ff;overflow-wrap:anywhere}
+.sd-properties .sd-hero-icon{flex:0 0 96px}
+.sd-properties .sd-properties-hero .art{border-radius:0;overflow:visible}
+.fields.sd-property-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.sd-property-fields>.field{grid-template-columns:var(--sd-label-width,112px) minmax(0,1fr);gap:8px;align-items:center}
+.sd-path-controls{display:grid;grid-template-columns:minmax(0,1fr) repeat(var(--sd-buttons,1),31px);align-items:center;gap:5px;min-width:0;position:relative}
+.sd-icon-button.quiet{width:31px;height:31px;min-height:0;padding:0;display:grid;place-items:center}
+.sd-icon-button svg{width:16px;height:16px}
+.sd-local-picker{position:absolute;right:0;top:100%;z-index:3;display:grid;width:120px;padding:4px;gap:3px;background:#241a29;border:1px solid #d9a5e350;border-radius:8px}
+.sd-local-picker button{text-align:left;min-height:28px}
+.sd-icon-detail{grid-column:2;display:flex;align-items:center;gap:8px;color:var(--soft);font-size:11px}
+.sd-icon-detail select{width:auto}
+@media(max-width:480px){dialog.sd-properties,.sd-property-fields{--sd-label-width:84px}.sd-properties .sd-properties-hero{font-size:17px}}
 dialog.sd-panel-region::backdrop{background:transparent}
-dialog.sd-panel-region{box-shadow:0 5px 16px #07020b8c}
+dialog.sd-panel-region{box-shadow:none}
+.sd-modal-active #island,.sd-modal-active .folder-flight,.sd-modal-active #toast{visibility:hidden}
 .sd-search-input{width:100%;border:1px solid #ffffff28;background:#140d18;color:#f4ebf8;border-radius:9px;padding:9px 11px}
 .sd-search-summary{margin:0}.sd-search-results{display:grid;gap:5px;max-height:min(390px,48dvh);min-height:28px;overflow:auto}
 .sd-search-result{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px;text-align:left;min-width:0}
@@ -40,17 +50,19 @@ dialog.sd-panel-region{box-shadow:0 5px 16px #07020b8c}
 
   function stopModalRegion() {
     modalGeneration++;
+    dialogMoved=()=>{};
     modalObserver?.disconnect();
     modalObserver = null;
     if (modalFrame !== null) cancelAnimationFrame(modalFrame);
     modalFrame = null;
     dialog.classList.remove('sd-panel-region');
+    document.documentElement.classList.remove('sd-modal-active');
   }
 
   dialog.addEventListener('close', () => {
     // Native close events are queued. A new dialog may already be open.
     if (!dialog.open) stopModalRegion();
-  });
+  }, true);
 
   dialogBuild = function (...args) {
     if (!nativeWindow || !fixedHost || !nativeArea) {
@@ -61,6 +73,7 @@ dialog.sd-panel-region{box-shadow:0 5px 16px #07020b8c}
     stopModalRegion();
     const generation = modalGeneration;
     dialog.classList.add('sd-panel-region');
+    document.documentElement.classList.add('sd-modal-active');
     try {
       dialogBuildHere(...args);
     } catch (error) {
@@ -69,35 +82,39 @@ dialog.sd-panel-region{box-shadow:0 5px 16px #07020b8c}
       throw error;
     }
 
+    let applying=false,dirty=false;
+    function schedule() {
+      dirty=true;
+      if (modalFrame!==null||applying) return;
+      modalFrame=requestAnimationFrame(()=>{modalFrame=null;fitModalRegion();});
+    }
     function fitModalRegion() {
-      if (!dialog.open || generation !== modalGeneration) return;
+      if (!dialog.open || generation !== modalGeneration || applying) return;
+      dirty=false;
       const panel = dialog.getBoundingClientRect();
       if (panel.width <= 0 || panel.height <= 0) return;
-      const shadowPad = 12;
-      const region = nativeCover({
-        x: panel.left + nativeHost.x - shadowPad,
-        y: panel.top + nativeHost.y - shadowPad,
-        w: panel.width + 2 * shadowPad,
-        h: panel.height + 2 * shadowPad
-      });
+      const x = panel.left + nativeHost.x;
+      const y = Math.max(nativeArea.gutter || 0, panel.top + nativeHost.y);
+      const region = {
+        x, y, w: panel.width, h: panel.top + panel.height + nativeHost.y - y,
+        radius: parseFloat(getComputedStyle(dialog).borderTopLeftRadius) || 0
+      };
       if (region.w <= 0 || region.h <= 0) return;
+      applying=true;
       void moveHost(region).then(ok => {
-        // Don't strand a modal outside the current clipping region if Windows rejects it.
-        if (!ok && dialog.open && generation === modalGeneration) void moveHost(nativeFull());
+        applying=false;
+        if (!dialog.open||generation!==modalGeneration) return;
+        if (!ok) dialog.close();
+        else if(dirty)schedule();
       });
     }
-
+    dialogMoved=schedule;
     fitModalRegion();
     if (typeof ResizeObserver === 'function') {
-      modalObserver = new ResizeObserver(() => {
-        if (modalFrame !== null || generation !== modalGeneration) return;
-        modalFrame = requestAnimationFrame(() => {
-          modalFrame = null;
-          fitModalRegion();
-        });
-      });
+      modalObserver = new ResizeObserver(schedule);
       modalObserver.observe(dialog);
     }
+
   };
 
   // Park keyboard focus on the dock container after Escape, without leaving an icon selected.
@@ -108,183 +125,156 @@ dialog.sd-panel-region{box-shadow:0 5px 16px #07020b8c}
     if (refocus) dockView.focus({ preventScroll: true });
   };
 
-  const originalIconPicker = iconPicker;
+  const buttonGlyph = {
+    folder: '<path d="M3 7V5a1 1 0 0 1 1-1h5l2 2h7a1 1 0 0 1 1 1v2M3 7v12h15l3-10H7l-2 6"/>',
+    reset: '<path d="M4 10a8 8 0 1 1 1 7M4 4v6h6"/>'
+  };
+  function iconButton(label, glyph, action) {
+    const button = B('', 'quiet sd-icon-button', action);
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+buttonGlyph[glyph]+'</svg>';
+    return button;
+  }
+  function pathRow(input, buttons) {
+    const old = input.closest('label');
+    const row = E('div','field');
+    const label = E('label','',old.firstElementChild.textContent);
+    input.id = 'sd-path-' + uid();
+    label.htmlFor = input.id;
+    const controls = E('div','sd-path-controls');
+    controls.style.setProperty('--sd-buttons', buttons.length);
+    controls.append(input,...buttons);row.append(label,controls);
+    old.replaceWith(row);
+    return {row,controls};
+  }
+
   iconPicker = function (body, source, initial, image, size, round, error, onChange = () => {}, programTarget = null, prior = {}) {
-    // Wrap the existing gallery so saved icons, built-ins and image uploads continue to work.
-    let nativePicture = prior.iconPath && image ? image : '';
-    const shell = E('div', 'sd-native-icon');
-    body.append(shell);
-    const existing = originalIconPicker(shell, source, initial, nativePicture ? '' : image, size, round, error, () => {
-      onChange();
-    });
-    const gallery = shell.querySelector('.gallery');
-    const preview = shell.querySelector('.inline > span');
-    const custom = E('div', 'inline');
-    const pager = E('div', 'sd-icon-pager');
-    const status = E('span', 'asset-name');
-    const previous = B('Previous', 'quiet');
-    const next = B('Next', 'quiet');
-    const reset = B('Clear picked icon', 'quiet');
-    const browse = B('Browse icon…', 'quiet');
-    const pathField = E('input');
-    pathField.type = 'text';
-    pathField.className = 'sd-icon-path';
-    pathField.placeholder = 'Path to an image, ICO, or EXE';
-    pathField.setAttribute('aria-label', 'Icon path');
-    const loadPath = B('Load path', 'quiet', () => {
-      const file = cleanPath(pathField.value);
-      if (!file) return;
-      choose(file, 0, 'custom');
-    });
-    pathField.addEventListener('keydown', event => {
-      if (event.key === 'Enter') { event.preventDefault(); loadPath.click(); }
-    });
-    const fromTarget = programTarget && B('Use target EXE icon', 'quiet', () => {
-      const file = cleanPath(programTarget());
-      if (!/\.exe$/i.test(file)) {
-        error.textContent = 'Select a program EXE in Target location first.';
-        error.hidden = false;
-        return;
+    const defaultKey = source === APP_ICONS ? 'web' : 'folder-emerald';
+    let key = Object.hasOwn(source,initial) ? initial : defaultKey;
+    let picture = image || '', path = prior.iconPath || '';
+    let index = Number(prior.iconIndex) || 0, count = Number(prior.iconCount) || (picture ? 1 : 0);
+    let mode = prior.iconMode || (picture ? 'custom' : 'default');
+    let generation = 0, busy = false, draft = false, timer, targetTimer, renderedKey, renderedPicture;
+    const fields = section(body,'Icon');
+    fields.classList.add('sd-property-fields');
+    const input = field(fields,'Icon path','text',path,{placeholder:'Default icon'});
+    const browse = iconButton('Browse icon','folder',() => void load(null,0,'custom'));
+    const reset = iconButton('Reset icon to automatic','reset',() => resetIcon(true));
+    pathRow(input,[browse,reset]);
+    const detail = E('div','sd-icon-detail');
+    const variants = E('select');
+    variants.setAttribute('aria-label','Embedded icon');
+    const status = E('span');
+    status.setAttribute('role','status');
+    detail.append(variants,status);
+    fields.append(detail);
+    const hoverPath = pathTooltip(input);
+    const attached = () => dialog.open && error.isConnected;
+    const currentTarget = () => {
+      const target = cleanPath(programTarget?.() || '');
+      return /\.exe$/i.test(target) ? target : '';
+    };
+    function draw(keepDraft = false) {
+      if (!keepDraft) input.value = path;
+      hoverPath();
+      if (variants.options.length !== count && count > 1) {
+        variants.replaceChildren(...Array.from({length:count},(_,i)=>{
+          const option=E('option','','Icon '+(i+1));option.value=i;return option;
+        }));
+      } else if (count <= 1 && variants.options.length) variants.replaceChildren();
+      variants.value = String(index);
+      variants.hidden = count <= 1;
+      variants.disabled = busy || draft;
+      const message = busy ? 'Reading icon…' : mode==='target' ? 'From target EXE' : picture && !path ? 'Saved custom icon' : '';
+      status.textContent = message;
+      detail.hidden = variants.hidden && !message;
+      if (key!==renderedKey || picture!==renderedPicture) {
+        renderedKey=key;renderedPicture=picture;onChange({icon:key,image:picture});
       }
-      choose(file, 0, 'target');
-    });
-    let path = nativePicture ? prior.iconPath : '', chosen = Number(prior.iconIndex) || 0;
-    let count = nativePicture ? Math.max(chosen + 1, Number(prior.iconCount) || 1) : 0;
-    let mode = prior.iconMode || (image ? 'custom' : 'default'), busy = false, generation = 0;
-    pathField.value = path;
-    const updatePathTooltip = pathTooltip(pathField);
-
-    function updatePager() {
-      updatePathTooltip();
-      pager.hidden = count <= 1;
-      previous.disabled = busy || chosen <= 0;
-      next.disabled = busy || chosen + 1 >= count;
-      browse.disabled = loadPath.disabled = busy;
-      if (fromTarget) fromTarget.disabled = busy;
-      reset.hidden = !nativePicture;
-      status.textContent = busy ? 'Reading icon…' : nativePicture
-        ? basename(path) + (count > 1 ? ' · ' + (chosen + 1) + ' of ' + count : '') : '';
     }
-
-    async function loadIcon(file, index) {
-      const result = await call('read_shortcut_icon', { target: file, index });
-      const decoded = new Image();
-      decoded.src = result.source;
-      await decoded.decode();
-      const canvas = document.createElement('canvas');
-      const factor = 96 / Math.max(decoded.naturalWidth, decoded.naturalHeight);
-      canvas.width = Math.max(1, Math.round(decoded.naturalWidth * factor));
-      canvas.height = Math.max(1, Math.round(decoded.naturalHeight * factor));
-      canvas.getContext('2d').drawImage(decoded, 0, 0, canvas.width, canvas.height);
-      return { picture: canvas.toDataURL('image/png'), count: result.count };
+    function stop() {
+      clearTimeout(timer);clearTimeout(targetTimer);
+      generation++;busy=draft=false;
     }
-
-    async function choose(fileOrNull, index, nextMode = 'custom', automatic = false) {
-      if (busy && !automatic) return;
-      const ticket = ++generation;
-      busy = true;
-      error.hidden = true;
-      updatePager();
+    async function load(file, variant = 0, nextMode = 'custom') {
+      stop();
+      const ticket = generation;
+      const current = () => attached() && ticket===generation;
+      busy = true;error.hidden = true;
+      draw(file !== null);
       try {
-        const file = fileOrNull || await pickPath('icon');
-        if (!file || !shell.isConnected || !dialog.open || ticket !== generation) return;
-        const result = await loadIcon(file, index);
-        if (!shell.isConnected || !dialog.open || ticket !== generation) return;
-        nativePicture = result.picture;
-        path = file;
-        pathField.value = file;
-        mode = nextMode;
-        chosen = index;
-        count = result.count;
-        gallery.querySelectorAll('button').forEach(button => button.setAttribute('aria-pressed', 'false'));
-        preview.replaceChildren(art(initial, source, size, nativePicture, round));
-        onChange();
+        file = file || await pickPath('icon');
+        if (!file || !current()) return;
+        const result = await call('read_shortcut_icon',{target:file,index:variant});
+        if (!current()) return;
+        picture=result.source;path=file;index=variant;count=result.count;mode=nextMode;
       } catch (message) {
-        if (shell.isConnected && dialog.open && ticket === generation) {
-          if (automatic) {
-            nativePicture = '';
-            path = pathField.value = '';
-            count = chosen = 0;
-            mode = 'default';
-            const pick = existing();
-            preview.replaceChildren(art(pick.icon, source, size, pick.image, round));
-            gallery.querySelectorAll('button').forEach(button =>
-              button.setAttribute('aria-pressed', String(!pick.image && button.dataset.icon === pick.icon)));
-            onChange();
-          } else {
-            error.textContent = String(message);
-            error.hidden = false;
-          }
+        if (current() && nextMode !== 'target') {
+          error.textContent=String(message);error.hidden=false;
         }
       } finally {
-        if (ticket === generation) busy = false;
-        updatePager();
+        if(current()){busy=false;draw();}
       }
     }
-
-    function clearPicked(nextMode = 'custom') {
-      generation++;
-      busy = false;
-      nativePicture = '';
-      path = pathField.value = '';
-      mode = nextMode;
-      count = 0;
-      chosen = 0;
-      updatePager();
+    function resetIcon(explicit = false) {
+      stop();error.hidden=true;
+      if(explicit)key=defaultKey;
+      picture='';index=count=0;
+      path=currentTarget();mode=path?'target':'default';
+      draw();
+      if(path)void load(path,0,'target');
     }
-
-    // A built-in pick or browser-file upload overrides a native pick.
-    gallery.addEventListener('click', event => { if (event.target.closest('button')) clearPicked(); }, true);
-    shell.querySelector('input[type=file]').addEventListener('change', event => {
-      const blob = event.target.files[0];
-      if (blob && ['image/png','image/jpeg','image/gif','image/webp'].includes(blob.type) && blob.size <= 360000) clearPicked();
-    }, true);
-    for (const b of shell.querySelectorAll('button')) {
-      if (b.textContent === 'Clear') b.addEventListener('click', () => clearPicked('default'), true);
+    function syncTarget() {
+      if (mode==='custom' || draft) return;
+      const target=currentTarget();
+      if (target===path) return;
+      resetIcon();
     }
-    browse.onclick = () => choose(null, 0);
-    previous.onclick = () => choose(path, chosen - 1, mode);
-    next.onclick = () => choose(path, chosen + 1, mode);
-    reset.onclick = () => {
-      clearPicked('default');
-      const pick = existing();
-      mode = pick.image ? 'custom' : 'default';
-      preview.replaceChildren(art(pick.icon, source, size, pick.image, round));
-      gallery.querySelectorAll('button').forEach(button =>
-        button.setAttribute('aria-pressed', String(!pick.image && button.dataset.icon === pick.icon)));
-      onChange();
-    };
-    pager.append(previous, next);
-    custom.append(pathField, loadPath, browse);
-    if (fromTarget) custom.append(fromTarget);
-    custom.append(pager, status, reset);
-    shell.append(custom);
-    if (nativePicture) {
-      gallery.querySelectorAll('button').forEach(button => button.setAttribute('aria-pressed', 'false'));
-      preview.replaceChildren(art(initial, source, size, nativePicture, round));
+    function commitPath() {
+      if(!draft)return;
+      const value=cleanPath(input.value);
+      if(!value){resetIcon(true);return;}
+      if(value===path){stop();draw();return;}
+      void load(value,0,'custom');
     }
-    updatePager();
+    input.addEventListener('input',()=>{
+      stop();draft=true;error.hidden=true;draw(true);
+      timer=setTimeout(()=>{if(attached())commitPath();},320);
+    });
+    input.addEventListener('change',commitPath);
+    input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commitPath();}});
+    variants.addEventListener('change',()=>void load(path,+variants.value,mode));
+    draw();
+    queueMicrotask(()=>{if(attached())syncTarget();});
     const read = () => {
-      if (busy) throw Error('Finish choosing the icon before saving.');
-      return nativePicture
-        ? { icon: Object.hasOwn(source, initial) ? initial : Object.keys(source)[0], image: nativePicture,
-            iconPath: path, iconIndex: chosen, iconCount: count, iconMode: mode }
-        : { ...existing(), iconPath: '', iconIndex: 0, iconCount: 0, iconMode: mode };
+      if(draft)commitPath();
+      syncTarget();
+      if(busy)throw Error('The icon is still loading. Try saving again when it’s ready.');
+      return {icon:key,image:picture,iconPath:path,iconMode:mode,iconIndex:index,iconCount:count};
     };
-    read.useDefaultExe = file => {
-      if (mode !== 'custom' && (!nativePicture || path !== file)) return choose(file, 0, 'target', true);
+    read.syncTarget = (debounce=false) => {
+      clearTimeout(targetTimer);
+      if(debounce)targetTimer=setTimeout(()=>{if(attached())syncTarget();},320);
+      else syncTarget();
     };
     return read;
   };
 
+  dialog.addEventListener('close',()=>{if(!dialog.open)dialog.classList.remove('sd-properties');});
   editShortcut = function (f, where, t) {
     const base = t || { id: uid(), type: 'item', name: '', target: '', kind: 'program', args: '', cwd: '', icon: 'web', image: '' };
     let name, kind, target, args, cwd, readIcon;
     let browsing = false;
     dialogBuild(t ? 'Shortcut properties' : 'Add shortcut here',
       'Row ' + (where.r + 1) + ', column ' + (where.c + 1), 'Save shortcut', (body, error) => {
+        dialog.classList.add('sd-properties');
+        const hero=E('div','sd-properties-hero'),heroName=E('span','',base.name||'New shortcut'),heroArt=E('span','sd-hero-icon');
+        hero.append(heroName,heroArt);body.append(hero);
         const p = section(body, 'Shortcut target');
+        p.classList.add('sd-property-fields');
         name = field(p, 'Display name', 'text', base.name, { required: true, maxLength: 65 });
+        name.addEventListener('input',()=>{heroName.textContent=name.value||'New shortcut';});
         const savedKind = base.kind || guess(base.target);
         kind = select(p, 'Target type', [
           ['program', 'Program'], ['local', 'File or folder'], ['url', 'Web link']
@@ -292,76 +282,70 @@ dialog.sd-panel-region{box-shadow:0 5px 16px #07020b8c}
         target = field(p, 'Target location', 'text', base.target, { required: true });
         args = field(p, 'Arguments', 'text', base.args || '');
         cwd = field(p, 'Start in', 'text', base.cwd || '');
-
-        function buttonsFor(input) {
-          const row = E('div', 'sd-browse');
-          // Keep the button outside the input's label so a click cannot activate both.
-          const wrapper = E('div', 'sd-path-row');
-          const label = input.closest('label');
-          label.before(wrapper);
-          wrapper.append(label, row);
-          return { row, wrapper };
-        }
-
-        const { row: targetButtons } = buttonsFor(target);
-        const { row: folderButtons, wrapper: cwdWrapper } = buttonsFor(cwd);
-        const updateTargetTooltip = pathTooltip(target);
-        const updateFolderTooltip = pathTooltip(cwd);
+        const updateTargetTooltip = pathTooltip(target),updateFolderTooltip = pathTooltip(cwd);
         async function browse(mode, input) {
+          choices.hidden=true;
           if (browsing) return;
-          browsing = true;
-          error.hidden = true;
+          browsing = true;error.hidden = true;
           try {
             const path = await pickPath(mode);
             if (!path || !input.isConnected || !dialog.open) return;
             input.value = path;
-            if (input === target) updateTargetTooltip();
-            else updateFolderTooltip();
-            if (input === target && !name.value.trim()) {
-              const label = basename(path);
-              name.value = (mode === 'exe' ? label.replace(/\.exe$/i, '') : label).slice(0, 65);
-              name.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-            if (input === target && mode === 'exe') await readIcon.useDefaultExe(path);
+            if (input === target) {
+              updateTargetTooltip();
+              if (!name.value.trim()) {
+                const label=basename(path);
+                name.value=(mode==='exe'?label.replace(/\.exe$/i,''):label).slice(0,65);
+                name.dispatchEvent(new Event('input',{bubbles:true}));
+              }
+              readIcon.syncTarget();
+            } else updateFolderTooltip();
           } catch (message) {
-            if (input.isConnected && dialog.open) {
-              error.textContent = String(message);
-              error.hidden = false;
-            }
-          } finally {
-            browsing = false;
-          }
+            if (input.isConnected && dialog.open) {error.textContent = String(message);error.hidden = false;}
+          } finally { browsing = false; }
         }
-        const exe = B('Browse EXE…', 'quiet', () => browse('exe', target));
-        const file = B('Browse file…', 'quiet', () => browse('file', target));
-        const folder = B('Browse folder…', 'quiet', () => browse('folder', target));
-        targetButtons.append(exe, file, folder);
-        folderButtons.append(B('Browse folder…', 'quiet', () => browse('folder', cwd)));
+        const choices = E('div','sd-local-picker');choices.hidden=true;
+        choices.append(B('Choose file','quiet',()=>void browse('file',target)),B('Choose folder','quiet',()=>void browse('folder',target)));
+        const targetButton=iconButton('Browse target','folder',()=>{
+          if(kind.value==='local'){choices.hidden=!choices.hidden;if(!choices.hidden)choices.firstElementChild.focus();}
+          else void browse('exe',target);
+        });
+        const targetRow=pathRow(target,[targetButton]);
+        targetRow.controls.append(choices);
+        targetRow.controls.addEventListener('focusout',event=>{
+          if(!event.relatedTarget || !targetRow.controls.contains(event.relatedTarget))choices.hidden=true;
+        });
+        targetRow.controls.addEventListener('keydown',event=>{
+          if(event.key==='Escape'&&!choices.hidden){event.preventDefault();event.stopPropagation();choices.hidden=true;targetButton.focus();}
+        });
+        const cwdRow=pathRow(cwd,[iconButton('Browse start-in folder','folder',()=>void browse('folder',cwd))]);
+        readIcon = iconPicker(body, APP_ICONS, base.icon, base.image, 96, '0px', error,
+          pick=>heroArt.replaceChildren(art(pick.icon,APP_ICONS,96,pick.image,'0px')),
+          () => kind.value === 'program' || kind.value === 'local' ? target.value : '', base);
         function update() {
           const program = kind.value === 'program', local = kind.value === 'local';
-          exe.hidden = !program;
-          file.hidden = folder.hidden = !local;
-          targetButtons.hidden = !program && !local;
-          args.closest('label').hidden = cwdWrapper.hidden = !program;
+          choices.hidden=true;
+          targetButton.hidden = !program && !local;
+          targetRow.controls.style.setProperty('--sd-buttons',program||local?1:0);
+          args.closest('label').hidden = cwdRow.row.hidden = !program;
           target.placeholder = kind.value === 'url' ? 'https://example.com or steam://…' : 'C:\\Path\\To\\Target';
+          if(!program&&!local)targetRow.controls.style.gridTemplateColumns='minmax(0,1fr)';
+          else targetRow.controls.style.gridTemplateColumns='';
+          readIcon.syncTarget();
         }
-        kind.onchange = update;
+        kind.addEventListener('change',update);
+        target.addEventListener('input',()=>readIcon.syncTarget(true));
+        target.addEventListener('change',()=>readIcon.syncTarget());
         update();
-        readIcon = iconPicker(body, APP_ICONS, base.icon, base.image, 38, false, error, () => {},
-          () => kind.value === 'program' ? target.value : '', base);
-        target.addEventListener('change', () => {
-          const file = cleanPath(target.value);
-          if (kind.value === 'program' && /\.exe$/i.test(file)) void readIcon.useDefaultExe(file);
-        });
       }, () => {
         if (browsing) throw Error('Finish choosing the target before saving.');
-        const n = name.value.trim(), dest = target.value.trim(), pick = readIcon();
+        const n = name.value.trim(), dest = target.value.trim();
         if (!n || !dest) throw Error('Enter a name and target.');
         if (kind.value === 'url') {
           try { new URL(dest); }
           catch { throw Error('Enter a full URL, including its scheme.'); }
         }
-        const program = kind.value === 'program';
+        const pick = readIcon(), program = kind.value === 'program';
         Object.assign(base, { name: n, target: dest, kind: kind.value,
           args: program ? args.value.trim() : '', cwd: program ? cleanPath(cwd.value) : '', ...pick });
         if (!t && !placeEntries(f, where, [base])) throw Error('This grid is full.');
@@ -397,7 +381,9 @@ dialog.sd-panel-region{box-shadow:0 5px 16px #07020b8c}
       const result = { ...defaults };
       const bounds = {
         opacity:[0,100], radius:[0,56], icon:[24,88],
-        gap:[0,32], pad:[0,36], borderOpacity:[0,100], borderWidth:[1,5], titleIcon:[16,44],
+        gap:[0,120], gapX:[0,120], gapY:[0,120], pad:[0,160], padX:[0,160], padY:[0,160],
+        hoverMode:[0,5], hoverScale:[100,200], hoverLift:[0,48], hoverAngle:[-30,30], hoverDuration:[0,900], hoverCurve:[0,3],
+        groundShadowOffset:[-24,48], highlightArea:[0,32], reflectionArea:[0,64], reflectionIntensity:[0,100], groundShadowIntensity:[0,100], borderOpacity:[0,100], borderWidth:[1,5], titleIcon:[16,44],
         motionSpeed:[25,250], hoverOpacity:[0,100], labelFont:[9,18], labelWidth:[64,200],
         launchWidth:[140,680],launchHeight:[42,120],launchHold:[0,8000],launchTravel:[0,1000],
         launchReturn:[0,700],launchIcon:[16,84],launchFont:[11,34],launchRadius:[0,60],launchGap:[0,28],launchPad:[4,28]
@@ -410,6 +396,9 @@ dialog.sd-panel-region{box-shadow:0 5px 16px #07020b8c}
           : int(val, ...(bounds[key] || [0,100]));
         if (!ok) fail('appearance value "' + key + '" is not valid.');
         result[key] = val;
+      }
+      for (const key of ['gap','pad']) {
+        for (const axis of ['X','Y']) if (input[key+axis] === undefined) result[key+axis] = result[key];
       }
       for (const key of ['iconCorner','highlightCorner']) {
         if(input[key]===undefined)continue;
@@ -455,7 +444,14 @@ dialog.sd-panel-region{box-shadow:0 5px 16px #07020b8c}
         icon:Object.hasOwn(FOLDER_ICONS,f.icon) ? f.icon : Object.keys(FOLDER_ICONS)[0],
         image:f.image || '', ...iconSource(f) };
     });
-    return { edge:s.edge, align:s.align, dock:appearanceCopy(s.dock, dockDefaults), folders };
+    const general={...generalDefaults};
+    for(const [key,fallback] of Object.entries(generalDefaults)){
+      const value=s.general?.[key];
+      if(value===undefined)continue;
+      if(typeof fallback==='boolean'?typeof value!=='boolean':!int(value,500,5000))fail('invalid General setting.');
+      general[key]=value;
+    }
+    return { edge:s.edge, align:s.align, general, dock:appearanceCopy(s.dock, dockDefaults), folders };
   }
 
   const notice = message => {

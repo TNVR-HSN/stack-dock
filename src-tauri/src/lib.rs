@@ -3,11 +3,6 @@ mod native_shortcuts;
 mod desktop_widget;
 
 #[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
-#[tauri::command]
 fn set_dock_bounds(
     window: tauri::WebviewWindow,
     x: i32,
@@ -64,6 +59,7 @@ fn set_dock_region(
     y: i32,
     width: i32,
     height: i32,
+    radius: Option<i32>,
 ) -> Result<(), String> {
     #[cfg(windows)]
     {
@@ -72,6 +68,7 @@ fn set_dock_region(
         #[link(name = "gdi32")]
         unsafe extern "system" {
             fn CreateRectRgn(left: i32, top: i32, right: i32, bottom: i32) -> *mut c_void;
+            fn CreateRoundRectRgn(left: i32, top: i32, right: i32, bottom: i32, ew: i32, eh: i32) -> *mut c_void;
             fn DeleteObject(object: *mut c_void) -> i32;
         }
 
@@ -94,7 +91,12 @@ fn set_dock_region(
         let bottom = y.checked_add(height).ok_or("Dock region is too tall")?;
 
         unsafe {
-            let region = CreateRectRgn(x, y, right, bottom);
+            let diameter = 2 * radius.unwrap_or(0).clamp(0, width.min(height) / 2);
+            let region = if diameter == 0 {
+                CreateRectRgn(x, y, right, bottom)
+            } else {
+                CreateRoundRectRgn(x, y, right, bottom, diameter, diameter)
+            };
             if region.is_null() {
                 return Err("Windows could not create the dock region".into());
             }
@@ -109,7 +111,7 @@ fn set_dock_region(
 
     #[cfg(not(windows))]
     {
-        let _ = (window, x, y, width, height);
+        let _ = (window, x, y, width, height, radius);
         Err("Dock regions are only supported on Windows".into())
     }
 }
@@ -189,15 +191,51 @@ fn open_shortcut_path(app: tauri::AppHandle, target: String) -> Result<(), Strin
         .map_err(|error| error.to_string())
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StartupStatus {
+    enabled: bool,
+    can_enable: bool,
+}
+
+#[tauri::command]
+fn stack_dock_startup(app: tauri::AppHandle, enabled: Option<bool>) -> Result<StartupStatus, String> {
+    #[cfg(windows)]
+    {
+        use tauri_plugin_autostart::ManagerExt;
+        let launcher = app.autolaunch();
+        let can_enable = !cfg!(debug_assertions);
+        if let Some(enabled) = enabled {
+            if enabled && !can_enable {
+                return Err("Use an installed or release build to enable startup.".into());
+            }
+            let result = if enabled { launcher.enable() } else { launcher.disable() };
+            result.map_err(|e| format!("Could not update Windows startup: {e}"))?;
+        }
+        let enabled = launcher.is_enabled().map_err(|e| e.to_string())?;
+        Ok(StartupStatus { enabled, can_enable })
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, enabled);
+        Ok(StartupStatus { enabled: false, can_enable: false })
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+    let builder = tauri::Builder::default();
+    #[cfg(windows)]
+    let builder = builder.plugin(tauri_plugin_autostart::init(
+        tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+        None,
+    ));
+    builder.plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
-            greet,
             set_dock_bounds,
             set_dock_region,
+            stack_dock_startup,
             launch_program,
             open_shortcut_path,
             native_shortcuts::pick_shortcut_path,
