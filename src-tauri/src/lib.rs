@@ -60,6 +60,7 @@ fn set_dock_region(
     width: i32,
     height: i32,
     radius: Option<i32>,
+    clip_top: Option<i32>,
 ) -> Result<(), String> {
     #[cfg(windows)]
     {
@@ -70,6 +71,7 @@ fn set_dock_region(
             fn CreateRectRgn(left: i32, top: i32, right: i32, bottom: i32) -> *mut c_void;
             fn CreateRoundRectRgn(left: i32, top: i32, right: i32, bottom: i32, ew: i32, eh: i32) -> *mut c_void;
             fn DeleteObject(object: *mut c_void) -> i32;
+            fn CombineRgn(dst: *mut c_void, first: *mut c_void, second: *mut c_void, mode: i32) -> i32;
         }
 
         #[link(name = "user32")]
@@ -83,7 +85,7 @@ fn set_dock_region(
         if width == 0 && height == 0 {
             return Ok(());
         }
-        if x < 0 || y < 0 || width <= 0 || height <= 0 {
+        if (clip_top.is_none() && (x < 0 || y < 0)) || width <= 0 || height <= 0 {
             return Err("Invalid dock region".into());
         }
 
@@ -100,6 +102,22 @@ fn set_dock_region(
             if region.is_null() {
                 return Err("Windows could not create the dock region".into());
             }
+            // Intersect the original rounded dialog region with the safe area.
+            // Moving partly past an edge must not create new rounded corners at the cut.
+            if let Some(top) = clip_top.filter(|&top| top > y) {
+                let clip = CreateRectRgn(x, top.min(bottom), right, bottom);
+                if clip.is_null() {
+                    DeleteObject(region);
+                    return Err("Windows could not create the caption clip".into());
+                }
+                const RGN_AND: i32 = 1;
+                let status = CombineRgn(region, region, clip, RGN_AND);
+                DeleteObject(clip);
+                if status == 0 {
+                    DeleteObject(region);
+                    return Err("Windows could not clip the dialog".into());
+                }
+            }
             if SetWindowRgn(hwnd.0 as *mut c_void, region, 1) == 0 {
                 DeleteObject(region);
                 return Err("Windows could not apply the dock region".into());
@@ -111,7 +129,7 @@ fn set_dock_region(
 
     #[cfg(not(windows))]
     {
-        let _ = (window, x, y, width, height, radius);
+        let _ = (window, x, y, width, height, radius, clip_top);
         Err("Dock regions are only supported on Windows".into())
     }
 }
@@ -191,6 +209,27 @@ fn open_shortcut_path(app: tauri::AppHandle, target: String) -> Result<(), Strin
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn open_shortcut_destination(app: tauri::AppHandle, target: String) -> Result<(), String> {
+    use std::path::Path;
+    use tauri_plugin_opener::OpenerExt;
+
+    let path = Path::new(target.trim().trim_matches('"'));
+    if !path.is_absolute() {
+        return Err("Enter a full file or folder path.".into());
+    }
+    let folder = if path.is_dir() {
+        path
+    } else {
+        path.parent().ok_or("This shortcut has no containing folder.")?
+    };
+    if !folder.is_dir() {
+        return Err(format!("Destination folder not found: {}", folder.display()));
+    }
+    app.opener().open_path(folder.to_string_lossy().into_owned(), None::<&str>)
+        .map_err(|error| error.to_string())
+}
+
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StartupStatus {
@@ -238,8 +277,10 @@ pub fn run() {
             stack_dock_startup,
             launch_program,
             open_shortcut_path,
+            open_shortcut_destination,
             native_shortcuts::pick_shortcut_path,
             native_shortcuts::read_shortcut_icon,
+            native_shortcuts::list_shortcut_icons,
             native_shortcuts::inspect_shortcut_drops,
             native_shortcuts::exit_stack_dock,
             native_shortcuts::stack_dock_layout_backup,

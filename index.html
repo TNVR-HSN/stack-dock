@@ -11,13 +11,15 @@
 .desktop::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(112deg,transparent 34%,#c9608820 47%,transparent 59%),linear-gradient(246deg,transparent 33%,#ac78f014 49%,transparent 62%),radial-gradient(ellipse at 50% 52%,transparent 38%,#050309b3 100%);pointer-events:none}
 .quiet,.primary{border:1px solid var(--line);border-radius:8px;padding:7px 11px;min-height:34px;background:#ffffff0b}.quiet:hover{background:#ffffff18}.primary{background:#dca6ef;color:#291232;font-weight:750;border-color:#f3c6ff}.primary:hover{background:#efbdfc}
 .island{position:absolute;z-index:4;isolation:isolate;overflow:hidden;touch-action:auto}.glass{position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:var(--fill);border:var(--border-w,1px) solid var(--edge);box-shadow:inset 0 1px 0 var(--shine)}.dock-view,.gs-view{position:absolute;inset:0;min-width:0;min-height:0}.dock-view{display:flex;align-items:center;justify-content:center}.gs-view{padding:var(--pad-y) var(--pad-x);display:flex;flex-direction:column;align-items:stretch}
-.gs-heading{display:flex;align-items:flex-start;justify-content:center;flex:0 0 var(--heading-h);min-width:0;pointer-events:none}
+.gs-heading{display:flex;align-items:flex-start;justify-content:center;flex:0 0 var(--heading-h);min-width:0;position:relative}
+.gs-heading.has-settings{padding-inline:25px}
+.gs-settings{position:absolute;right:0;top:0;width:25px;height:25px;border:0;border-radius:6px;background:transparent;padding:0;display:grid;place-items:center;font-size:17px;line-height:1}.gs-settings:hover{background:#ffffff22}
 .gs-heading-inner{height:28px;max-width:100%;display:flex;align-items:center;gap:8px}
 .gs-heading h2{min-width:0;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.25;font-weight:650;letter-spacing:.015em;text-shadow:0 1px 6px #000a}
 .gs-view .scroll{flex:1 1 0;height:auto}
 .folder-flight{position:fixed;z-index:6;pointer-events:none;transform-origin:center;will-change:transform}
 .flight-endpoint{visibility:hidden}.folders{display:flex;min-width:0;min-height:0;gap:var(--gap-y) var(--gap-x);padding:var(--pad-y) var(--pad-x);max-width:100%;max-height:100%;overflow:auto;scrollbar-width:none}.folders.vertical{flex-direction:column}.folders::-webkit-scrollbar{display:none}.folder-btn{border:none;background:none;flex:none;border-radius:15px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;padding:3px;width:var(--bw);height:var(--bh);transition:background .15s}.folder-btn:hover{background:#fff1}.folder-btn span:not(.art){font-size:10px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.art{display:block;flex:none;width:var(--size);height:var(--size);border-radius:var(--ir,25%);overflow:hidden}.art svg,.art img{width:100%;height:100%;display:block;object-fit:contain;pointer-events:none}
-.scroll{width:100%;height:100%;overflow:auto;scrollbar-width:thin;scrollbar-color:#b17dc07d transparent;overscroll-behavior:contain}.grid{display:grid;width:max-content;min-height:100%;grid-template-columns:repeat(var(--cols),var(--cellw));grid-auto-rows:var(--cellh);gap:var(--gap-y) var(--gap-x);align-content:start}.cell{display:grid;place-items:center;position:relative;border-radius:11px;min-width:0;min-height:0} .cell.spacer.guides{outline:1px dashed #e5bfe84d;outline-offset:-1px;background:#ffffff06}.cell.spacer.guides::after{content:"";width:13px;height:1px;background:#e4c5e28a}.cell.drop-target{outline:1px dashed #efb3ff;outline-offset:-1px;background:#df9bf031;box-shadow:inset 0 0 0 2px #5f2e728c}.tile{width:100%;height:100%;border:0;background:none;min-width:0;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:2px;border-radius:10px;touch-action:none;user-select:none;-webkit-user-select:none}.tile:hover,.tile:focus-visible{background:#ffffff14}.tile.dragging{opacity:.32}.tile .caption{max-width:100%;flex:none;max-height:2.36em;font-size:11px;line-height:1.18;text-align:center;overflow-wrap:anywhere;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;text-shadow:0 1px 3px #000}.icon-effects{position:relative;display:block;flex:none;pointer-events:none;width:var(--effect-size);height:var(--effects-h)}
+.scroll{width:100%;height:100%;overflow:auto;scrollbar-width:thin;scrollbar-color:#b17dc07d transparent;overscroll-behavior:contain}.grid{display:grid;width:max-content;min-height:100%;grid-template-columns:repeat(var(--cols),var(--cellw));grid-auto-rows:var(--cellh);gap:var(--gap-y) var(--gap-x);align-content:start}.cell{display:grid;place-items:center;position:relative;border-radius:11px;min-width:0;min-height:0}.cell.drop-target{outline:1px dashed #efb3ff;outline-offset:-1px;background:#df9bf031;box-shadow:inset 0 0 0 2px #5f2e728c}.tile{width:100%;height:100%;border:0;background:none;min-width:0;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:2px;border-radius:10px;touch-action:none;user-select:none;-webkit-user-select:none}.tile:hover,.tile:focus-visible{background:#ffffff14}.tile.dragging{opacity:.32}.tile .caption{max-width:100%;flex:none;max-height:2.36em;font-size:11px;line-height:1.18;text-align:center;overflow-wrap:anywhere;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;text-shadow:0 1px 3px #000}.icon-effects{position:relative;display:block;flex:none;pointer-events:none;width:var(--effect-size);height:var(--effects-h)}
 .icon-effects .reflect{position:absolute;inset:0 0 auto;height:var(--reflection-h);overflow:hidden;mask-image:linear-gradient(#000,transparent);opacity:var(--reflection-alpha)}
 .icon-effects .reflect .art{transform:scaleY(-1);transform-origin:50% 50%}
 .icon-effects .ground-shadow{position:absolute;top:var(--shadow-y,0px);left:5%;width:90%;height:var(--shadow-h,8px);background:radial-gradient(ellipse at center,#000 0%,#0008 42%,transparent 73%);opacity:var(--shadow-alpha)}
@@ -82,6 +84,8 @@ dialog.settings-dialog{width:min(950px,calc(100% - 24px))}
 .settings-pane>.section{align-self:stretch}
 .settings-pane .fields>.note{grid-column:1/-1;margin:2px 0}
 .settings-pane .fields{align-content:start}
+.settings-pane .gs-dimensions{grid-template-columns:repeat(2,minmax(0,1fr))}
+.settings-groups{flex-wrap:wrap}
 .settings-pane .fields>.check{min-height:28px}
 .settings-pane .sd-preview-card{grid-column:1/-1}
 .settings-pane .sd-property-fields{--sd-label-width:80px}
@@ -89,8 +93,7 @@ dialog.settings-dialog{width:min(950px,calc(100% - 24px))}
 .settings-pane fieldset legend{font-weight:650}
 .card-toggle{grid-column:1/-1}
 #settings-pane-folder .fields>.field:first-child{grid-column:1/-1}
-dialog.sd-movable .dialogtop{cursor:grab;touch-action:none;user-select:none}
-dialog.sd-movable .dialogtop:active{cursor:grabbing}
+dialog.sd-movable .dialogtop{touch-action:none;user-select:none}
 dialog.sd-movable .dialogtop button{cursor:pointer}
 dialog.sd-movable.sd-dialog-placed:modal{margin:0;right:auto;bottom:auto;left:var(--panel-x);top:var(--panel-y)}
 @media(max-width:790px){
@@ -102,6 +105,7 @@ dialog.sd-movable.sd-dialog-placed:modal{margin:0;right:auto;bottom:auto;left:va
  .settings-monitor .settings-preview{min-height:90px;max-height:110px}
  .settings-monitor>.note{display:none}
 }
+.field select.sd-target-type{width:min(100%,215px);justify-self:start}
 </style>
 </head>
 <body>
@@ -414,9 +418,9 @@ const B=(label,cls='',fn)=>{const b=E('button',cls,label);b.type='button';if(fn)
 const cap=s=>s[0].toUpperCase()+s.slice(1), clamp=(x,a,b)=>Math.max(a,Math.min(x,b));
 const uid=()=>Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
 const generalDefaults={hoverNames:true,hoverTargets:true,hoverDelay:1500,collapseOnFocusLoss:true};
-const iconEffectDefaults={hoverMode:0,hoverScale:125,hoverLift:10,hoverAngle:10,hoverDuration:160,hoverCurve:1,groundShadowOffset:0,gapSplit:false,padSplit:false,highlightArea:0,reflectionIntensity:55,reflectionArea:10,groundShadow:false,groundShadowIntensity:65};
+const iconEffectDefaults={highlightEnabled:true,hitExpand:false,hitPadding:8,hoverLabels:true,hoverLabelBackground:true,hoverLabelSize:12,customHoverDelay:false,hoverDetailsDelay:1500,hoverMode:0,hoverScale:125,hoverLift:10,hoverAngle:10,hoverDuration:160,hoverCurve:1,groundShadowOffset:0,gapSplit:false,padSplit:false,highlightArea:0,reflectionIntensity:55,reflectionArea:10,groundShadow:false,groundShadowIntensity:65};
 const dockDefaults={...iconEffectDefaults,gapX:6,gapY:6,padX:8,padY:8,reflections:false,opacity:76,border:true,shadow:true,radius:26,icon:40,gap:6,pad:8,labels:false,color:'#101019',motion:true,borderColor:'#ffffff',borderOpacity:23,borderWidth:1,roundIcons:true};
-const gsDefaults={...iconEffectDefaults,gapX:7,gapY:7,padX:15,padY:15,opacity:84,border:true,shadow:true,radius:22,icon:52,gap:7,pad:15,labels:true,reflections:true,color:'#0e0e16',guides:false,borderColor:'#ffffff',borderOpacity:23,borderWidth:1,titleIcon:25,roundIcons:true};
+const gsDefaults={...iconEffectDefaults,gapX:7,gapY:7,padX:15,padY:15,opacity:84,border:true,shadow:true,radius:22,icon:52,gap:7,pad:15,labels:true,reflections:true,color:'#0e0e16',borderColor:'#ffffff',borderOpacity:23,borderWidth:1,titleIcon:25,roundIcons:true,settingsGear:false};
 const storageKey='dynamic-island-stack-dock-custom-v1';
 const headingHeight=42,headingIconSize=25;
 const triggerSize=(f,d=state.dock)=>f.triggerSize||d.icon;
@@ -424,7 +428,7 @@ const headingSize=s=>s.titleIcon||headingIconSize;
 const headingSpace=s=>Math.max(headingHeight,headingSize(s)+15);
 function fresh(){
  return {edge:'bottom',align:'center',general:{...generalDefaults},dock:{...dockDefaults},folders:[{
-  id:uid(),name:'Shortcuts',icon:'folder-emerald',image:'',mode:'auto',cols:5,rows:3,slots:[],style:{...gsDefaults}
+  id:uid(),name:'Shortcuts',icon:'folder-emerald',image:'',cols:5,rows:3,slots:[],style:{...gsDefaults}
  }]};
 }
 let state=fresh();
@@ -438,6 +442,14 @@ try {
    if(appearance&&Object.hasOwn(appearance,'blur')){
     delete appearance.blur;
     migrated=true;
+   }
+  }
+   // Keep each shortcut at its saved coordinates. Old gaps become ordinary empty cells.
+  for(const folder of state.folders){
+   if(Object.hasOwn(folder,'mode')){delete folder.mode;migrated=true;}
+   if(folder.style&&Object.hasOwn(folder.style,'guides')){delete folder.style.guides;migrated=true;}
+   if(folder.slots.some(slot=>slot.type!=='item')){
+    folder.slots=folder.slots.filter(slot=>slot.type==='item');migrated=true;
    }
   }
   if(migrated)localStorage.setItem(storageKey,JSON.stringify(state));
@@ -474,13 +486,13 @@ function nativeCover(...boxes){
  const bottom=Math.min(nativeArea.h,Math.ceil(Math.max(...boxes.map(b=>b.y+b.h))+nativeMargin));
  return {x,y,w:right-x,h:bottom-y};
 }
-const sameNativeBox=(a,b)=>a&&['x','y','w','h','radius'].every(k=>a[k]===b[k]);
+const sameNativeBox=(a,b)=>a&&['x','y','w','h','radius','clipTop'].every(k=>a[k]===b[k]);
 async function setNativeRegion(target){
  if(sameNativeBox(nativeRegion,target))return;
  const px=value=>Math.round(value*nativeArea.scale);
  const x=px(target.x),y=px(target.y);
  await nativeCore.invoke('set_dock_region',{x,y,width:px(target.x+target.w)-x,height:px(target.y+target.h)-y,
-  ...(target.radius>0?{radius:px(target.radius)}:{})});
+  ...(target.radius>0?{radius:px(target.radius)}:{}),...(target.clipTop!==undefined?{clipTop:px(target.clipTop)}:{})});
  nativeRegion=target;
 }
 function moveHost(target){
@@ -560,7 +572,7 @@ function expandForControls(callback){
    surfaceWanted=false;callback(old.x-nativeHost.x,old.y-nativeHost.y);
  });
 }
-let clearHover=()=>{};
+let clearHover=()=>{}, expandedIconAt=()=>null;
 let phase='closed', activeId=null, lastId=null, serial=0, tracks=[], currentMetrics=null, menuFocus=null, savedFocus=null, toastTimer=0;
 let drag=null, dropCell=null, suppressClick=0, press=null, ignoreNativeMenuUntil=0, flight=null;
 const active=()=>state.folders.find(f=>f.id===activeId);
@@ -584,6 +596,7 @@ function gridIconRadius(s){return roundnessCSS(gridRoundness(s))}
 function highlightArt(node,s,iconRadius,scale=1){
  const value=iconCornerValue(s.highlightCorner,Number.parseFloat(iconRadius)||0);
  node.style.setProperty('--highlight-round',roundnessCSS(value));
+ node.style.setProperty('--sd-highlight-enabled',s.highlightEnabled===false?0:1);
  node.style.setProperty('--highlight-area',Math.round((s.highlightArea??0)*scale)+'px');
  return node;
 }
@@ -726,15 +739,21 @@ function renderGrid(f,retain=true){
  gsView.style.setProperty('--pad-x',m.padX+'px');gsView.style.setProperty('--pad-y',m.padY+'px');gsView.style.setProperty('--heading-h',headingSpace(s)+'px');
  const heading=E('header','gs-heading'),badge=E('div','gs-heading-inner'),name=E('h2','',f.name);
  name.title=f.name;badge.style.height=(headingSize(s)+3)+'px';
- badge.append(art(f.icon,FOLDER_ICONS,headingSize(s),f.image,gridIconRadius(s)),name);heading.append(badge);
+ badge.append(art(f.icon,FOLDER_ICONS,headingSize(s),f.image,gridIconRadius(s)),name);
+ heading.append(badge);
+ if(s.settingsGear){
+  heading.classList.add('has-settings');
+  const settings=B('⚙','gs-settings',()=>{if(phase==='open')editSettings(f,'gs')});
+  settings.setAttribute('aria-label','Grid Stack settings');settings.title='Grid Stack settings';
+  heading.append(settings);
+ }
  const sc=E('div','scroll'),grid=E('div','grid');
  sc.setAttribute('aria-label',f.name+' grid stack');gsView.setAttribute('aria-label',f.name+' grid stack');
  for(const [k,v] of Object.entries({cols:m.cols,cellw:m.cw+'px',cellh:m.ch+'px','gap-x':m.gapX+'px','gap-y':m.gapY+'px'}))grid.style.setProperty('--'+k,v);
  const map=new Map(f.slots.map(t=>[t.r+':'+t.c,t]));
  for(let r=0;r<m.rows;r++)for(let c=0;c<m.cols;c++){
   const cell=E('div','cell'),t=map.get(r+':'+c);cell.dataset.r=r;cell.dataset.c=c;
-  if(t?.type==='spacer'){cell.classList.add('spacer');if(s.guides)cell.classList.add('guides');cell.title='Empty spacer'}
-  else if(t){
+  if(t){
    const b=B('','tile',ev=>{if(phase==='open'&&performance.now()>=suppressClick)launch(t)});
    b.dataset.tile=t.id;b.setAttribute('aria-label',t.name);
    const radius=gridIconRadius(s);
@@ -890,32 +909,18 @@ function locate(x,y){
 function assignIndex(t,i,f){t.r=Math.floor(i/f.cols);t.c=i%f.cols}
 const MAX_ROWS=80;
 function placeEntries(f,where,entries){
- const map=occupiedMap(f),base=where.r*f.cols+where.c, limit=MAX_ROWS*f.cols;
- let i=base;
+ if(!Number.isInteger(where.r)||!Number.isInteger(where.c)||where.r<0||where.r>=MAX_ROWS||where.c<0||where.c>=f.cols)return 0;
+ const map=occupiedMap(f),base=where.r*f.cols+where.c,limit=MAX_ROWS*f.cols;
+ let next=base,placed=0;
  for(const entry of entries){
-   if(i>=limit)break;
-   if(map.has(i)&&map.get(i).type==='spacer'){map.delete(i)}
-   if(map.has(i)){
-     let free=i;
-     const rowEnd=(Math.floor(i/f.cols)+1)*f.cols;
-     const end=f.mode==='rows'?rowEnd:limit;
-     while(free<end&&map.has(free))free++;
-     if(free===limit)break;
-     if(f.mode==='rows'&&free===rowEnd){
-       // An occupied, full shelf grows into a continuation row without displacing later shelves.
-       if(f.rows>=MAX_ROWS)break;
-       for(const j of [...map.keys()].filter(j=>j>=rowEnd).sort((a,b)=>b-a)){
-         map.set(j+f.cols,map.get(j));map.delete(j);
-       }
-       f.rows++;
-     }
-     for(let j=free;j>i;j--)map.set(j,map.get(j-1));
-   }
-   map.set(i++,entry);
+  while(next<limit&&map.has(next))next++;
+  if(next>=limit)break;
+  assignIndex(entry,next++,f);
+  f.slots.push(entry);
+  f.rows=Math.max(f.rows,entry.r+1);
+  placed++;
  }
- f.slots=[...map].map(([idx,t])=>{assignIndex(t,idx,f);return t});
- f.rows=Math.min(MAX_ROWS,Math.max(f.rows,1+Math.max(0,...f.slots.map(t=>t.r))));
- return i-base;
+ return placed;
 }
 function reposition(f,t,where){
  if(t.r===where.r&&t.c===where.c)return;
@@ -924,20 +929,6 @@ function reposition(f,t,where){
  t.r=where.r;t.c=where.c;persist();refresh();
 }
 function erase(f,t){f.slots=f.slots.filter(x=>x!==t);persist();refresh()}
-function reflow(f,n,mode){
- if(n!==f.cols){
-  if(mode==='auto'){
-   const old=f.cols;for(const t of f.slots){const i=t.r*old+t.c;t.r=Math.floor(i/n);t.c=i%n}
-  }else{
-   // Keep explicit row boundaries. Narrow rows spill to their own continuation rows.
-   const source=new Map();for(const t of f.slots){if(!source.has(t.r))source.set(t.r,[]);source.get(t.r).push(t)}
-   let write=0;for(let r=0;r<f.rows;r++){const items=source.get(r)||[],m=Math.max(0,...items.map(t=>t.c));for(const t of items){t.r=write+Math.floor(t.c/n);t.c%=n}write+=1+Math.floor(m/n)}
-   f.rows=write;
-  }
-  f.cols=n;f.rows=Math.max(1,f.rows,1+Math.max(0,...f.slots.map(t=>t.r)));
- }
- f.mode=mode;
-}
 function addRow(f,where){
  const next=Math.min(f.rows,where.r+1);
  if(f.rows>=MAX_ROWS){notify('This stack already has '+MAX_ROWS+' rows.');return}
@@ -1015,20 +1006,18 @@ function gridMenu(x,y,target,explicit=null){
    mt(t?t.name:f.name+' · Row '+(where.r+1)+', column '+(where.c+1));
    if(t){
     mi('Shortcut properties…',()=>editShortcut(f,where,t));
-    mi('Choose destination…',()=>moveDialog(f,t));
+    const link=['url','uri'].includes(t.kind||guess(t.target));
+    mi(link?'Open Link':'Open Destination',()=>link?void launch(t):void openDestination(t));
     mi('Remove shortcut',()=>erase(f,t),{danger:true});
-   }else{
-    mi('Add shortcut here…',()=>editShortcut(f,where));
-    if(existing?.type==='spacer')mi('Remove empty spacer',()=>erase(f,existing));
-    else if(f.mode==='auto'&&!existing)mi('Mark as empty spacer',()=>{placeEntries(f,where,[{id:uid(),type:'spacer'}]);persist();refresh()});
-
-    if(f.mode==='auto')mi(f.style.guides?'Hide spacer guides':'Show spacer guides',()=>{f.style.guides=!f.style.guides;persist();refresh()});
-   }
+   }else mi('Add shortcut here…',()=>editShortcut(f,where));
    sep();
    mi('Insert row below',()=>addRow(f,where),{disabled:f.rows>=MAX_ROWS});
    mi('Insert column right',()=>changeColumn(f,where.c+1,true),{disabled:f.cols>=MAX_COLUMNS});
    if(f.rows>1&&!f.slots.some(v=>v.r===where.r&&v.type==='item'))mi('Remove empty row',()=>{f.slots=f.slots.filter(v=>v.r!==where.r);f.slots.forEach(v=>{if(v.r>where.r)v.r--});f.rows--;persist();refresh()});
    if(f.cols>1&&!f.slots.some(v=>v.c===where.c&&v.type==='item'))mi('Remove empty column',()=>changeColumn(f,where.c,false));
+   sep();
+   mi('Grid Stack settings…',()=>editSettings(f,'gs'));
+   mi('Close grid',()=>closeStack());
  });
 }
 function context(e){
@@ -1076,7 +1065,8 @@ function insideIsland(x,y){
 }
 island.addEventListener('pointerdown',e=>{
  if(e.button!==0||!['open','closed'].includes(phase))return;
- const tile=e.target.closest('.tile'),f=active();
+ if(e.target.closest('.gs-settings'))return;
+ const tile=e.target.closest('.tile')||expandedIconAt(e)?.closest('.tile'),f=active();
  const item=tile&&f?.slots.find(x=>x.id===tile.dataset.tile);
  press={id:e.pointerId,x:e.clientX,y:e.clientY,target:e.target,tile,item,timer:null};
  if(e.pointerType!=='mouse')press.timer=setTimeout(()=>{
@@ -1144,9 +1134,12 @@ function installDialogDrag(head){
  });
  head.addEventListener('pointermove',e=>{
   if(!start||start.id!==e.pointerId)return;
-  const d=dims(),r=dialog.getBoundingClientRect(),pad=6;
-  const x=clamp(start.left+e.clientX-start.x,pad,Math.max(pad,d.w-r.width-pad));
-  const y=clamp(start.top+e.clientY-start.y,d.top+pad,Math.max(d.top+pad,d.top+d.h-r.height-pad));
+  const d=dims(),r=dialog.getBoundingClientRect();
+  // Permit partial off-screen placement while retaining a reachable title strip.
+  const gripX=Math.min(112,r.width/2),gripY=Math.min(28,head.getBoundingClientRect().height||28);
+  const header=Math.max(gripY,head.getBoundingClientRect().height||54);
+  const x=clamp(start.left+e.clientX-start.x,gripX-r.width,d.w-gripX);
+  const y=clamp(start.top+e.clientY-start.y,d.top+gripY-header,d.top+d.h-gripY);
   dialog.style.setProperty('--panel-x',x+'px');dialog.style.setProperty('--panel-y',y+'px');
   dialog.classList.add('sd-dialog-placed');dialogMoved();
  });
@@ -1162,7 +1155,7 @@ function dialogBuildHere(title,desc,submit,build,save,settings=false){
  dialog.classList.toggle('sd-movable',movable);
  const head=E('div','dialogtop'),text=E('div'),h=E('h2','',title);h.id='dialogTitle';text.append(h,E('p','',desc));
  const cancelX=B('×','close',()=>dialog.close());cancelX.setAttribute('aria-label','Cancel dialog');head.append(text,cancelX);
- if(movable){head.title='Drag to move this window'; installDialogDrag(head);}
+ if(movable)installDialogDrag(head);
  const body=E('div','dialogbody'),error=E('div','err');error.hidden=true;error.setAttribute('role','alert');
  build(body,error);body.append(error);
  const foot=E('div','dialogfoot'),cancel=B('Cancel','quiet',()=>dialog.close()),ok=B(submit,'primary');ok.type='submit';foot.append(cancel,ok);form.append(head,body,foot);
@@ -1248,8 +1241,7 @@ function appearance(body,s,isGrid){
  const pad=axisControls('pad','Inner padding',160);
  const labels=check(spacing,'Show labels',s.labels);
  const titleIcon=isGrid?px(spacing,'Title icon size',headingSize(s),16,44):null;
- const guides=isGrid?check(spacing,'Show spacer guides',s.guides):null;
- return ()=>({...s,color:color.value,opacity:+opacity.value,radius:+radius.value,icon:+icon.value,...gap(),...pad(),border:border.checked,shadow:shadow.checked,labels:labels.checked,borderColor:borderColor.value,borderOpacity:+borderOpacity.value,borderWidth:+borderWidth.value,...(isGrid?{titleIcon:+titleIcon.value,guides:guides.checked}:{})});
+ return ()=>({...s,color:color.value,opacity:+opacity.value,radius:+radius.value,icon:+icon.value,...gap(),...pad(),border:border.checked,shadow:shadow.checked,labels:labels.checked,borderColor:borderColor.value,borderOpacity:+borderOpacity.value,borderWidth:+borderWidth.value,...(isGrid?{titleIcon:+titleIcon.value}:{})});
 }
 // The browser version uses a local file chooser. The desktop bridge adds path and EXE support.
 function iconPicker(body,source,initial,image,size,round,error,onChange=()=>{}){
@@ -1281,12 +1273,12 @@ function iconPicker(body,source,initial,image,size,round,error,onChange=()=>{}){
 let generalLaunchControls=()=>()=>({});
 let stylePreviewIcon=()=>{};
 function editSettings(selected=null,initial='dock',creating=false){
- const newFolder={id:uid(),name:'',mode:'auto',icon:'folder-emerald',image:'',cols:5,rows:3,slots:[],style:{...gsDefaults}};
+ const newFolder={id:uid(),name:'',icon:'folder-emerald',image:'',cols:5,rows:3,slots:[],style:{...gsDefaults}};
  const folders=creating?[newFolder]:state.folders;
  let folder=selected||active()||folders[0],tab=initial,collectDock,collectGeneral,applyStartup,edge,alignment,activate,targetWrap,tablist,scroll;
  const cache=new Map(),previews=new Map(),labels={general:'General',dock:'Dock',folder:'Folder',gs:'Grid Stack'};
- const groups={general:[['behavior','Behavior'],['launch','Launch indicator']],dock:[['layout','Layout'],['surface','Panel'],['effects','Effects']],
-  folder:[['identity','Folder icon']],gs:[['layout','Layout'],['surface','Panel'],['effects','Effects']]};
+ const groups={general:[['behavior','Behavior'],['launch','Launch indicator']],dock:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects']],
+  folder:[['identity','Folder icon']],gs:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects']]};
  const activeGroups={};
  let groupBar,previewSlot;
  if(creating)delete labels.general;
@@ -1312,7 +1304,7 @@ function editSettings(selected=null,initial='dock',creating=false){
    (sample.length?sample:[{name:'Shortcut',icon:'web',image:''}]).forEach(t=>{
     const item=E('div','sample-item'),radius=gridIconRadius(s);item.append(highlightArt(art(t.icon,APP_ICONS,Math.round(s.icon*k),t.image,radius),s,radius,k));
     iconEffects(item,t.icon,APP_ICONS,Math.round(s.icon*k),t.image,radius,s,k);
-    stylePreviewIcon(item,s,k);if(s.labels)item.append(E('small','',t.name));row.append(item);
+    stylePreviewIcon(item,s,k,t.name);if(s.labels)item.append(E('small','',t.name));row.append(item);
    });
   }else{
    (type==='folder'?[f]:state.folders.slice(0,3)).forEach(entry=>{
@@ -1322,7 +1314,8 @@ function editSettings(selected=null,initial='dock',creating=false){
     const item=E('div','sample-item'),radius=dockIconRadius(entry,s,override);
     item.append(highlightArt(art(ico.icon,FOLDER_ICONS,Math.round(size*k),ico.image,radius),s,radius,k));
     iconEffects(item,ico.icon,FOLDER_ICONS,Math.round(size*k),ico.image,radius,s,k);
-    stylePreviewIcon(item,s,k);if(s.labels)item.append(E('small','',controls?.name.value||entry.name||'New folder'));row.append(item);
+    const label=controls?.name.value||entry.name||'New folder';
+    stylePreviewIcon(item,{...s,hoverLabels:s.hoverLabels!==false&&(controls?.folderHoverLabels.checked??entry.folderHoverLabels!==false)},k,label);if(s.labels)item.append(E('small','',label));row.append(item);
    });
   }
   hull.append(row);draw.replaceChildren(hull);
@@ -1382,7 +1375,7 @@ function editSettings(selected=null,initial='dock',creating=false){
   const tips=settingsCard(general,'Hover labels','behavior');
   const names=check(tips,'Show full icon name on hover',prefs.hoverNames);
   const targets=check(tips,'Show shortcut path or URL after a pause',prefs.hoverTargets);
-  const delay=field(tips,'Path delay','range',prefs.hoverDelay,{min:500,max:5000,step:100,datasetUnit:' ms'});
+  const delay=field(tips,'Default details delay','range',prefs.hoverDelay,{min:0,max:5000,step:100,datasetUnit:' ms'});
   const syncGeneral=()=>{speed.disabled=!anim.checked;delay.disabled=!targets.checked;};
   anim.addEventListener('change',syncGeneral);targets.addEventListener('change',syncGeneral);syncGeneral();
   const configureLaunch=generalLaunchControls(general,state.dock);
@@ -1402,6 +1395,7 @@ function editSettings(selected=null,initial='dock',creating=false){
    const folderPreview=previewBox(folderPane);
    const identity=settingsCard(folderPane,'Folder appearance','identity');
    const name=field(identity,'Folder name','text',f.name,{maxLength:40});
+   const folderHoverLabels=check(identity,'Show hover label for this folder',f.folderHoverLabels!==false);
    const useSize=check(identity,'Override dock icon size',f.triggerSize);
    const size=field(identity,'Custom folder icon size','range',f.triggerSize||state.dock.icon,{min:24,max:74,datasetUnit:' px'});
    const ownCorner=check(identity,'Override dock icon roundness',Number.isFinite(f.dockIconCorner)||['raw','rounded'].includes(f.dockIconShape));
@@ -1414,12 +1408,14 @@ function editSettings(selected=null,initial='dock',creating=false){
    const icon=iconPicker(folderPane,FOLDER_ICONS,f.icon,f.image,37,true,error,()=>queueMicrotask(draw),null,f);
 
    const gsPreview=previewBox(gs),layout=settingsCard(gs,'Grid layout','layout');
-   const mode=select(layout,'Layout',[['auto','Auto-fill'],['rows','Row-wise']],f.mode);
+   layout.classList.add('gs-dimensions');
    const cols=field(layout,'Columns','number',f.cols,{min:1,max:12});
    const rows=field(layout,'Rows','number',f.rows,{min:1,max:MAX_ROWS});
-   layout.append(E('p','note','Auto-fill wraps across columns. Row-wise keeps later rows grouped.'));
+   const settingsGear=check(layout,'Show Settings gear in this grid',f.style.settingsGear);
+   settingsGear.parentElement.classList.add('card-toggle');
+   layout.append(E('p','note','Shortcuts stay in their assigned cells. Move a shortcut before shrinking past its cell.'));
    const style=appearance(gs,{...gsDefaults,...f.style},true);
-   const c={f,folderPane,gs,name,useSize,size,ownCorner,dockCorner,icon,mode,cols,rows,style,folderPreview,gsPreview};cache.set(f.id,c);return c;
+   const c={f,folderPane,gs,name,folderHoverLabels,useSize,size,ownCorner,dockCorner,icon,cols,rows,settingsGear,style,folderPreview,gsPreview};cache.set(f.id,c);return c;
   }
   function show(key){
    tab=key;error.hidden=true;
@@ -1452,17 +1448,16 @@ function editSettings(selected=null,initial='dock',creating=false){
   show(initial);queueMicrotask(draw);
  },()=>{
   const changes=[];
-  function invalid(c,key,input,message){activate(c.f,key);input?.focus();throw Error(message)}
+  function invalid(c,key,input,message){if(key==='gs')activeGroups.gs='layout';activate(c.f,key);input?.focus();throw Error(message)}
   for(const c of cache.values()){
    const name=c.name.value.trim();if(!name)invalid(c,'folder',c.name,'Enter a folder name.');
    let icon;try{icon=c.icon()}catch(e){invalid(c,'folder',null,e.message)}
    const cols=+c.cols.value,rows=+c.rows.value;
    if(!Number.isInteger(cols)||cols<1||cols>12)invalid(c,'gs',c.cols,'Enter a column count between 1 and 12.');
    if(!Number.isInteger(rows)||rows<1||rows>MAX_ROWS)invalid(c,'gs',c.rows,'Enter a row count between 1 and '+MAX_ROWS+'.');
-   const shape={...c.f,slots:c.f.slots.map(t=>({...t}))};reflow(shape,cols,c.mode.value);
-   if(shape.slots.some(t=>t.r>=MAX_ROWS))invalid(c,'gs',c.cols,'This column count would exceed '+MAX_ROWS+' rows. Try more columns.');
-   const minimum=1+Math.max(0,...shape.slots.map(t=>t.r));
-   changes.push([c.f,{name,...icon,dockIconShape:undefined,dockIconCorner:c.ownCorner.checked?+c.dockCorner.value:undefined,triggerSize:c.useSize.checked?+c.size.value:0,cols:shape.cols,rows:Math.max(rows,minimum),mode:shape.mode,slots:shape.slots,style:c.style()}]);
+   if(c.f.slots.some(t=>t.c>=cols))invalid(c,'gs',c.cols,'Move shortcuts out of the columns you want to remove first.');
+   if(c.f.slots.some(t=>t.r>=rows))invalid(c,'gs',c.rows,'Move shortcuts out of the rows you want to remove first.');
+   changes.push([c.f,{name,...icon,folderHoverLabels:c.folderHoverLabels.checked,dockIconShape:undefined,dockIconCorner:c.ownCorner.checked?+c.dockCorner.value:undefined,triggerSize:c.useSize.checked?+c.size.value:0,cols,rows,style:{...c.style(),settingsGear:c.settingsGear.checked}}]);
   }
   const personal=collectGeneral(),dock={...collectDock(),...personal.dock},nextEdge=edge.value,nextAlign=alignment.value;
   const commit=()=>{
@@ -1492,6 +1487,7 @@ function editShortcut(f,where,t){
   ['local', 'File or folder'],
   ['url', 'Web link']
 ], savedKind === 'uri' ? 'url' : savedKind);
+  kind.classList.add('sd-target-type');
   target=field(p,'Target location','text',base.target,{required:true});
   args=field(p,'Arguments','text',base.args||'');
   cwd=field(p,'Start in','text',base.cwd||'');
@@ -1512,11 +1508,13 @@ function editShortcut(f,where,t){
   persist();return refresh;
  });
 }
-function moveDialog(f,t){
- let r,c;
- dialogBuild('Move shortcut','Choose a grid cell. If it is occupied, the two items swap positions.','Move shortcut',body=>{
-  const p=section(body,'Destination');r=field(p,'Row','number',t.r+1,{min:1,max:f.rows,required:true});c=field(p,'Column','number',t.c+1,{min:1,max:f.cols,required:true});
- },()=>()=>reposition(f,t,{r:+r.value-1,c:+c.value-1}));
+async function openDestination(t){
+ try{
+  if(!nativeCore?.invoke)throw Error('Open destinations from the Stack Dock desktop app.');
+  await nativeCore.invoke('open_shortcut_destination',{target:t.target});
+ }catch(error){
+  dialogBuild('Could not open destination',String(error),'OK',()=>{},()=>{});
+ }
 }
 let resized=0;
 window.addEventListener('resize',()=>{
@@ -1536,13 +1534,12 @@ async function startNative(){
    if(!monitor?.workArea)throw Error('No monitor work area returned');
    const {position,size}=monitor.workArea,scale=monitor.scaleFactor;
    const win=nativeAPI.getCurrentWindow();
-   const inset = Math.ceil(1 * scale);
-
+   // Cover the exact usable rectangle. Dock breathing room is applied inside it.
   nativeArea = {
-    px: position.x + inset,
-    py: position.y + inset,
-    w: Math.floor((size.width - 2 * inset) / scale),
-    h: Math.floor((size.height - 2 * inset) / scale),
+    px: position.x,
+    py: position.y,
+    w: size.width / scale,
+    h: size.height / scale,
     scale
   };
    nativeWindow=win;

@@ -23,7 +23,7 @@ pub async fn pick_shortcut_path(
             "folder" => picker.set_title("Choose a folder").blocking_pick_folder(),
             "icon" => picker
                 .set_title("Choose an icon image or program")
-                .add_filter("Icons and programs", &["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "exe"])
+                .add_filter("Icons and programs", &["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "exe", "dll", "mun"])
                 .blocking_pick_file(),
             _ => return Err("Unknown picker type.".into()),
         };
@@ -41,60 +41,236 @@ pub async fn pick_shortcut_path(
     .map_err(|e| e.to_string())?
 }
 
+#[cfg(windows)]
+mod windows_icons {
+    use std::{ffi::c_void, os::windows::ffi::OsStrExt, path::Path, ptr};
+    use image::RgbaImage;
+
+    type Handle = *mut c_void;
+    #[repr(C)]
+    struct BitmapInfo {
+        header_size: u32, width: i32, height: i32, planes: u16, bit_count: u16,
+        compression: u32, image_size: u32, x_resolution: i32, y_resolution: i32,
+        used_colors: u32, important_colors: u32, colors: [u32; 1],
+    }
+    #[link(name = "shell32")]
+    unsafe extern "system" {
+        fn ExtractIconExW(file: *const u16, index: i32, large: *mut Handle, small: *mut Handle, count: u32) -> u32;
+    }
+    #[link(name = "user32")]
+    unsafe extern "system" {
+        fn PrivateExtractIconsW(file: *const u16, index: i32, cx: i32, cy: i32,
+            icons: *mut Handle, ids: *mut u32, count: u32, flags: u32) -> u32;
+        fn DestroyIcon(icon: Handle) -> i32;
+        fn DrawIconEx(dc: Handle, x: i32, y: i32, icon: Handle, cx: i32, cy: i32,
+            step: u32, brush: Handle, flags: u32) -> i32;
+    }
+    #[link(name = "gdi32")]
+    unsafe extern "system" {
+        fn CreateCompatibleDC(dc: Handle) -> Handle;
+        fn CreateDIBSection(dc: Handle, info: *const BitmapInfo, usage: u32,
+            bits: *mut *mut c_void, section: Handle, offset: u32) -> Handle;
+        fn SelectObject(dc: Handle, object: Handle) -> Handle;
+        fn DeleteObject(object: Handle) -> i32;
+        fn DeleteDC(dc: Handle) -> i32;
+        fn GdiFlush() -> i32;
+    }
+    fn wide(path: &Path) -> Vec<u16> { path.as_os_str().encode_wide().chain([0]).collect() }
+    pub fn count(path: &Path) -> usize {
+        let file = wide(path);
+        let n = unsafe { ExtractIconExW(file.as_ptr(), -1, ptr::null_mut(), ptr::null_mut(), 0) };
+        if n == u32::MAX { 0 } else { n as usize }
+    }
+    pub fn read(path: &Path, index: usize, size: i32) -> Option<RgbaImage> {
+        let file = wide(path);
+        let index = i32::try_from(index).ok()?;
+        unsafe {
+            let mut icon = ptr::null_mut();
+            PrivateExtractIconsW(file.as_ptr(), index, size, size, &mut icon, ptr::null_mut(), 1, 0);
+            if icon.is_null() {
+                ExtractIconExW(file.as_ptr(), index, &mut icon, ptr::null_mut(), 1);
+            }
+            if icon.is_null() { return None; }
+            let result = pixels(icon, size);
+            DestroyIcon(icon);
+            result
+        }
+    }
+    unsafe fn pixels(icon: Handle, size: i32) -> Option<RgbaImage> {
+        let info = BitmapInfo { header_size: 40, width: size, height: -size, planes: 1,
+            bit_count: 32, compression: 0, image_size: 0, x_resolution: 0, y_resolution: 0,
+            used_colors: 0, important_colors: 0, colors: [0] };
+        unsafe {
+            let dc = CreateCompatibleDC(ptr::null_mut());
+            if dc.is_null() { return None; }
+            let mut bits: *mut c_void = ptr::null_mut();
+            let bitmap = CreateDIBSection(dc, &info, 0, &mut bits, ptr::null_mut(), 0);
+            if bitmap.is_null() || bits.is_null() {
+                if !bitmap.is_null() { DeleteObject(bitmap); }
+                DeleteDC(dc);
+                return None;
+            }
+            let old = SelectObject(dc, bitmap);
+            let out = if old.is_null() || old as isize == -1 {
+                None
+            } else {
+                // Recover straight-alpha RGBA by measuring compositing against black
+                // and white. This also handles older icons with a binary AND mask.
+                let data = std::slice::from_raw_parts_mut(bits.cast::<u8>(), (size * size * 4) as usize);
+                data.fill(0);
+                let black_ok = DrawIconEx(dc, 0, 0, icon, size, size, 0, ptr::null_mut(), 3) != 0;
+                GdiFlush();
+                let black = data.to_vec();
+                data.fill(255);
+                let white_ok = DrawIconEx(dc, 0, 0, icon, size, size, 0, ptr::null_mut(), 3) != 0;
+                GdiFlush();
+                let result = if black_ok && white_ok {
+                    let mut rgba = Vec::with_capacity(data.len());
+                    for (b, w) in black.chunks_exact(4).zip(data.chunks_exact(4)) {
+                        let clear = (0..3).map(|i| w[i].saturating_sub(b[i]) as u16).sum::<u16>() / 3;
+                        let alpha = 255 - clear;
+                        let channel = |i: usize| if alpha == 0 { 0 } else {
+                            ((u16::from(b[i]) * 255 + alpha / 2) / alpha).min(255) as u8
+                        };
+                        rgba.extend([channel(2), channel(1), channel(0), alpha as u8]);
+                    }
+                    if rgba.iter().skip(3).step_by(4).all(|&a| a == 0) { None }
+                    else { RgbaImage::from_raw(size as u32, size as u32, rgba) }
+                } else { None };
+                SelectObject(dc, old);
+                result
+            };
+            DeleteObject(bitmap);
+            DeleteDC(dc);
+            out
+        }
+    }
+}
+
 #[derive(serde::Serialize)]
 pub struct ShortcutIcon {
     source: String,
     count: usize,
+    index: usize,
+}
+
+#[derive(serde::Serialize)]
+pub struct IconThumbnail {
+    index: usize,
+    source: String,
+}
+
+#[derive(serde::Serialize)]
+pub struct IconPage {
+    count: usize,
+    entries: Vec<IconThumbnail>,
+}
+
+fn icon_path(target: &str) -> Result<(&Path, String), String> {
+    let path = Path::new(target);
+    if !path.is_absolute() || !path.is_file() {
+        return Err("Choose an existing icon file.".into());
+    }
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+    Ok((path, ext))
+}
+
+fn png_source(image: image::DynamicImage, max: u32) -> Result<String, String> {
+    let icon = if image.width() > max || image.height() > max { image.thumbnail(max, max) } else { image };
+    let mut buffer = Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgba8(icon.into_rgba8()).write_to(&mut buffer, ImageFormat::Png)
+        .map_err(|e| format!("Could not save the selected icon: {e}"))?;
+    Ok(format!("data:image/png;base64,{}", STANDARD.encode(buffer.into_inner())))
+}
+
+struct ResourceIcons<'a> {
+    path: &'a Path,
+    native_count: usize,
+    fallback: Option<IconExtractor>,
+    fallback_count: usize,
+}
+impl<'a> ResourceIcons<'a> {
+    fn open(path: &'a Path) -> Self {
+        #[cfg(windows)]
+        let native_count = windows_icons::count(path).min(65536);
+        #[cfg(not(windows))]
+        let native_count = 0;
+        let mut icons = Self { path, native_count, fallback: None, fallback_count: 0 };
+        if native_count == 0 { icons.open_fallback(); }
+        icons
+    }
+    fn open_fallback(&mut self) {
+        self.fallback = IconExtractor::from_path(self.path).ok();
+        self.fallback_count = self.fallback.as_ref().and_then(|ar| ar.list_group_icons().ok())
+            .map(|groups| groups.len().min(65536)).unwrap_or(0);
+    }
+    fn count(&self) -> usize {
+        if self.native_count > 0 { self.native_count } else { self.fallback_count }
+    }
+    fn read(&mut self, index: usize, size: u32) -> Option<image::DynamicImage> {
+        if index >= self.count() { return None; }
+        #[cfg(windows)]
+        if self.native_count > 0 {
+            if let Some(icon) = windows_icons::read(self.path, index, size as i32) {
+                return Some(image::DynamicImage::ImageRgba8(icon));
+            }
+            // Keep the numbering consistent within a file. Mixing the index order
+            // of two independent readers could show the wrong selected icon.
+            return None;
+        }
+        let bytes = self.fallback.as_ref()?.icon_by_index(index).ok()?.to_ico_bytes().ok()?;
+        ImageReader::with_format(Cursor::new(bytes), ImageFormat::Ico).decode().ok()
+    }
 }
 
 #[tauri::command]
-pub async fn read_shortcut_icon(target: String, index: usize) -> Result<ShortcutIcon, String> {
+pub async fn list_shortcut_icons(target: String, offset: usize) -> Result<IconPage, String> {
     spawn_blocking(move || {
-        let path = Path::new(&target);
-        if !path.is_absolute() || !path.is_file() {
-            return Err("Choose an existing icon image or EXE.".into());
+        let (path, ext) = icon_path(&target)?;
+        if !matches!(ext.as_str(), "exe" | "dll" | "mun") {
+            return Err("Choose an EXE, DLL, or MUN to browse embedded icons.".into());
         }
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-        // Decode on the worker and send only a small PNG across the bridge.
-        // There is no source-file size cutoff. The decoder's memory protections
-        // still apply to invalid or exceptionally large decoded images.
-        let (decoded, count) = if ext == "exe" {
-            let extractor = IconExtractor::from_path(path)
-                .map_err(|e| format!("Could not read program icons: {e}"))?;
-            let count = extractor.list_group_icons().map_err(|e| e.to_string())?.len();
-            let bytes = extractor.icon_by_index(index)
-                .and_then(|icon| icon.to_ico_bytes())
-                .map_err(|e| format!("Could not extract icon {}: {e}", index + 1))?;
-            (ImageReader::with_format(Cursor::new(bytes), ImageFormat::Ico).decode(), count)
-        } else {
-            let format = match ext.as_str() {
-                "png" => ImageFormat::Png,
-                "jpg" | "jpeg" => ImageFormat::Jpeg,
-                "gif" => ImageFormat::Gif,
-                "webp" => ImageFormat::WebP,
-                "bmp" => ImageFormat::Bmp,
-                "ico" => ImageFormat::Ico,
-                _ => return Err("Choose a PNG, JPEG, GIF, WebP, BMP, ICO, or EXE.".into()),
-            };
-            let mut reader = ImageReader::open(path).map_err(|e| e.to_string())?;
-            reader.set_format(format);
-            (reader.decode(), 1)
+        let mut icons = ResourceIcons::open(path);
+        let count = icons.count();
+        let entries = (offset..offset.saturating_add(24).min(count))
+            .filter_map(|index| {
+                let source = png_source(icons.read(index, 48)?, 48).ok()?;
+                Some(IconThumbnail { index, source })
+            }).collect();
+        Ok(IconPage { count, entries })
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn read_shortcut_icon(target: String, index: usize, automatic: Option<bool>) -> Result<ShortcutIcon, String> {
+    spawn_blocking(move || {
+        let (path, ext) = icon_path(&target)?;
+        if matches!(ext.as_str(), "exe" | "dll" | "mun") {
+            let mut icons = ResourceIcons::open(path);
+            let count = icons.count();
+            let first = icons.read(index, 128).map(|icon| (index, icon));
+            let found = first.or_else(|| {
+                if automatic != Some(true) { return None; }
+                (0..count).filter(|&i| i != index).find_map(|i| icons.read(i, 128).map(|icon| (i, icon)))
+            });
+            return found.map(|(index, icon)| {
+                Ok(ShortcutIcon { source: png_source(icon, 256)?, count, index })
+            }).unwrap_or_else(|| Err("No usable icon was found. Choose another file or keep the current icon.".into()));
+        }
+        let format = match ext.as_str() {
+            "png" => ImageFormat::Png,
+            "jpg" | "jpeg" => ImageFormat::Jpeg,
+            "gif" => ImageFormat::Gif,
+            "webp" => ImageFormat::WebP,
+            "bmp" => ImageFormat::Bmp,
+            "ico" => ImageFormat::Ico,
+            _ => return Err("Choose a supported image, ICO, EXE, DLL, or MUN.".into()),
         };
-        let decoded = decoded.map_err(|e| format!("Could not decode this icon: {e}"))?;
-        let icon = if decoded.width() > 256 || decoded.height() > 256 {
-            decoded.thumbnail(256, 256)
-        } else { decoded };
-        let mut buffer = Cursor::new(Vec::new());
-        image::DynamicImage::ImageRgba8(icon.into_rgba8())
-            .write_to(&mut buffer, ImageFormat::Png)
-            .map_err(|e| format!("Could not save the selected icon: {e}"))?;
-        Ok(ShortcutIcon {
-            source: format!("data:image/png;base64,{}", STANDARD.encode(buffer.into_inner())),
-            count,
-        })
-    })
-    .await
-    .map_err(|e| e.to_string())?
+        let mut reader = ImageReader::open(path).map_err(|e| e.to_string())?;
+        reader.set_format(format);
+        let icon = reader.decode().map_err(|_| "Could not read this image. Try a PNG or ICO.".to_string())?;
+        Ok(ShortcutIcon { source: png_source(icon, 256)?, count: 1, index: 0 })
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[derive(serde::Serialize)]

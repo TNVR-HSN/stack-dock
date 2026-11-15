@@ -18,6 +18,7 @@
   style.textContent = `
 #dockView:focus{outline:none}
 dialog.sd-properties{width:min(720px,calc(100% - 24px));--sd-label-width:112px}
+.sd-properties:has(.sd-icon-gallery:not([hidden])) .dialogbody{max-height:calc(100dvh - var(--sd-caption-gutter,0px) - 148px);overflow:auto}
 .sd-properties .sd-properties-hero{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:112px;background:#ffffff07;border:1px solid #ffffff13;border-radius:11px;padding:8px 14px;font-size:20px;font-weight:700;color:#e9b0ff;overflow-wrap:anywhere}
 .sd-properties .sd-hero-icon{flex:0 0 96px}
 .sd-properties .sd-properties-hero .art{border-radius:0;overflow:visible}
@@ -29,7 +30,16 @@ dialog.sd-properties{width:min(720px,calc(100% - 24px));--sd-label-width:112px}
 .sd-local-picker{position:absolute;right:0;top:100%;z-index:3;display:grid;width:120px;padding:4px;gap:3px;background:#241a29;border:1px solid #d9a5e350;border-radius:8px}
 .sd-local-picker button{text-align:left;min-height:28px}
 .sd-icon-detail{grid-column:2;display:flex;align-items:center;gap:8px;color:var(--soft);font-size:11px}
-.sd-icon-detail select{width:auto}
+.sd-icon-gallery{padding:10px;display:grid;gap:8px;border:1px solid #dea4f550;border-radius:9px;background:#16101a}
+.sd-gallery-path{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:7px}
+.sd-gallery-path span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--soft);font-size:12px}
+.sd-icon-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(50px,1fr));gap:5px;max-height:180px;min-height:60px;overflow:auto}
+.sd-icon-thumbs button{height:50px;display:grid;place-items:center;padding:4px}
+.sd-icon-thumbs button[aria-pressed=true]{border-color:#ecbcff;background:#c987dc36}
+.sd-icon-thumbs img{width:38px;height:38px;object-fit:contain}
+.sd-icon-gallery p{margin:0}
+.sd-icon-gallery-actions{display:flex;gap:6px;flex-wrap:wrap}
+.sd-icon-gallery-actions .primary{margin-left:auto}
 @media(max-width:480px){dialog.sd-properties,.sd-property-fields{--sd-label-width:84px}.sd-properties .sd-properties-hero{font-size:17px}}
 dialog.sd-panel-region::backdrop{background:transparent}
 dialog.sd-panel-region{box-shadow:none}
@@ -94,9 +104,10 @@ dialog.sd-panel-region{box-shadow:none}
       const panel = dialog.getBoundingClientRect();
       if (panel.width <= 0 || panel.height <= 0) return;
       const x = panel.left + nativeHost.x;
-      const y = Math.max(nativeArea.gutter || 0, panel.top + nativeHost.y);
+      const y = panel.top + nativeHost.y, clipTop = nativeArea.gutter || 0;
       const region = {
-        x, y, w: panel.width, h: panel.top + panel.height + nativeHost.y - y,
+        x, y, w: panel.width, h: panel.height,
+        ...(y < clipTop || x < 0 ? {clipTop} : {}),
         radius: parseFloat(getComputedStyle(dialog).borderTopLeftRadius) || 0
       };
       if (region.w <= 0 || region.h <= 0) return;
@@ -159,18 +170,31 @@ dialog.sd-panel-region{box-shadow:none}
     const fields = section(body,'Icon');
     fields.classList.add('sd-property-fields');
     const input = field(fields,'Icon path','text',path,{placeholder:'Default icon'});
-    const browse = iconButton('Browse icon','folder',() => void load(null,0,'custom'));
+    const browse = iconButton('Browse icon','folder',() => void chooseSource(null));
     const reset = iconButton('Reset icon to automatic','reset',() => resetIcon(true));
     pathRow(input,[browse,reset]);
     const detail = E('div','sd-icon-detail');
-    const variants = E('select');
-    variants.setAttribute('aria-label','Embedded icon');
-    const status = E('span');
-    status.setAttribute('role','status');
-    detail.append(variants,status);
-    fields.append(detail);
-    const hoverPath = pathTooltip(input);
+    const change = B('Choose embedded icon…','quiet',()=>void chooseSource(path));
+    const status=E('span');status.setAttribute('role','status');
+    detail.append(change,status);fields.append(detail);
+    const panel=E('section','sd-icon-gallery');
+    panel.hidden=true;panel.setAttribute('aria-label','Choose embedded icon');
+    const pathBar=E('div','sd-gallery-path');
+    const sourceText=E('span');
+    const browseAgain=B('Browse…','quiet',()=>void chooseSource(null));
+    pathBar.append(sourceText,browseAgain);
+    const thumbs=E('div','sd-icon-thumbs');thumbs.setAttribute('role','group');thumbs.setAttribute('aria-label','Available icons');
+    const info=E('p','note');info.setAttribute('role','status');
+    const actions=E('div','sd-icon-gallery-actions');
+    const back=B('Previous','quiet',()=>void page(Math.max(0,offset-24)));
+    const next=B('Next','quiet',()=>void page(offset+24));
+    const use=B('Use selected icon','primary',()=>void useSelected());
+    const cancel=B('Cancel selection','quiet',()=>{stop();closePicker();draw();browse.focus();});
+    actions.append(back,next,cancel,use);
+    panel.append(E('strong','','Choose an icon'),pathBar,thumbs,info,actions);fields.append(panel);
+    const hoverPath = pathTooltip(input), resource = file=>/\.(exe|dll|mun)$/i.test(file);
     const attached = () => dialog.open && error.isConnected;
+    let selecting='', selection=null, offset=0, available=0, listTicket=0, listBusy=false, browsing=false;
     const currentTarget = () => {
       const target = cleanPath(programTarget?.() || '');
       return /\.exe$/i.test(target) ? target : '';
@@ -178,17 +202,11 @@ dialog.sd-panel-region{box-shadow:none}
     function draw(keepDraft = false) {
       if (!keepDraft) input.value = path;
       hoverPath();
-      if (variants.options.length !== count && count > 1) {
-        variants.replaceChildren(...Array.from({length:count},(_,i)=>{
-          const option=E('option','','Icon '+(i+1));option.value=i;return option;
-        }));
-      } else if (count <= 1 && variants.options.length) variants.replaceChildren();
-      variants.value = String(index);
-      variants.hidden = count <= 1;
-      variants.disabled = busy || draft;
-      const message = busy ? 'Reading icon…' : mode==='target' ? 'From target EXE' : picture && !path ? 'Saved custom icon' : '';
-      status.textContent = message;
-      detail.hidden = variants.hidden && !message;
+      change.hidden=!resource(path);
+      change.disabled=busy||!!selecting;
+      const message = busy ? 'Reading icon…' : mode==='target' ? (picture?'From target EXE':'No readable target icon. Using the default.') : picture && !path ? 'Saved custom icon' : '';
+      status.textContent=message;
+      detail.hidden = change.hidden && !message;
       if (key!==renderedKey || picture!==renderedPicture) {
         renderedKey=key;renderedPicture=picture;onChange({icon:key,image:picture});
       }
@@ -197,28 +215,90 @@ dialog.sd-panel-region{box-shadow:none}
       clearTimeout(timer);clearTimeout(targetTimer);
       generation++;busy=draft=false;
     }
+    function closePicker(){
+      listTicket++;listBusy=false;selecting='';selection=null;panel.hidden=true;dialogMoved();
+    }
+    function updateActions(){
+      back.disabled=listBusy||busy||!offset;
+      next.disabled=listBusy||busy||offset+24>=available;
+      use.disabled=listBusy||busy||selection===null;
+    }
+    async function page(start){
+      if(!selecting)return;
+      const ticket=++listTicket,file=selecting;
+      offset=start;listBusy=true;thumbs.replaceChildren();info.textContent='Looking for icons…';updateActions();
+      try{
+        const result=await call('list_shortcut_icons',{target:file,offset:start});
+        if(ticket!==listTicket||!attached())return;
+        available=result.count;
+        if(selection===null||!result.entries.some(entry=>entry.index===selection)){
+          selection=result.entries.some(entry=>entry.index===index&&file===path)?index:result.entries[0]?.index??null;
+        }
+        for(const entry of result.entries){
+          const button=B('','quiet',()=>{
+            selection=entry.index;
+            for(const thumb of thumbs.children)thumb.setAttribute('aria-pressed',String(+thumb.dataset.index===selection));
+            updateActions();
+          });
+          button.dataset.index=entry.index;button.setAttribute('aria-label','Icon '+(entry.index+1));
+          button.setAttribute('aria-pressed',String(entry.index===selection));
+          const img=E('img');img.src=entry.source;img.alt='';button.append(img);thumbs.append(button);
+        }
+        info.textContent=!available?'No usable embedded icons. Browse another file or keep the current icon.':
+          !result.entries.length?'No readable icons on this page. Try another page or file.':
+          (start+1)+'–'+Math.min(available,start+24)+' of '+available+' icon slots. Unreadable icons are skipped.';
+      }catch(message){
+        if(ticket!==listTicket||!attached())return;
+        available=0;selection=null;info.textContent=String(message);
+      }finally{
+        if(ticket===listTicket){listBusy=false;updateActions();}
+      }
+    }
+    async function chooseSource(file){
+      if(browsing)return;
+      error.hidden=true;
+      if(!file){
+        browsing=true;
+        try{file=await pickPath('icon');}
+        catch(message){if(attached()){error.textContent=String(message);error.hidden=false;}return;}
+        finally{browsing=false;}
+      }
+      if(!file||!attached())return;
+      if(resource(file)){
+        stop();closePicker();
+        selecting=file;sourceText.textContent=file;sourceText.title=file;panel.hidden=false;dialogMoved();
+        draw();void page(file===path?Math.floor(index/24)*24:0);
+      }else{
+        closePicker();await load(file,0,'custom');
+      }
+    }
     async function load(file, variant = 0, nextMode = 'custom') {
       stop();
-      const ticket = generation;
-      const current = () => attached() && ticket===generation;
-      busy = true;error.hidden = true;
-      draw(file !== null);
-      try {
-        file = file || await pickPath('icon');
-        if (!file || !current()) return;
-        const result = await call('read_shortcut_icon',{target:file,index:variant});
-        if (!current()) return;
-        picture=result.source;path=file;index=variant;count=result.count;mode=nextMode;
-      } catch (message) {
-        if (current() && nextMode !== 'target') {
-          error.textContent=String(message);error.hidden=false;
-        }
-      } finally {
-        if(current()){busy=false;draw();}
+      const ticket=generation, current=()=>attached()&&ticket===generation;
+      busy=true;error.hidden=true;draw(true);updateActions();
+      try{
+        const result=await call('read_shortcut_icon',{target:file,index:variant,automatic:nextMode==='target'&&!selecting});
+        if(!current())return false;
+        picture=result.source;path=file;index=result.index??variant;count=result.count;mode=nextMode;
+        return true;
+      }catch(message){
+        if(current()&&selecting){info.textContent=String(message);}
+        else if(current()&&nextMode!=='target'){error.textContent=String(message);error.hidden=false;}
+        return false;
+      }finally{
+        if(current()){busy=false;draw();updateActions();}
+      }
+    }
+    async function useSelected(){
+      if(!selecting||selection===null||busy||listBusy)return;
+      const file=selecting,variant=selection;
+      const nextMode=file===path&&mode==='target'?'target':'custom';
+      if(await load(file,variant,nextMode)&&selecting===file){
+        closePicker();draw();browse.focus();
       }
     }
     function resetIcon(explicit = false) {
-      stop();error.hidden=true;
+      stop();closePicker();error.hidden=true;
       if(explicit)key=defaultKey;
       picture='';index=count=0;
       path=currentTarget();mode=path?'target':'default';
@@ -226,7 +306,7 @@ dialog.sd-panel-region{box-shadow:none}
       if(path)void load(path,0,'target');
     }
     function syncTarget() {
-      if (mode==='custom' || draft) return;
+      if (mode==='custom' || draft || selecting || browsing) return;
       const target=currentTarget();
       if (target===path) return;
       resetIcon();
@@ -236,21 +316,22 @@ dialog.sd-panel-region{box-shadow:none}
       const value=cleanPath(input.value);
       if(!value){resetIcon(true);return;}
       if(value===path){stop();draw();return;}
-      void load(value,0,'custom');
+      void chooseSource(value);
     }
     input.addEventListener('input',()=>{
-      stop();draft=true;error.hidden=true;draw(true);
+      stop();closePicker();draft=true;error.hidden=true;draw(true);
       timer=setTimeout(()=>{if(attached())commitPath();},320);
     });
     input.addEventListener('change',commitPath);
     input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commitPath();}});
-    variants.addEventListener('change',()=>void load(path,+variants.value,mode));
+    panel.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancel.click();}});
     draw();
     queueMicrotask(()=>{if(attached())syncTarget();});
     const read = () => {
       if(draft)commitPath();
       syncTarget();
-      if(busy)throw Error('The icon is still loading. Try saving again when it’s ready.');
+      if(selecting)throw Error('Use the selected icon or cancel the icon selection before saving.');
+      if(busy||browsing)throw Error('The icon is still loading. Try saving again when it’s ready.');
       return {icon:key,image:picture,iconPath:path,iconMode:mode,iconIndex:index,iconCount:count};
     };
     read.syncTarget = (debounce=false) => {
@@ -279,6 +360,7 @@ dialog.sd-panel-region{box-shadow:none}
         kind = select(p, 'Target type', [
           ['program', 'Program'], ['local', 'File or folder'], ['url', 'Web link']
         ], savedKind === 'uri' ? 'url' : savedKind);
+        kind.classList.add('sd-target-type');
         target = field(p, 'Target location', 'text', base.target, { required: true });
         args = field(p, 'Arguments', 'text', base.args || '');
         cwd = field(p, 'Start in', 'text', base.cwd || '');
@@ -382,6 +464,7 @@ dialog.sd-panel-region{box-shadow:none}
       const bounds = {
         opacity:[0,100], radius:[0,56], icon:[24,88],
         gap:[0,120], gapX:[0,120], gapY:[0,120], pad:[0,160], padX:[0,160], padY:[0,160],
+        hitPadding:[0,48], hoverLabelSize:[9,28], hoverDetailsDelay:[0,5000],
         hoverMode:[0,5], hoverScale:[100,200], hoverLift:[0,48], hoverAngle:[-30,30], hoverDuration:[0,900], hoverCurve:[0,3],
         groundShadowOffset:[-24,48], highlightArea:[0,32], reflectionArea:[0,64], reflectionIntensity:[0,100], groundShadowIntensity:[0,100], borderOpacity:[0,100], borderWidth:[1,5], titleIcon:[16,44],
         motionSpeed:[25,250], hoverOpacity:[0,100], labelFont:[9,18], labelWidth:[64,200],
@@ -418,17 +501,17 @@ dialog.sd-panel-region{box-shadow:none}
     const folders = s.folders.map(f => {
       if (!object(f) || !keys(f.id) || seenIds.has(f.id) || !string(f.name, 100) || !f.name.trim() ||
           !int(f.cols, 1, 12) || !int(f.rows, 1, MAX_ROWS) ||
-          !['auto', 'rows'].includes(f.mode) || !Array.isArray(f.slots) ||
+          !Array.isArray(f.slots) ||
           f.slots.length > f.cols * f.rows || !picture(f.image)) fail('bad folder or grid dimensions.');
       seenIds.add(f.id);
       const cells = new Set(), ids = new Set();
-      const slots = f.slots.map(t => {
+      // Older version-one exports contain synthetic empty cells. Do not restore them.
+      const slots = f.slots.filter(t=>t?.type !== 'spacer').map(t => {
         if (!object(t) || !keys(t.id) || ids.has(t.id) || !int(t.r,0,f.rows-1) ||
             !int(t.c,0,f.cols-1) || cells.has(t.r + ':' + t.c)) fail('duplicate or invalid shortcut position.');
         cells.add(t.r + ':' + t.c);
         ids.add(t.id);
         const slot = { id:t.id, r:t.r, c:t.c, type:t.type };
-        if (t.type === 'spacer') return slot;
         if (t.type !== 'item' || !string(t.name,1024) || !t.name.trim() || !string(t.target,32768) ||
             !t.target.trim() || !string(t.args ?? '',32768) || !string(t.cwd ?? '',32768) ||
             ![undefined,'program','local','url','uri'].includes(t.kind) || !picture(t.image)) fail('bad shortcut.');
@@ -436,7 +519,8 @@ dialog.sd-panel-region{box-shadow:none}
           icon:Object.hasOwn(APP_ICONS,t.icon) ? t.icon : 'web', image:t.image || '',
           ...iconSource(t) };
       });
-      return { id:f.id, name:f.name, cols:f.cols, rows:f.rows, mode:f.mode, slots,
+      return { id:f.id, name:f.name, cols:f.cols, rows:f.rows, slots,
+        folderHoverLabels:f.folderHoverLabels!==false,
         style:appearanceCopy(f.style, gsDefaults),
         dockIconShape:['default','rounded','raw'].includes(f.dockIconShape) ? f.dockIconShape : 'default',
         dockIconCorner:int(f.dockIconCorner,0,50) ? f.dockIconCorner : undefined,
@@ -448,7 +532,7 @@ dialog.sd-panel-region{box-shadow:none}
     for(const [key,fallback] of Object.entries(generalDefaults)){
       const value=s.general?.[key];
       if(value===undefined)continue;
-      if(typeof fallback==='boolean'?typeof value!=='boolean':!int(value,500,5000))fail('invalid General setting.');
+      if(typeof fallback==='boolean'?typeof value!=='boolean':!int(value,0,5000))fail('invalid General setting.');
       general[key]=value;
     }
     return { edge:s.edge, align:s.align, general, dock:appearanceCopy(s.dock, dockDefaults), folders };

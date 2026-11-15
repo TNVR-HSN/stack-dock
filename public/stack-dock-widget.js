@@ -11,7 +11,7 @@
 #dockView .folder-btn>.art,#gsView .tile>.art,.sample-item>.art{position:relative;overflow:visible;z-index:1}
 #dockView .folder-btn>.art>img,#dockView .folder-btn>.art>svg,#gsView .tile>.art>img,#gsView .tile>.art>svg,.sample-item>.art>img,.sample-item>.art>svg{border-radius:inherit}
 .sample-item>.art::after{content:"";position:absolute;inset:calc(-1 * var(--highlight-area,0px));pointer-events:none;border-radius:var(--highlight-round,var(--ir,25%));opacity:0;box-shadow:inset 0 0 0 2px #fff;transition:opacity .12s}
-.sample-item:hover>.art::after{opacity:var(--sd-hover,.14)}
+.sample-item:hover>.art::after{opacity:calc(var(--sd-hover,.14) * var(--sd-highlight-enabled,1))}
 #gsView .tile{gap:0;justify-content:flex-start}
 #gsView.sd-labels .tile{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:var(--sd-icon-size) var(--sd-reflect) var(--sd-label-space);row-gap:2px;align-content:start;justify-items:center}
 #gsView.sd-labels .tile>.art{grid-row:1}
@@ -21,10 +21,12 @@
 .sd-hover-ring,.sd-hover-art,.sd-hover-label{position:fixed;pointer-events:none}
 .sd-hover-art{z-index:1}
 .sd-hover-original{visibility:hidden}
-.sd-hover-label{z-index:2;display:grid;gap:4px;width:max-content;text-align:center;padding:3px 8px;border-radius:5px;background:#130f19ed;color:#fff;overflow-wrap:anywhere;unicode-bidi:plaintext;text-shadow:0 1px 2px #000;font-size:12px;line-height:1.25;font-weight:650}
-.sd-hover-target{font-size:11px;font-weight:400;color:#eee1f4;white-space:pre-wrap;unicode-bidi:plaintext;max-height:40dvh;overflow:hidden}
+.sd-hover-label{z-index:2;display:grid;gap:4px;width:max-content;text-align:center;padding:3px 8px;border-radius:5px;background:var(--sd-tip-bg,#130f19ed);color:#fff;overflow-wrap:anywhere;unicode-bidi:plaintext;text-shadow:0 1px 2px #000;font-size:var(--sd-tip-size,12px);line-height:1.25;font-weight:650}
+.sd-hover-target{font-size:max(9px,calc(var(--sd-tip-size,12px) - 1px));font-weight:400;color:#eee1f4;white-space:pre-wrap;unicode-bidi:plaintext;max-height:40dvh;overflow:hidden}
  .sample-item>.art{transition:transform var(--sd-hover-duration,0ms) var(--sd-hover-easing,ease-out)}
 .sample-item:hover>.art{transform:var(--sd-hover-transform,none)}
+.sample-item .sd-hover-label{position:absolute;top:100%;width:max-content;max-width:155px;display:none}
+.sample-item:hover>.sd-hover-label{display:grid}
 .sd-edge-grow{position:fixed;z-index:51;pointer-events:none;background:#d99bff80;border:1px solid #ead1ff;border-radius:5px}
 .launch-view,.launch-sample{display:flex;align-items:center;gap:var(--launch-gap,12px);padding:0 var(--launch-pad,16px);color:var(--launch-text,#fff);min-width:0}
 .launch-view{position:absolute;inset:0;pointer-events:none}
@@ -105,11 +107,34 @@
   const baseAppearance = appearance;
   appearance = function (body, s, isGrid) {
     const read = baseAppearance(body, s, isGrid);
-    const panel = settingsCard(body,'Icon shape and hover highlight','effects');
+    const shapePanel=settingsCard(body,'Icon shape','layout');
+    const panel=settingsCard(body,'Hover highlight','hover');
     const slider = (parent,key,name,min,max,unit,fallback) =>
       field(parent,name,'range',numeric(s[key],min,max,fallback),{min,max,datasetUnit:unit});
-    const hover = slider(panel,'hoverOpacity','Highlight opacity',0,100,'%',14);
-    const area = slider(panel,'highlightArea','Highlight reach',0,32,' px',0);
+    const highlightEnabled=check(panel,'Enable hover highlight',s.highlightEnabled!==false);
+    highlightEnabled.parentElement.classList.add('card-toggle');
+    const hover=slider(panel,'hoverOpacity','Highlight opacity',0,100,'%',14);
+    const area=slider(panel,'highlightArea','Highlight reach',0,32,' px',0);
+    const hit=settingsCard(body,'Pointer detection','hover');
+    const hitExpand=check(hit,'Extend hover and click area',s.hitExpand);
+    hitExpand.parentElement.classList.add('card-toggle');
+    const hitPadding=slider(hit,'hitPadding','Extra detection distance',0,48,' px',8);
+    hitPadding.parentElement.style.gridColumn='1/-1';
+    hit.append(E('p','note','Makes nearby space over the dock or grid count toward the nearest icon. An icon directly under the pointer takes priority.'));
+    const caption=settingsCard(body,'Hover labels','hover');
+    const showLabels=check(caption,'Show hover labels',s.hoverLabels!==false);
+    const background=check(caption,'Show label background',s.hoverLabelBackground!==false);
+    const labelSize=slider(caption,'hoverLabelSize','Text size',9,28,' px',12);
+    const localDelay=isGrid?check(caption,'Override General details delay',s.customHoverDelay):null;
+    const delay=isGrid?slider(caption,'hoverDetailsDelay','Details delay',0,5000,' ms',1500):null;
+    if(delay)delay.step=100;
+    const updateHover=()=>{
+      hitPadding.disabled=!hitExpand.checked;
+      background.disabled=labelSize.disabled=!showLabels.checked;
+      if(localDelay){localDelay.disabled=!showLabels.checked;delay.disabled=!showLabels.checked||!localDelay.checked;}
+    };
+    for(const toggle of [hitExpand,showLabels,localDelay])toggle?.addEventListener('change',updateHover);
+    updateHover();
     const reflect = settingsCard(body,'Reflection','effects');
     const reflected = check(reflect,'Show icon reflections',s.reflections);reflected.parentElement.classList.add('card-toggle');
     const reflectionIntensity = slider(reflect,'reflectionIntensity','Reflection intensity',0,100,'%',55);
@@ -138,21 +163,26 @@
       duration.disabled=curve.disabled=!m;
     };
     mode.addEventListener('change',syncMotion);syncMotion();
-    const effects = () => ({highlightArea:+area.value,reflections:reflected.checked,
+    const effects = () => ({highlightEnabled:highlightEnabled.checked,highlightArea:+area.value,
+      hitExpand:hitExpand.checked,hitPadding:+hitPadding.value,hoverLabels:showLabels.checked,
+      hoverLabelBackground:background.checked,hoverLabelSize:+labelSize.value,
+      ...(isGrid?{customHoverDelay:localDelay.checked,hoverDetailsDelay:+delay.value}:{}),reflections:reflected.checked,
       reflectionIntensity:+reflectionIntensity.value,reflectionArea:+reflectionArea.value,
       groundShadow:shadow.checked,groundShadowIntensity:+groundShadowIntensity.value,groundShadowOffset:+groundShadowOffset.value,
       hoverMode:+mode.value,hoverScale:+scale.value,hoverLift:+lift.value,hoverAngle:+angle.value,
       hoverDuration:+duration.value,hoverCurve:+curve.value});
     const initial = isGrid?gridRoundness(s):dockRoundness(s);
-    const shape = (name,value) => {
-      const input=field(panel,name,'range',value,{min:0,max:50,datasetUnit:'%'});
+    const shape = (parent,name,value) => {
+      const input=field(parent,name,'range',value,{min:0,max:50,datasetUnit:'%'});
       const output=input.parentElement.querySelector('output');
       input.oninput=()=>output.textContent=input.value*2+'%';
       input.oninput();
       return input;
     };
-    const corner=shape('Icon roundness',initial);
-    const highlight=shape('Highlight roundness',iconCornerValue(s.highlightCorner,initial));
+    const corner=shape(shapePanel,'Icon roundness',initial);
+    const highlight=shape(panel,'Highlight roundness',iconCornerValue(s.highlightCorner,initial));
+    const syncHighlight=()=>{hover.disabled=area.disabled=highlight.disabled=!highlightEnabled.checked;};
+    highlightEnabled.addEventListener('change',syncHighlight);syncHighlight();
     let separate=Number.isFinite(s.highlightCorner);
     highlight.addEventListener('input',()=>{separate=true;});
     corner.addEventListener('input',()=>{if(!separate){highlight.value=corner.value;highlight.oninput();}});
@@ -196,17 +226,24 @@
     };
   }
   const matrix=m=>`translateY(${m.y}px) rotate(${m.angle}deg) scale(${m.scale})`;
-  stylePreviewIcon=(item,s,k)=>{
+  stylePreviewIcon=(item,s,k,name)=>{
     const m=hoverMotion(s,k);
     item.style.setProperty('--sd-hover-transform',matrix(m));
     item.style.setProperty('--sd-hover-duration',m.time+'ms');
     item.style.setProperty('--sd-hover-easing',m.easing);
+    if(name&&s.hoverLabels!==false&&state.general?.hoverNames!==false){
+      const label=E('span','sd-hover-label',name);styleHoverLabel(label,s);item.append(label);
+    }
   };
   const place=(el,x,y,w,h)=>{
     el.style.left=x+'px';el.style.top=y+'px';
     if(w!==undefined)el.style.width=w+'px';
     if(h!==undefined)el.style.height=h+'px';
   };
+  function styleHoverLabel(label,s){
+    label.style.setProperty('--sd-tip-size',(s.hoverLabelSize??12)+'px');
+    if(s.hoverLabelBackground===false)label.style.setProperty('--sd-tip-bg','transparent');
+  }
   function showIconHover(button){
     const onDock=phase==='closed'&&dockView.contains(button);
     if(!onDock&&!(phase==='open'&&gsView.contains(button)))return;
@@ -228,7 +265,7 @@
     const cy=clamp(r.top+r.height/2+m.y,top+extent/2,bottom-extent/2);
     const xShift=cx-r.left-r.width/2;
     m.y=cy-r.top-r.height/2;
-    const area=s.highlightArea??0,alpha=(s.hoverOpacity??14)/100;
+    const area=s.highlightArea??0,alpha=s.highlightEnabled===false?0:(s.hoverOpacity??14)/100;
     const ring=E('div','sd-hover-ring');
     const x1=clamp(r.left-area,left,right), y1=clamp(r.top-area,top,bottom);
     const x2=clamp(r.right+area,left,right), y2=clamp(r.bottom+area,top,bottom);
@@ -270,8 +307,11 @@
     const label=E('div','sd-hover-label'), title=E('span','sd-hover-name',entry.name);
     const trail=E('span','sd-hover-target',entry.target||'');
     trail.hidden=true;label.append(title,trail);
-    title.hidden=!general.hoverNames;
-    if(general.hoverNames||(!onDock&&general.hoverTargets&&entry.target))hoverLayer.append(label);
+    styleHoverLabel(label,s);
+    const labelsEnabled=s.hoverLabels!==false&&(!onDock||entry.folderHoverLabels!==false);
+    const showDetails=labelsEnabled&&!onDock&&general.hoverTargets&&!!entry.target;
+    title.hidden=!(labelsEnabled&&general.hoverNames);
+    if(!title.hidden||showDetails)hoverLayer.append(label);
     hoverLayer.hidden=false;
     function layout(){
       if(hovered!==button)return;
@@ -293,17 +333,52 @@
     if(clone?.animate&&m.time){
       hoverAnimation=clone.animate([{transform:'none'},{transform:matrix(m)}],{duration:m.time,easing:m.easing});
     }
-    if(!onDock&&general.hoverTargets&&entry.target){
-      hoverTimer=setTimeout(()=>{if(hovered===button){trail.hidden=false;layout();}},general.hoverDelay);
+    if(showDetails){
+      const delay=s.customHoverDelay?(s.hoverDetailsDelay??1500):general.hoverDelay;
+      const details=()=>{if(hovered===button){trail.hidden=false;layout();}};
+      if(delay===0)details();
+      else hoverTimer=setTimeout(details,delay);
     }
   }
   const hitIcon=el=>el?.closest?.('.folder-btn,.tile');
-  island.addEventListener('pointerover',e=>{
-    const icon=hitIcon(e.target);
-    if(icon&&icon!==hitIcon(e.relatedTarget)&&e.pointerType!=='touch'&&!e.buttons)showIconHover(icon);
-  });
-  island.addEventListener('pointerout',e=>{
-    if(hovered&&hitIcon(e.target)===hovered&&hitIcon(e.relatedTarget)!==hovered)clearHover();
+  expandedIconAt=event=>{
+    const {clientX:x,clientY:y,target}=event;
+    if(target?.closest?.('button')||!insideIsland(x,y))return null;
+    const view=phase==='closed'?dockView:phase==='open'?gsView:null;
+    const appearance=phase==='closed'?state.dock:active()?.style;
+    if(!view||!appearance?.hitExpand||!view.contains(target))return null;
+    const scroll=view.querySelector('.scroll,.folders');
+    if(!scroll)return null;
+    const clip=scroll.getBoundingClientRect();
+    // Do not make scrollbars behave like shortcut buttons.
+    if(target===scroll&&((scroll.scrollWidth>scroll.clientWidth&&y>=clip.top+scroll.clientHeight)||
+      (scroll.scrollHeight>scroll.clientHeight&&x>=clip.left+scroll.clientWidth)))return null;
+    const reach=appearance.hitPadding??8;
+    let best=null,bestDistance=Infinity;
+    for(const button of view.querySelectorAll('.folder-btn,.tile')){
+      const r=button.getBoundingClientRect();
+      if(r.left>=clip.right||r.top>=clip.bottom||r.right<=clip.left||r.bottom<=clip.top)continue;
+      const dx=Math.max(Math.max(r.left,clip.left)-x,0,x-Math.min(r.right,clip.right));
+      const dy=Math.max(Math.max(r.top,clip.top)-y,0,y-Math.min(r.bottom,clip.bottom));
+      const distance=dx*dx+dy*dy;
+      if(distance<=reach*reach&&distance<bestDistance){best=button;bestDistance=distance;}
+    }
+    return best;
+  };
+  function hoverPointer(e){
+    if(e.pointerType==='touch'||e.buttons||drag)return;
+    const icon=hitIcon(e.target)||expandedIconAt(e);
+    if(icon)showIconHover(icon);
+    else if(hovered)clearHover();
+  }
+  island.addEventListener('pointerover',hoverPointer);
+  island.addEventListener('pointermove',hoverPointer);
+  island.addEventListener('pointerout',e=>{if(!island.contains(e.relatedTarget))clearHover();});
+  island.addEventListener('click',e=>{
+    if(!e.detail||e.button!==0||performance.now()<suppressClick||dialog.open||!menu.hidden)return;
+    const icon=expandedIconAt(e);
+    if(!icon)return;
+    e.preventDefault();icon.dispatchEvent(new MouseEvent('click',{bubbles:true,detail:e.detail,clientX:e.clientX,clientY:e.clientY}));
   });
   island.addEventListener('pointerdown',()=>clearHover(),true);
   island.addEventListener('scroll',()=>clearHover(),true);
@@ -584,9 +659,9 @@
         else if (l<=bounds.l+2 && r<bounds.r) a.l=Math.max(a.l,r);
       }
     }
-    const scale=monitor.scaleFactor,pad=Math.ceil(8*scale);
-    const w=Math.floor((a.r-a.l-2*pad)/scale),h=Math.floor((a.b-a.t-2*pad)/scale);
-    return w>0&&h>0?shieldNativeArea({px:a.l+pad,py:a.t+pad,w,h,scale}):null;
+    const scale=monitor.scaleFactor;
+    const w=(a.r-a.l)/scale,h=(a.b-a.t)/scale;
+    return w>0&&h>0?shieldNativeArea({px:a.l,py:a.t,w,h,scale}):null;
   }
 
   async function applyArea(area) {
