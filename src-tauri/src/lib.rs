@@ -1,5 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod native_shortcuts;
+mod desktop_widget;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -203,7 +204,9 @@ pub fn run() {
             native_shortcuts::read_shortcut_icon,
             native_shortcuts::inspect_shortcut_drops,
             native_shortcuts::exit_stack_dock,
-            native_shortcuts::stack_dock_layout_backup
+            native_shortcuts::stack_dock_layout_backup,
+            desktop_widget::dock_taskbar_rects,
+            desktop_widget::start_desktop_widget
         ])
         .on_window_event(native_shortcuts::keep_dock_open)
         .run(tauri::generate_context!())

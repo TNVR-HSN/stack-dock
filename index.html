@@ -55,6 +55,8 @@ dialog::backdrop{background:#09050bc0;backdrop-filter:blur(3px)}.dialogtop{paddi
 /* The web preview stays intact if this file is opened outside Tauri. */
 html.native-dock,html.native-dock body,html.native-dock #desktop{background:transparent}
 .native-dock #desktop::before,.native-dock .desktop-tag,.native-dock .guide{display:none}
+.native-dock dialog:modal{top:var(--sd-caption-gutter,0px);bottom:0;max-height:calc(100dvh - var(--sd-caption-gutter,0px) - 20px)}
+.native-dock .menu{max-height:calc(100dvh - var(--sd-caption-gutter,0px) - 14px)}
 #island[data-phase="opening"] .scroll,#island[data-phase="closing"] .scroll{overflow:hidden}
 </style>
 </head>
@@ -446,8 +448,8 @@ const $=id=>document.getElementById(id), E=(tag,cls='',text='')=>{const x=docume
 const B=(label,cls='',fn)=>{const b=E('button',cls,label);b.type='button';if(fn)b.onclick=fn;return b};
 const cap=s=>s[0].toUpperCase()+s.slice(1), clamp=(x,a,b)=>Math.max(a,Math.min(x,b));
 const uid=()=>Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
-const dockDefaults={opacity:76,blur:23,border:true,shadow:true,radius:26,icon:40,gap:6,pad:8,labels:false,color:'#101019',motion:true,borderColor:'#ffffff',borderOpacity:23,borderWidth:1};
-const gsDefaults={opacity:84,blur:24,border:true,shadow:true,radius:22,icon:52,gap:7,pad:15,labels:true,reflections:true,color:'#0e0e16',guides:false,borderColor:'#ffffff',borderOpacity:23,borderWidth:1,titleIcon:25};
+const dockDefaults={opacity:76,blur:23,border:true,shadow:true,radius:26,icon:40,gap:6,pad:8,labels:false,color:'#101019',motion:true,borderColor:'#ffffff',borderOpacity:23,borderWidth:1,roundIcons:true};
+const gsDefaults={opacity:84,blur:24,border:true,shadow:true,radius:22,icon:52,gap:7,pad:15,labels:true,reflections:true,color:'#0e0e16',guides:false,borderColor:'#ffffff',borderOpacity:23,borderWidth:1,titleIcon:25,roundIcons:true};
 const storageKey='dynamic-island-stack-dock-custom-v1';
 const headingHeight=42,headingIconSize=25;
 const triggerSize=(f,d=state.dock)=>f.triggerSize||d.icon;
@@ -476,10 +478,20 @@ function nativeFailure(error){
  console.error('Stack Dock window:',error);
  notify('Window sizing unavailable. Check Tauri permissions and the developer console.');
 }
-function nativeFull(){return {x:0,y:0,w:nativeArea.w,h:nativeArea.h}}
+// Put the HWND's caption strip above the usable work area, then exclude that
+// strip from every visible region. The dock stays in the same screen position.
+const captionGutter=56;
+function shieldNativeArea(area) {
+ return {...area,py:area.py-Math.round(captionGutter*area.scale),h:area.h+captionGutter,gutter:captionGutter};
+}
+function setCaptionGutter(area){
+ if(area?.gutter)document.documentElement.style.setProperty('--sd-caption-gutter',area.gutter+'px');
+ else document.documentElement.style.removeProperty('--sd-caption-gutter');
+}
+function nativeFull(){const y=nativeArea.gutter||0;return {x:0,y,w:nativeArea.w,h:nativeArea.h-y}}
 function nativeCover(...boxes){
  const x=Math.max(0,Math.floor(Math.min(...boxes.map(b=>b.x))-nativeMargin));
- const y=Math.max(0,Math.floor(Math.min(...boxes.map(b=>b.y))-nativeMargin));
+ const y=Math.max(nativeArea.gutter||0,Math.floor(Math.min(...boxes.map(b=>b.y))-nativeMargin));
  const right=Math.min(nativeArea.w,Math.ceil(Math.max(...boxes.map(b=>b.x+b.w))+nativeMargin));
  const bottom=Math.min(nativeArea.h,Math.ceil(Math.max(...boxes.map(b=>b.y+b.h))+nativeMargin));
  return {x,y,w:right-x,h:bottom-y};
@@ -574,14 +586,21 @@ const active=()=>state.folders.find(f=>f.id===activeId);
 function persist(){try{localStorage.setItem(storageKey,JSON.stringify(state));return true}catch{notify('Saved for this session only. Browser storage is unavailable or full.');return false}}
 function notify(message){const t=$('toast');t.textContent=message;t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.hidden=true,3100)}
 function art(key,source,size,image='',round=false){
- const n=E('span','art');n.style.setProperty('--size',size+'px');if(round)n.style.setProperty('--ir','50%');n.setAttribute('aria-hidden','true');
+ const n=E('span','art');n.style.setProperty('--size',size+'px');if(round)n.style.setProperty('--ir',round===true?'50%':round);n.setAttribute('aria-hidden','true');
  if(/^data:image\/(png|jpeg|gif|webp);base64,/i.test(image)){const img=E('img');img.src=image;img.alt='';img.draggable=false;n.append(img)}
  else{n.innerHTML=(Object.hasOwn(source,key)?source[key]:Object.values(source)[0]).svg}
  return n;
 }
+function dockIconRadius(f,s=state.dock,mode=f.dockIconShape){
+ return (mode==='rounded'||(mode!=='raw'&&s.roundIcons!==false))?'50%':'0px';
+}
+function gridIconRadius(s,heading=false){
+ if(s.roundIcons===false)return '0px';
+ return heading?'50%':Math.max(0,Math.min(50,Number.isFinite(s.iconCorner)?s.iconCorner:25))+'%';
+}
 function dims(){
- const w=nativeArea?.w??desktop.clientWidth,h=nativeArea?.h??desktop.clientHeight;
- return {w,h,p:Math.min(14,Math.floor(w/40)+4)};
+ const top=nativeArea?.gutter??0,w=nativeArea?.w??desktop.clientWidth,h=(nativeArea?.h??desktop.clientHeight)-top;
+ return {w,h,top,p:Math.min(14,Math.floor(w/40)+4)};
 }
 function vertical(){return state.edge==='left'||state.edge==='right'}
 function metrics(f){
@@ -592,7 +611,7 @@ function box(w,h,r){
  const d=dims(), a=state.align==='start'?0:state.align==='end'?1:.5;
  w=Math.max(1,Math.min(w,d.w-2*d.p));h=Math.max(1,Math.min(h,d.h-2*d.p));
  const x=vertical()?(state.edge==='left'?d.p:d.w-d.p-w):d.p+a*(d.w-2*d.p-w);
- const y=vertical()?d.p+a*(d.h-2*d.p-h):(state.edge==='top'?d.p:d.h-d.p-h);
+ const y=d.top+(vertical()?d.p+a*(d.h-2*d.p-h):(state.edge==='top'?d.p:d.h-d.p-h));
  return {x,y,w,h,r:Math.min(r,w/2,h/2)};
 }
 function dockBox(){
@@ -637,7 +656,13 @@ function startFlight(f,from,destination,source,duration,easing){
  if(!f||!from?.width||!to?.width)return null;
  const node=E('div','folder-flight');
  node.setAttribute('aria-hidden','true');node.style.left=from.left+'px';node.style.top=from.top+'px';
- node.append(art(f.icon,FOLDER_ICONS,from.width,f.image,true));desktop.append(node);
+ const startRadius=source?.style.getPropertyValue('--ir')||'50%';
+ const endRadius=destination.style.getPropertyValue('--ir')||'50%';
+ const traveling=art(f.icon,FOLDER_ICONS,from.width,f.image,startRadius);
+ node.append(traveling);desktop.append(node);
+ // Shape follows the source and destination, including raw icons.
+ if(startRadius!==endRadius&&traveling.animate)traveling.animate(
+  [{borderRadius:startRadius},{borderRadius:endRadius}],{duration,easing,fill:'forwards'});
  source?.classList.add('flight-endpoint');destination.classList.add('flight-endpoint');
  flight={node,source,destination};
  const dx=to.left+to.width/2-from.left-from.width/2,dy=to.top+to.height/2-from.top-from.height/2;
@@ -666,7 +691,7 @@ function renderDock(){
   const b=B('','folder-btn',ev=>{if(performance.now()<suppressClick)return;openStack(f.id,ev.detail===0)});
   const size=triggerSize(f);
   b.style.setProperty('--bw',(size+14)+'px');b.style.setProperty('--bh',(size+(s.labels?29:14))+'px');
-  b.dataset.folder=f.id;b.setAttribute('aria-label',f.name);b.setAttribute('aria-controls','gsView');b.title=f.name;b.append(art(f.icon,FOLDER_ICONS,size,f.image,true));
+  b.dataset.folder=f.id;b.setAttribute('aria-label',f.name);b.setAttribute('aria-controls','gsView');b.title=f.name;b.append(art(f.icon,FOLDER_ICONS,size,f.image,dockIconRadius(f,s)));
   if(s.labels)b.append(E('span','',f.name));fs.append(b)
  }
  dockView.replaceChildren(fs);fs.scrollLeft=sx;fs.scrollTop=sy;
@@ -679,7 +704,7 @@ function renderGrid(f,retain=true){
  gsView.style.setProperty('--pad',m.pad+'px');gsView.style.setProperty('--heading-h',headingSpace(s)+'px');
  const heading=E('header','gs-heading'),badge=E('div','gs-heading-inner'),name=E('h2','',f.name);
  name.title=f.name;badge.style.height=(headingSize(s)+3)+'px';
- badge.append(art(f.icon,FOLDER_ICONS,headingSize(s),f.image,true),name);heading.append(badge);
+ badge.append(art(f.icon,FOLDER_ICONS,headingSize(s),f.image,gridIconRadius(s,true)),name);heading.append(badge);
  const sc=E('div','scroll'),grid=E('div','grid');
  sc.setAttribute('aria-label',f.name+' grid stack');gsView.setAttribute('aria-label',f.name+' grid stack');
  for(const [k,v] of Object.entries({cols:m.cols,cellw:m.cw+'px',cellh:m.ch+'px',gap:m.gap+'px'}))grid.style.setProperty('--'+k,v);
@@ -690,8 +715,8 @@ function renderGrid(f,retain=true){
   else if(t){
    const b=B('','tile',ev=>{if(phase==='open'&&performance.now()>=suppressClick)launch(t)});
    b.dataset.tile=t.id;b.setAttribute('aria-label',t.name);b.title=t.name;
-   b.append(art(t.icon,APP_ICONS,s.icon,t.image));
-   if(s.reflections){const refl=E('span','reflect');refl.style.setProperty('--size',s.icon+'px');refl.setAttribute('aria-hidden','true');refl.append(art(t.icon,APP_ICONS,s.icon,t.image));b.append(refl)}
+   b.append(art(t.icon,APP_ICONS,s.icon,t.image,gridIconRadius(s)));
+   if(s.reflections){const refl=E('span','reflect');refl.style.setProperty('--size',s.icon+'px');refl.setAttribute('aria-hidden','true');refl.append(art(t.icon,APP_ICONS,s.icon,t.image,gridIconRadius(s)));b.append(refl)}
    if(s.labels)b.append(E('span','caption',t.name));cell.append(b);
   }
   grid.append(cell);
@@ -892,7 +917,8 @@ function showMenu(x,y,build,position=false){
 function showMenuHere(x,y,build,position=false){
  const focus=menu.hidden?document.activeElement:menuFocus;closeMenu();menuFocus=focus;
  menu.classList.toggle('position',position);menu.replaceChildren();build();menu.hidden=false;
- const r=menu.getBoundingClientRect();menu.style.left=clamp(x,7,Math.max(7,innerWidth-r.width-7))+'px';menu.style.top=clamp(y,7,Math.max(7,innerHeight-r.height-7))+'px';
+ const r=menu.getBoundingClientRect(),top=7+(nativeArea?.gutter||0);
+ menu.style.left=clamp(x,7,Math.max(7,innerWidth-r.width-7))+'px';menu.style.top=clamp(y,top,Math.max(top,innerHeight-r.height-7))+'px';
  menu.querySelector('button:not(:disabled)')?.focus({preventScroll:true});
 }
 function mt(s){menu.append(E('div','menu-title',s))}
@@ -999,7 +1025,7 @@ document.addEventListener('pointermove',e=>{
  if(!press||e.pointerId!==press.id)return;
  if(!drag&&Math.hypot(e.clientX-press.x,e.clientY-press.y)>7){
    clearTimeout(press.timer);
-   if(phase==='open'&&press.item){const ghost=E('div','drag-ghost');ghost.append(art(press.item.icon,APP_ICONS,active().style.icon,press.item.image));document.body.append(ghost);press.tile.classList.add('dragging');drag={ghost,tile:press.tile,item:press.item}}
+   if(phase==='open'&&press.item){const s=active().style,ghost=E('div','drag-ghost');ghost.append(art(press.item.icon,APP_ICONS,s.icon,press.item.image,gridIconRadius(s)));document.body.append(ghost);press.tile.classList.add('dragging');drag={ghost,tile:press.tile,item:press.item}}
    else{press=null;return}
  }
  if(drag){
@@ -1140,16 +1166,16 @@ function editSettings(selected=null,initial='dock',creating=false){
   if(type==='gs'){
    const title=E('div','sample-row sample-name');
    const ico=readIcon(f);
-   title.style.gap='5px';title.append(art(ico.icon,FOLDER_ICONS,Math.round(headingSize(s)*.66),ico.image,true),E('span','',cache.get(f.id)?.name.value||f.name||'New folder'));hull.append(title);
+   title.style.gap='5px';title.append(art(ico.icon,FOLDER_ICONS,Math.round(headingSize(s)*.66),ico.image,gridIconRadius(s,true)),E('span','',cache.get(f.id)?.name.value||f.name||'New folder'));hull.append(title);
    f.slots.filter(t=>t.type==='item').slice(0,3).forEach(t=>{
-    const item=E('div','sample-item');item.append(art(t.icon,APP_ICONS,Math.round(s.icon*k),t.image));
+    const item=E('div','sample-item');item.append(art(t.icon,APP_ICONS,Math.round(s.icon*k),t.image,gridIconRadius(s)));
     if(s.labels)item.append(E('small','',t.name));row.append(item);
    });
   }else{
    (type==='folder'?[f]:state.folders.slice(0,3)).forEach(entry=>{
     const controls=cache.get(entry.id),ico=readIcon(entry);
     const size=controls?(controls.useSize.checked?+controls.size.value:s.icon):triggerSize(entry,s);
-    const item=E('div','sample-item');item.append(art(ico.icon,FOLDER_ICONS,Math.round(size*k),ico.image,true));
+    const item=E('div','sample-item');item.append(art(ico.icon,FOLDER_ICONS,Math.round(size*k),ico.image,dockIconRadius(entry,s,controls?.dockShape.value||entry.dockIconShape)));
     if(s.labels)item.append(E('small','',controls?.name.value||entry.name||'New folder'));row.append(item);
    });
   }
@@ -1194,8 +1220,9 @@ function editSettings(selected=null,initial='dock',creating=false){
    const name=field(identity,'Folder name','text',f.name,{maxLength:40});
    const useSize=check(identity,'Override dock icon size',f.triggerSize);
    const size=field(identity,'Custom folder icon size','range',f.triggerSize||state.dock.icon,{min:24,max:74,datasetUnit:' px'});
+   const dockShape=select(identity,'Dock icon corners',[['default','Use dock setting'],['rounded','Rounded'],['raw','Original shape']],f.dockIconShape||'default');
    size.disabled=!useSize.checked;useSize.onchange=()=>{size.disabled=!useSize.checked;if(useSize.checked&&size.value==state.dock.icon){size.value=collectDock().icon;size.dispatchEvent(new Event('input'))}};
-   const icon=iconPicker(folderPane,FOLDER_ICONS,f.icon,f.image,37,true,error,()=>queueMicrotask(draw));
+   const icon=iconPicker(folderPane,FOLDER_ICONS,f.icon,f.image,37,true,error,()=>queueMicrotask(draw),null,f);
    gs.append(E('p','note','These settings apply only to this folder’s expanded grid. Its background remains independent from the dock.'));
    const gsPreview=previewBox(gs),layout=section(gs,'Grid layout');
    const mode=select(layout,'Layout',[['auto','Auto-fill'],['rows','Row-wise']],f.mode);
@@ -1203,7 +1230,7 @@ function editSettings(selected=null,initial='dock',creating=false){
    const rows=field(layout,'Rows','number',f.rows,{min:1,max:MAX_ROWS});
    gs.append(E('p','note','Right-click or drop onto an exact cell. Auto-fill wraps across columns. Row-wise keeps later rows grouped.'));
    const style=appearance(gs,{...gsDefaults,...f.style},true);
-   const c={f,folderPane,gs,name,useSize,size,icon,mode,cols,rows,style,folderPreview,gsPreview};cache.set(f.id,c);return c;
+   const c={f,folderPane,gs,name,useSize,size,dockShape,icon,mode,cols,rows,style,folderPreview,gsPreview};cache.set(f.id,c);return c;
   }
   function show(key){
    tab=key;error.hidden=true;const c=key==='dock'?null:ensure(folder),node=key==='dock'?dock:key==='folder'?c.folderPane:c.gs;
@@ -1229,7 +1256,7 @@ function editSettings(selected=null,initial='dock',creating=false){
    const shape={...c.f,slots:c.f.slots.map(t=>({...t}))};reflow(shape,cols,c.mode.value);
    if(shape.slots.some(t=>t.r>=MAX_ROWS))invalid(c,'gs',c.cols,'This column count would exceed '+MAX_ROWS+' rows. Try more columns.');
    const minimum=1+Math.max(0,...shape.slots.map(t=>t.r));
-   changes.push([c.f,{name,...icon,triggerSize:c.useSize.checked?+c.size.value:0,cols:shape.cols,rows:Math.max(rows,minimum),mode:shape.mode,slots:shape.slots,style:c.style()}]);
+   changes.push([c.f,{name,...icon,dockIconShape:c.dockShape.value,triggerSize:c.useSize.checked?+c.size.value:0,cols:shape.cols,rows:Math.max(rows,minimum),mode:shape.mode,slots:shape.slots,style:c.style()}]);
   }
   for(const [f,v] of changes)Object.assign(f,v);
   if(creating)state.folders.push(newFolder);
@@ -1240,7 +1267,7 @@ function editSettings(selected=null,initial='dock',creating=false){
 function guess(target){
  if(/^https?:\/\//i.test(target))return 'url';
  if(/^[a-z][a-z0-9+.-]+:\/\//i.test(target))return 'uri';
- return /\.(exe|com)$/i.test(target)?'program':'local';
+ return /\.exe$/i.test(target)?'program':'local';
 }
 function editShortcut(f,where,t){
  const base=t||{id:uid(),type:'item',name:'',target:'',kind:'program',args:'',cwd:'',icon:'web',image:''};
@@ -1319,9 +1346,16 @@ async function startNative(){
     }
     if(regionAvailable){
      root.classList.add('native-dock');
-     if(await moveHost(nativeFull())){
-      try{await setNativeRegion(nativeCover(dockBox()));fixedHost=true}
+     const work=nativeArea;
+     nativeArea=shieldNativeArea(work);
+     setCaptionGutter(nativeArea);
+     if(await moveHost({x:0,y:0,w:nativeArea.w,h:nativeArea.h})){
+      try{applyBox(dockBox());await setNativeRegion(nativeCover(dockBox()));fixedHost=true}
       catch(error){console.warn('Could not clip the fixed dock host:',error)}
+     }
+     if(!fixedHost){
+      nativeArea=work;setCaptionGutter(work);
+      applyBox(dockBox());
      }
     }
     if(!fixedHost&&!await moveHost(nativeCover(dockBox()))){
@@ -1337,8 +1371,9 @@ async function startNative(){
    }).catch(error=>console.warn('Native focus listener unavailable:',error));
  }catch(error){nativeFailure(error)}
 }
-startNative();
+const nativeReady=startNative();
 </script>
 <script src="/stack-dock-native.js"></script>
+<script src="/stack-dock-widget.js"></script>
 </body>
 </html>

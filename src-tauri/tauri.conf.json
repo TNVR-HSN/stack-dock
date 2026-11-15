@@ -17,13 +17,14 @@
       "title": "Stack Dock (demo view)",
       "width": 1100,
       "height": 720,
-      "visible": true,
+      "visible": false,
+      "focus": false,
+      "skipTaskbar": true,
+      "alwaysOnTop": false,
       "decorations": false,
       "transparent": true,
       "shadow": false,
-      "visible": true,
-      "center": true,
-      "skipTaskbar": false
+      "center": true
       }
 
     ],
