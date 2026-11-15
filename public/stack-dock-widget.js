@@ -4,10 +4,16 @@
   const invoke = window.__TAURI__?.core?.invoke;
   const style = document.createElement('style');
   style.textContent = `
-#dockView .folder-btn,#gsView .tile{position:relative}
+#dockView .folder-btn,#gsView .tile{position:relative;padding:0}
+#dockView .folder-btn{gap:3px}
+#dockView .folder-btn>span:not(.art){line-height:14px}
 #dockView .folder-btn:hover,#gsView .tile:hover{background:none}
-#dockView .folder-btn:hover>.art,#gsView .tile:hover>.art{box-shadow:0 0 0 4px rgb(255 255 255 / var(--sd-hover,.14)), inset 0 0 0 100px rgb(255 255 255 / calc(var(--sd-hover,.14) / 2))}
-#gsView.sd-labels .tile{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:var(--sd-icon-size) var(--sd-reflect) var(--sd-label-space);row-gap:2px;align-content:start;justify-items:center;padding:5px 3px}
+#dockView .folder-btn>.art,#gsView .tile>.art,.sample-item>.art{position:relative;overflow:visible}
+#dockView .folder-btn>.art>img,#dockView .folder-btn>.art>svg,#gsView .tile>.art>img,#gsView .tile>.art>svg,.sample-item>.art>img,.sample-item>.art>svg{border-radius:inherit}
+#dockView .folder-btn>.art::after,#gsView .tile>.art::after,.sample-item>.art::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:var(--highlight-round,var(--ir,25%));opacity:0;box-shadow:inset 0 0 0 2px #fff;transition:opacity .12s}
+#dockView .folder-btn:hover>.art::after,#gsView .tile:hover>.art::after,.sample-item:hover>.art::after{opacity:var(--sd-hover,.14)}
+#gsView .tile{gap:0;justify-content:flex-start}
+#gsView.sd-labels .tile{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:var(--sd-icon-size) var(--sd-reflect) var(--sd-label-space);row-gap:2px;align-content:start;justify-items:center}
 #gsView.sd-labels .tile>.art{grid-row:1}
 #gsView.sd-labels .tile>.reflect{grid-row:2}
 #gsView.sd-labels .tile>.caption{grid-row:3;align-self:start;font-size:var(--sd-label-font);line-height:1.2;height:2.4em;max-height:2.4em;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;text-overflow:ellipsis}
@@ -22,32 +28,107 @@ dialog.sd-properties{width:min(670px,calc(100vw - 24px))}
 .sd-properties .sd-native-icon .sd-icon-path{flex:0 0 100%;width:100%}
 .sd-properties .sd-native-icon{border-top:1px solid #ffffff18;padding-top:8px}
 .sd-properties .sd-native-icon .gallery{max-height:84px}
+.launch-view,.launch-sample{display:flex;align-items:center;gap:var(--launch-gap,12px);padding:0 var(--launch-pad,16px);color:var(--launch-text,#fff);min-width:0}
+.launch-view{position:absolute;inset:0;pointer-events:none}
+.launch-sample{justify-content:flex-start;background:var(--launch-fill);max-width:100%;overflow:hidden}
+.launch-copy{min-width:0;flex:1;display:grid;gap:2px}
+.launch-title,.launch-caption{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.launch-title{font-size:var(--launch-font,19px);font-weight:650;letter-spacing:.03em}
+.launch-caption{font-size:11px;opacity:.76}
+.launch-settings .launch-sample{grid-column:1/-1}
 @media(max-width:450px){.sd-properties .sd-properties-rows>label.field{grid-template-columns:85px minmax(0,1fr)}}
 `;
   document.head.append(style);
 
   const numeric = (v, lo, hi, fallback) => Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : fallback;
   Object.assign(dockDefaults, {motionSpeed:100, hoverOpacity:14});
-  Object.assign(gsDefaults, {labelFont:11, labelWidth:76, iconCorner:25, hoverOpacity:14});
+  const launchDefaults={launchEnabled:true,launchWidth:300,launchHeight:64,launchHold:1250,
+    launchTravel:300,launchReturn:210,launchIcon:42,launchFont:19,launchRadius:32,
+    launchOpacity:94,launchColor:'#111a2c',launchText:'#ffffff',launchLabel:true,launchGap:12,launchPad:16};
+  Object.assign(dockDefaults,launchDefaults);
+  const launchView=$('launchView'),launchGlass=$('launchGlass');
+  function launchStyle(s){return {...launchDefaults,...s};}
+  function launchContent(node,item,s,size) {
+    node.style.setProperty('--launch-gap',s.launchGap+'px');
+    node.style.setProperty('--launch-pad',s.launchPad+'px');
+    node.style.setProperty('--launch-text',s.launchText);
+    node.style.setProperty('--launch-font',s.launchFont+'px');
+    node.style.setProperty('--launch-fill','rgba('+hexRgb(s.launchColor)+','+s.launchOpacity/100+')');
+    const icon=art(item.icon,APP_ICONS,size,item.image,item.radius||'50%');
+    const copy=E('div','launch-copy'),title=E('div','launch-title',item.name);
+    title.title=item.name;
+    copy.append(title);
+    if(s.launchLabel)copy.append(E('div','launch-caption','Launched'));
+    node.replaceChildren(icon,copy);
+    return {icon,copy};
+  }
+  function launchControls(body,s) {
+    const panel=section(body,'Launch indicator');
+    panel.classList.add('launch-settings');
+    const enabled=check(panel,'Show launch indicator',s.launchEnabled);
+    const label=check(panel,'Show Launched caption',s.launchLabel);
+    const preview=E('div','launch-sample');panel.append(preview);
+    const number=(key,label,min,max,unit)=>field(panel,label,'range',s[key],{min,max,datasetUnit:unit});
+    const inputs={
+      launchWidth:number('launchWidth','Maximum width',140,680,' px'),
+      launchHeight:number('launchHeight','Height',42,120,' px'),
+      launchHold:number('launchHold','Time shown',0,8000,' ms'),
+      launchTravel:number('launchTravel','Icon glide duration',0,1000,' ms'),
+      launchReturn:number('launchReturn','Return to dock duration',0,700,' ms'),
+      launchIcon:number('launchIcon','Icon size',16,84,' px'),
+      launchFont:number('launchFont','Title size',11,34,' px'),
+      launchRadius:number('launchRadius','Panel corner radius',0,60,' px'),
+      launchOpacity:number('launchOpacity','Panel opacity',0,100,'%'),
+      launchGap:number('launchGap','Icon and text spacing',0,28,' px'),
+      launchPad:number('launchPad','Side padding',4,28,' px'),
+    };
+    const background=field(panel,'Panel color','color',s.launchColor);
+    const text=field(panel,'Text color','color',s.launchText);
+    const read=()=>({launchEnabled:enabled.checked,launchLabel:label.checked,
+      launchColor:background.value,launchText:text.value,
+      ...Object.fromEntries(Object.entries(inputs).map(([k,v])=>[k,+v.value]))});
+    const draw=()=>{
+      const c=read();
+      preview.hidden=!c.launchEnabled;
+      preview.style.width=c.launchWidth+'px';
+      preview.style.height=c.launchHeight+'px';
+      preview.style.borderRadius=c.launchRadius+'px';
+      launchContent(preview,{icon:'terminal',name:'Example shortcut'},c,Math.min(c.launchIcon,c.launchHeight-10));
+    };
+    panel.addEventListener('input',draw);panel.addEventListener('change',draw);draw();
+    return read;
+  }
+  Object.assign(gsDefaults, {labelFont:11, labelWidth:76, hoverOpacity:14});
   // New appearance keys are preserved by the matching layout backup script.
   const baseAppearance = appearance;
   appearance = function (body, s, isGrid) {
     const read = baseAppearance(body, s, isGrid);
-    const panel = section(body, isGrid ? 'Tile styling and label layout' : 'Motion and hover');
+    const panel = section(body, isGrid ? 'Tile styling and label layout' : 'Icon shape, highlight and motion');
     const slider = (key, name, min, max, unit, fallback) =>
       field(panel, name, 'range', numeric(s[key],min,max,fallback), {min,max,datasetUnit:unit});
     const hover = slider('hoverOpacity','Hover highlight',0,100,'%',14);
-    const round = select(panel,'Icon corners',[['rounded','Rounded'],['raw','Original shape']],s.roundIcons===false?'raw':'rounded');
+    const initial = isGrid?gridRoundness(s):dockRoundness(s);
+    const shape = (name,value) => {
+      const input=field(panel,name,'range',value,{min:0,max:50,datasetUnit:'%'});
+      const output=input.parentElement.querySelector('output');
+      input.oninput=()=>output.textContent=input.value*2+'%';
+      input.oninput();
+      return input;
+    };
+    const corner=shape('Icon roundness',initial);
+    const highlight=shape('Highlight roundness',iconCornerValue(s.highlightCorner,initial));
+    let separate=Number.isFinite(s.highlightCorner);
+    highlight.addEventListener('input',()=>{separate=true;});
+    corner.addEventListener('input',()=>{if(!separate){highlight.value=corner.value;highlight.oninput();}});
+    const corners=()=>({iconCorner:+corner.value,highlightCorner:separate?+highlight.value:undefined,roundIcons:undefined});
     if (isGrid) {
       const font = slider('labelFont','Label size',9,18,' px',11);
       const width = slider('labelWidth','Minimum label width',64,200,' px',76);
-      const corner = slider('iconCorner','Icon roundness',0,50,'%',25);
-      const sync = () => {corner.disabled=round.value==='raw';};
-      round.onchange=sync;sync();
-      return () => ({...read(),labelFont:+font.value,labelWidth:+width.value,iconCorner:+corner.value,hoverOpacity:+hover.value,roundIcons:round.value==='rounded'});
+      return () => ({...read(),labelFont:+font.value,labelWidth:+width.value,hoverOpacity:+hover.value,...corners()});
     }
     const speed = slider('motionSpeed','Animation speed',25,250,'%',100);
-    return () => ({...read(),motionSpeed:+speed.value,hoverOpacity:+hover.value,roundIcons:round.value==='rounded'});
+    const indicator=launchControls(body,launchStyle(s));
+    return () => ({...read(),motionSpeed:+speed.value,hoverOpacity:+hover.value,...corners(),...indicator()});
   };
 
   const baseMetrics = metrics;
@@ -56,11 +137,16 @@ dialog.sd-properties{width:min(670px,calc(100vw - 24px))}
     const m = baseMetrics(folder), s = folder.style;
     if (!s.labels) return m;
     const font = numeric(s.labelFont,9,18,11);
+    const height=s.icon+(s.reflections?10:0)+Math.ceil(font*2.4)+4;
+    if(m.gap===0)return {...m,ch:height};
     const minWidth = Math.max(m.cw,numeric(s.labelWidth,64,200,76));
     try { measuring ||= document.createElement('canvas').getContext('2d'); } catch {}
-    const widthOf = measuring
-      ? label => { measuring.font = font + 'px "Segoe UI",system-ui,sans-serif'; return measuring.measureText(label).width; }
-      : label => Array.from(label).length * font * .57;
+    if(measuring)measuring.font=font+'px "Segoe UI",system-ui,sans-serif';
+    const widths=new Map();
+    const widthOf=label=>{
+      if(!widths.has(label))widths.set(label,measuring?measuring.measureText(label).width:Array.from(label).length*font*.57);
+      return widths.get(label);
+    };
     function fits(name, width) {
       const chunks = name.trim().split(/\s+/);
       let row = '', used = 1;
@@ -84,7 +170,7 @@ dialog.sd-properties{width:min(670px,calc(100vw - 24px))}
       while (w < 200 && !fits(item.name,w-8)) w = Math.min(200,w+4);
       if (w === 200) break;
     }
-    return { ...m,cw:w,ch:s.icon+(s.reflections?13:0)+Math.ceil(font*2.4)+16 };
+    return {...m,cw:w,ch:height};
   };
   const baseRenderGrid = renderGrid;
   renderGrid = function (folder,...args) {
@@ -104,22 +190,67 @@ dialog.sd-properties{width:min(670px,calc(100vw - 24px))}
     return baseRenderDock(...args);
   };
 
-  const baseMorph = morph, baseFlight = startFlight;
-  morph = function (...args) {
-    const factor = 100/numeric(state.dock.motionSpeed,25,250,100);
-    if (factor === 1) return baseMorph(...args);
-    const undo = [];
-    for (const node of [island,dockGlass,gsGlass,dockView,gsView]) {
-      if (typeof node.animate !== 'function') continue;
-      const own = Object.hasOwn(node,'animate'), original = node.animate;
-      node.animate = function (frames,options) {
-        return original.call(this,frames,{...options,duration:options.duration*factor,delay:(options.delay||0)*factor});
-      };
-      undo.push(() => {if(own) node.animate=original; else delete node.animate;});
+  showLaunchIndicator = async function(item,start,sourceArt,source) {
+    const s=launchStyle(state.dock);
+    if(!s.launchEnabled||phase!=='open'||nativeBusy)return false;
+    closeMenu();clearPointer();
+    const from=readBox(),dock=dockBox(),radius=gridIconRadius(active().style);
+    const target=box(s.launchWidth,s.launchHeight,s.launchRadius);
+    const moving=state.dock.motion&&!reduced.matches&&!!island.animate;
+    const duration=moving?s.launchTravel:0,returnTime=moving?s.launchReturn:0;
+    nativeBusy=true;setPhase('launching');
+    const play=async(animations)=>{await Promise.allSettled(animations.map(a=>a.finished));};
+    const fade=(el,a,b,ms)=>el.animate([{opacity:a},{opacity:b}],{duration:ms,fill:'both',easing:'ease-out'});
+    const hull=(a,b,ms)=>island.animate([boxFrame(a),boxFrame(b)],{duration:ms,fill:'both',easing:'cubic-bezier(.22,.74,.23,1)'});
+    const release=animations=>animations.forEach(a=>a.cancel());
+    let flying,incoming=[],outgoing=[];
+    try {
+      if(nativeWindow&&!await moveHost(nativeCover(from,target,dock)))return true;
+      styleGlass(launchGlass,{color:s.launchColor,opacity:s.launchOpacity,border:false});
+      island.style.boxShadow='none';
+      launchGlass.hidden=false;launchView.hidden=false;
+      const {icon,copy}=launchContent(launchView,{...item,radius},s,Math.max(12,Math.min(s.launchIcon,target.h-10,target.w-s.launchPad*2-24)));
+      applyBox(target);
+      if(duration){
+        const dest=icon.getBoundingClientRect();
+        incoming=[hull(from,target,duration),fade(gsView,1,0,duration*.65),fade(gsGlass,1,0,duration),
+          fade(launchGlass,0,1,duration),fade(copy,0,1,duration)];
+        if(start?.width&&dest.width&&sourceArt){
+          icon.style.visibility='hidden';
+          if(source)source.style.visibility='hidden';
+          flying=E('div','folder-flight');
+          flying.style.left=start.left+'px';flying.style.top=start.top+'px';
+          flying.append(sourceArt);desktop.append(flying);
+          const scale=dest.width/start.width;
+          const dx=dest.left-start.left+(dest.width-start.width)/2,dy=dest.top-start.top+(dest.height-start.height)/2;
+          incoming.push(flying.animate([{transform:'translate(0px,0px) scale(1)'},
+            {transform:'translate('+dx+'px,'+dy+'px) scale('+scale+')'}],{duration,easing:'cubic-bezier(.22,.74,.23,1)',fill:'both'}));
+        }
+        await play(incoming);
+      }
+      gsView.style.opacity=gsGlass.style.opacity='0';
+      icon.style.visibility='';flying?.remove();release(incoming);incoming=[];
+      setPhase('launched');
+      if(nativeWindow)await moveHost(nativeCover(target));
+      if(s.launchHold)await new Promise(resolve=>setTimeout(resolve,s.launchHold));
+      setPhase('returning');
+      if(nativeWindow&&!await moveHost(nativeCover(target,dock)))return true;
+      applyBox(dock);views(false);
+      if(returnTime){
+        outgoing=[hull(target,dock,returnTime),fade(launchGlass,1,0,returnTime),
+          fade(launchView,1,0,returnTime*.7),fade(dockGlass,0,1,returnTime),fade(dockView,0,1,returnTime)];
+        await play(outgoing);
+      }
+      return true;
+    } catch(error) {
+      console.warn('Stack Dock launch indicator:',error);
+      return true;
+    } finally {
+      release(incoming);release(outgoing);flying?.remove();
+      if(source)source.style.visibility='';
+      launchView.hidden=launchGlass.hidden=true;launchView.replaceChildren();
+      nativeBusy=false;finishClose(false);
     }
-    startFlight = function (f,a,b,c,duration,...rest) { return baseFlight(f,a,b,c,duration*factor,...rest); };
-    try { return baseMorph(...args); }
-    finally { startFlight=baseFlight; undo.forEach(fn=>fn()); }
   };
 
   const oldProperties = editShortcut;
@@ -231,7 +362,7 @@ dialog.sd-properties{width:min(670px,calc(100vw - 24px))}
       landing:{r:side==='top'?0:side==='bottom'?f.rows:before.r,c:side==='left'?0:side==='right'?f.cols:before.c}};
     if(horizontalEdge(side)) {if(side==='left')f.slots.forEach(t=>t.c++);f.cols++;}
     else {if(side==='top')f.slots.forEach(t=>t.r++);f.rows++;}
-    try { renderGrid(f);applyBox(gridBox(f));views(true);fitNative(); }
+    try { renderGrid(f);const grid=gridBox(f,currentMetrics);applyBox(grid);views(true);fitNative(grid); }
     catch(error){resetStrip(true); throw error;}
     const sc=gsView.querySelector('.scroll');
     if (side==='left') sc.scrollLeft=0;

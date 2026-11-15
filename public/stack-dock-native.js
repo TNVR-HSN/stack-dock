@@ -22,7 +22,7 @@
 .settings-dialog .settings-preview{grid-row:1;position:sticky;top:0;z-index:2;align-self:start;background-color:#211725;box-shadow:0 8px 10px -6px #0f0915}
 .settings-dialog .settings-body{scroll-padding-top:160px;overscroll-behavior:contain}
 @media(max-height:650px){.settings-dialog .settings-preview{min-height:88px;max-height:112px}.settings-dialog .settings-body{scroll-padding-top:122px}}
-dialog.sd-panel-region::backdrop{background:transparent;backdrop-filter:none}
+dialog.sd-panel-region::backdrop{background:transparent}
 dialog.sd-panel-region{box-shadow:0 5px 16px #07020b8c}
 .sd-search-input{width:100%;border:1px solid #ffffff28;background:#140d18;color:#f4ebf8;border-radius:9px;padding:9px 11px}
 .sd-search-summary{margin:0}.sd-search-results{display:grid;gap:5px;max-height:min(390px,48dvh);min-height:28px;overflow:auto}
@@ -396,9 +396,11 @@ dialog.sd-panel-region{box-shadow:0 5px 16px #07020b8c}
       if (!object(input)) fail('a dock or grid is missing its appearance settings.');
       const result = { ...defaults };
       const bounds = {
-        opacity:[0,100], blur:[0,32], radius:[0,56], icon:[24,88],
+        opacity:[0,100], radius:[0,56], icon:[24,88],
         gap:[0,32], pad:[0,36], borderOpacity:[0,100], borderWidth:[1,5], titleIcon:[16,44],
-        motionSpeed:[25,250], hoverOpacity:[0,100], labelFont:[9,18], labelWidth:[64,200], iconCorner:[0,50]
+        motionSpeed:[25,250], hoverOpacity:[0,100], labelFont:[9,18], labelWidth:[64,200],
+        launchWidth:[140,680],launchHeight:[42,120],launchHold:[0,8000],launchTravel:[0,1000],
+        launchReturn:[0,700],launchIcon:[16,84],launchFont:[11,34],launchRadius:[0,60],launchGap:[0,28],launchPad:[4,28]
       };
       for (const [key, fallback] of Object.entries(defaults)) {
         const val = input[key];
@@ -408,6 +410,12 @@ dialog.sd-panel-region{box-shadow:0 5px 16px #07020b8c}
           : int(val, ...(bounds[key] || [0,100]));
         if (!ok) fail('appearance value "' + key + '" is not valid.');
         result[key] = val;
+      }
+      for (const key of ['iconCorner','highlightCorner']) {
+        if(input[key]===undefined)continue;
+        if(!int(input[key],0,50))fail('appearance value "'+key+'" is not valid.');
+        // Older backups used a raw-mode flag alongside a dormant radius.
+        if(key!=='iconCorner'||input.roundIcons!==false)result[key]=input[key];
       }
       return result;
     }
@@ -442,6 +450,7 @@ dialog.sd-panel-region{box-shadow:0 5px 16px #07020b8c}
       return { id:f.id, name:f.name, cols:f.cols, rows:f.rows, mode:f.mode, slots,
         style:appearanceCopy(f.style, gsDefaults),
         dockIconShape:['default','rounded','raw'].includes(f.dockIconShape) ? f.dockIconShape : 'default',
+        dockIconCorner:int(f.dockIconCorner,0,50) ? f.dockIconCorner : undefined,
         triggerSize:int(f.triggerSize,24,74) ? f.triggerSize : 0,
         icon:Object.hasOwn(FOLDER_ICONS,f.icon) ? f.icon : Object.keys(FOLDER_ICONS)[0],
         image:f.image || '', ...iconSource(f) };
@@ -623,11 +632,10 @@ dialog.sd-panel-region{box-shadow:0 5px 16px #07020b8c}
         build();
         sep();
         mi('Find shortcut…', showShortcutSearch, { hint:'Ctrl+F' });
-        const appMenu = mi('Stack Dock', () => {
-          const rect = menu.getBoundingClientRect();
-          showMenu(rect.left || px, rect.top || py, () => {
+        const appMenu = mi('Stack Dock', ({x,y}) => {
+          showMenu(x,y, () => {
             mt('Stack Dock');
-            mi('Back', () => dockMenu(rect.left || px, rect.top || py, folder), { hint:'‹' });
+            mi('Back', ({x,y}) => dockMenu(x,y,folder), { hint:'‹' });
             sep();
             mi('Export layout…', () => void backupLayout(true));
             mi('Import layout…', () => void backupLayout(false));

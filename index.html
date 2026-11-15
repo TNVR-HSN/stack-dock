@@ -10,14 +10,14 @@
 .desktop{position:fixed;inset:0;overflow:hidden;background:radial-gradient(ellipse at 50% 38%,#7a2b4355,transparent 62%),radial-gradient(ellipse at 16% 78%,#551e7347,transparent 52%),radial-gradient(ellipse at 85% 77%,#6d23435c,transparent 52%),linear-gradient(160deg,#160d19,#0c0912 67%,#100913);isolation:isolate}
 .desktop::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(112deg,transparent 34%,#c9608820 47%,transparent 59%),linear-gradient(246deg,transparent 33%,#ac78f014 49%,transparent 62%),radial-gradient(ellipse at 50% 52%,transparent 38%,#050309b3 100%);pointer-events:none}
 .guide{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);width:min(386px,calc(100% - 34px));padding:17px 19px;border:1px solid #e5b3f52b;border-radius:16px;background:#110b18ae;box-shadow:0 15px 50px #07030b37;transition:opacity .19s}.guide strong{font-weight:700}.guide h1{font-size:16px;margin:4px 0 9px;letter-spacing:.01em}.guide p{font-size:12px;color:#d4c5dc;margin:0 0 7px}.guide .micro{font-size:10px;color:#ba9ecc;letter-spacing:.12em;font-weight:650;text-transform:uppercase}.guidebottom{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding-top:10px;margin-top:11px}.guidebottom span{font:11px Consolas,monospace;color:#c6a8d5}.desktop.has-stack .guide{opacity:0}.desktop-tag{position:absolute;top:17px;left:19px;pointer-events:none;color:#ceafcb86;letter-spacing:.18em;font-size:10px;text-transform:uppercase}.quiet,.primary{border:1px solid var(--line);border-radius:8px;padding:7px 11px;min-height:34px;background:#ffffff0b}.quiet:hover{background:#ffffff18}.primary{background:#dca6ef;color:#291232;font-weight:750;border-color:#f3c6ff}.primary:hover{background:#efbdfc}
-.island{position:absolute;z-index:4;isolation:isolate;overflow:hidden;touch-action:auto}.glass{position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:var(--fill);border:var(--border-w,1px) solid var(--edge);box-shadow:inset 0 1px 0 var(--shine);backdrop-filter:blur(var(--blur));-webkit-backdrop-filter:blur(var(--blur))}.dock-view,.gs-view{position:absolute;inset:0;min-width:0;min-height:0}.dock-view{display:flex;align-items:center;justify-content:center}.gs-view{padding:var(--pad);display:flex;flex-direction:column;align-items:stretch}
+.island{position:absolute;z-index:4;isolation:isolate;overflow:hidden;touch-action:auto}.glass{position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:var(--fill);border:var(--border-w,1px) solid var(--edge);box-shadow:inset 0 1px 0 var(--shine)}.dock-view,.gs-view{position:absolute;inset:0;min-width:0;min-height:0}.dock-view{display:flex;align-items:center;justify-content:center}.gs-view{padding:var(--pad);display:flex;flex-direction:column;align-items:stretch}
 .gs-heading{display:flex;align-items:flex-start;justify-content:center;flex:0 0 var(--heading-h);min-width:0;pointer-events:none}
 .gs-heading-inner{height:28px;max-width:100%;display:flex;align-items:center;gap:8px}
 .gs-heading h2{min-width:0;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.25;font-weight:650;letter-spacing:.015em;text-shadow:0 1px 6px #000a}
 .gs-view .scroll{flex:1 1 0;height:auto}
 .folder-flight{position:fixed;z-index:6;pointer-events:none;transform-origin:center;will-change:transform}
-.flight-endpoint{visibility:hidden}.folders{display:flex;min-width:0;min-height:0;gap:var(--gap);padding:var(--pad);max-width:100%;max-height:100%;overflow:auto;scrollbar-width:none}.folders.vertical{flex-direction:column}.folders::-webkit-scrollbar{display:none}.folder-btn{border:none;background:none;flex:none;border-radius:15px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;padding:3px;width:var(--bw);height:var(--bh);transition:background .15s}.folder-btn:hover{background:#fff1}.folder-btn span:not(.art){font-size:10px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.art{display:block;flex:none;width:var(--size);height:var(--size);border-radius:var(--ir,25%);overflow:hidden;filter:drop-shadow(0 2px 4px #0007)}.art svg,.art img{width:100%;height:100%;display:block;object-fit:contain;pointer-events:none}
-.scroll{width:100%;height:100%;overflow:auto;scrollbar-width:thin;scrollbar-color:#b17dc07d transparent;overscroll-behavior:contain}.grid{display:grid;width:max-content;min-height:100%;grid-template-columns:repeat(var(--cols),var(--cellw));grid-auto-rows:var(--cellh);gap:var(--gap);align-content:start}.cell{display:grid;place-items:center;position:relative;border:1px solid transparent;border-radius:11px;min-width:0;min-height:0}.cell.spacer.guides{border-color:#e5bfe84d;border-style:dashed;background:#ffffff06}.cell.spacer.guides::after{content:"";width:13px;height:1px;background:#e4c5e28a}.cell.drop-target{border:1px dashed #efb3ff;background:#df9bf031;box-shadow:inset 0 0 0 2px #5f2e728c}.tile{width:100%;height:100%;border:0;background:none;min-width:0;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:2px;border-radius:10px;touch-action:none;user-select:none;-webkit-user-select:none}.tile:hover,.tile:focus-visible{background:#ffffff14}.tile.dragging{opacity:.32}.tile .caption{max-width:100%;flex:none;max-height:2.36em;font-size:11px;line-height:1.18;text-align:center;overflow-wrap:anywhere;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;text-shadow:0 1px 3px #000}.reflect{display:block;flex:none;width:var(--size);height:10px;overflow:hidden;mask-image:linear-gradient(#0008,transparent);opacity:.55;pointer-events:none}.reflect .art{transform:scaleY(-1);transform-origin:50% 0;position:relative;top:var(--size);filter:none}.drag-ghost{position:fixed;z-index:50;pointer-events:none;transform:translate(-50%,-50%);opacity:.83}
+.flight-endpoint{visibility:hidden}.folders{display:flex;min-width:0;min-height:0;gap:var(--gap);padding:var(--pad);max-width:100%;max-height:100%;overflow:auto;scrollbar-width:none}.folders.vertical{flex-direction:column}.folders::-webkit-scrollbar{display:none}.folder-btn{border:none;background:none;flex:none;border-radius:15px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;padding:3px;width:var(--bw);height:var(--bh);transition:background .15s}.folder-btn:hover{background:#fff1}.folder-btn span:not(.art){font-size:10px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.art{display:block;flex:none;width:var(--size);height:var(--size);border-radius:var(--ir,25%);overflow:hidden}.art svg,.art img{width:100%;height:100%;display:block;object-fit:contain;pointer-events:none}
+.scroll{width:100%;height:100%;overflow:auto;scrollbar-width:thin;scrollbar-color:#b17dc07d transparent;overscroll-behavior:contain}.grid{display:grid;width:max-content;min-height:100%;grid-template-columns:repeat(var(--cols),var(--cellw));grid-auto-rows:var(--cellh);gap:var(--gap);align-content:start}.cell{display:grid;place-items:center;position:relative;border:1px solid transparent;border-radius:11px;min-width:0;min-height:0}.cell.spacer.guides{border-color:#e5bfe84d;border-style:dashed;background:#ffffff06}.cell.spacer.guides::after{content:"";width:13px;height:1px;background:#e4c5e28a}.cell.drop-target{border:1px dashed #efb3ff;background:#df9bf031;box-shadow:inset 0 0 0 2px #5f2e728c}.tile{width:100%;height:100%;border:0;background:none;min-width:0;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:2px;border-radius:10px;touch-action:none;user-select:none;-webkit-user-select:none}.tile:hover,.tile:focus-visible{background:#ffffff14}.tile.dragging{opacity:.32}.tile .caption{max-width:100%;flex:none;max-height:2.36em;font-size:11px;line-height:1.18;text-align:center;overflow-wrap:anywhere;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;text-shadow:0 1px 3px #000}.reflect{display:block;flex:none;width:var(--size);height:10px;overflow:hidden;mask-image:linear-gradient(#0008,transparent);opacity:.55;pointer-events:none}.reflect .art{transform:scaleY(-1);transform-origin:50% 0;position:relative;top:var(--size)}.drag-ghost{position:fixed;z-index:50;pointer-events:none;transform:translate(-50%,-50%);opacity:.83}
 .menu{position:fixed;z-index:15;min-width:218px;max-width:calc(100vw - 14px);max-height:calc(100dvh - 14px);overflow:auto;padding:5px;border:1px solid #e5b4ef40;border-radius:11px;background:#211726f7;box-shadow:0 16px 48px #08030ccf}.menu-title{padding:6px 9px;color:#d4acde;font-size:11px;font-weight:650;letter-spacing:.02em;overflow-wrap:anywhere}.menu button{width:100%;border:0;background:none;border-radius:7px;text-align:left;min-height:34px;padding:6px 9px;display:flex;justify-content:space-between;align-items:center;gap:8px}.menu button:not(:disabled):hover,.menu button:focus-visible{background:#ebaeff22}.menu small{font-size:10px;color:#c5abc9}.menu hr{border:0;border-top:1px solid var(--line);margin:4px}.menu .danger{color:#ffb4c8}.menu.position{min-width:min(278px,calc(100vw - 14px))}.posrow{display:grid;grid-template-columns:45px repeat(3,1fr);align-items:center;gap:4px;margin:4px}.posrow span{font-size:11px;color:#d8c6dd}.posrow button{justify-content:center;padding:4px;font-size:11px;border:1px solid #ffffff16}.posrow button[aria-pressed=true]{background:#ebaeff38;border-color:#edb7fc6f}
 dialog{width:min(524px,calc(100% - 20px));max-height:calc(100dvh - 20px);padding:0;border-radius:17px;border:1px solid #d9a5e350;background:var(--panel);box-shadow:0 20px 80px #07020bd5;color:#f2eaf6}dialog.settings-dialog{width:min(664px,calc(100% - 20px));overflow:hidden}
 .settings-dialog form{max-height:calc(100dvh - 24px);display:flex;flex-direction:column}
@@ -49,7 +49,7 @@ dialog{width:min(524px,calc(100% - 20px));max-height:calc(100dvh - 20px);padding
 .sample-item small{font-size:10px;max-width:75px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .sample-name{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;margin-bottom:6px}
 @media(max-width:460px){.settings-tabs,.settings-target,.settings-body{padding-left:12px;padding-right:12px}.settings-tabs button{font-size:12px}}
-dialog::backdrop{background:#09050bc0;backdrop-filter:blur(3px)}.dialogtop{padding:15px 18px 11px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.dialogtop h2{font-size:19px;margin:0 0 2px}.dialogtop p{font-size:12px;color:var(--soft);margin:0}.close{border:1px solid var(--line);background:#ffffff09;border-radius:7px;width:32px;height:32px;flex:none}.close:hover{background:#ffdae326}.dialogbody{padding:13px 18px 16px;display:grid;gap:13px}.dialogfoot{padding:11px 18px 14px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}.section{border:1px solid #ffffff1b;border-radius:11px;margin:0;padding:8px 11px 11px;min-width:0}.section legend{color:#ecbdf9;font-size:12px;padding:0 5px}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 13px}.field{display:grid;gap:5px;min-width:0;font-size:12px;color:#e4d4e9;align-content:start}.field input:not([type=range]):not([type=color]),.field select{width:100%;border:1px solid #ffffff28;background:#140d18;color:#f4ebf8;border-radius:8px;padding:7px 8px;min-width:0}.field input[type=color]{width:100%;min-height:34px;border:1px solid #ffffff28;background:#140d18;border-radius:8px;padding:3px}.field input[type=range]{width:100%;margin:3px 0;accent-color:#d78eeb}.field label,.field output{color:var(--soft)}.field .rangeLabel{display:flex;justify-content:space-between;gap:3px}.check{display:flex;align-items:center;gap:7px;font-size:12px;min-height:30px}.check input{accent-color:#d78eeb}.inline{display:flex;align-items:center;gap:8px;min-width:0}.filewrap{position:relative;overflow:hidden;cursor:pointer;font-size:12px}.filewrap:focus-within{outline:2px solid var(--accent)}.filewrap input{position:absolute;width:1px!important;height:1px;opacity:0;left:0}.asset-name{font-size:11px;color:var(--soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(39px,1fr));gap:5px;max-height:119px;overflow:auto;padding:5px;border-radius:9px;background:#ffffff06}.gallery button{height:39px;border:1px solid transparent;border-radius:8px;background:none;display:grid;place-items:center;padding:2px}.gallery button:hover,.gallery button[aria-pressed=true]{border-color:#dfa8f4;background:#daa2e62e}.err{color:#ffc1cf;font-size:12px}.note{color:var(--soft);font-size:11px}.toast{position:fixed;z-index:20;max-width:min(390px,calc(100vw - 20px));top:12px;right:12px;background:#271a2e;border:1px solid #e9b2f550;border-radius:9px;color:#f9eefd;box-shadow:0 8px 30px #10081797;padding:9px 12px;font-size:12px;pointer-events:none;overflow-wrap:anywhere}
+dialog::backdrop{background:#09050bc0}.dialogtop{padding:15px 18px 11px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.dialogtop h2{font-size:19px;margin:0 0 2px}.dialogtop p{font-size:12px;color:var(--soft);margin:0}.close{border:1px solid var(--line);background:#ffffff09;border-radius:7px;width:32px;height:32px;flex:none}.close:hover{background:#ffdae326}.dialogbody{padding:13px 18px 16px;display:grid;gap:13px}.dialogfoot{padding:11px 18px 14px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}.section{border:1px solid #ffffff1b;border-radius:11px;margin:0;padding:8px 11px 11px;min-width:0}.section legend{color:#ecbdf9;font-size:12px;padding:0 5px}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 13px}.field{display:grid;gap:5px;min-width:0;font-size:12px;color:#e4d4e9;align-content:start}.field input:not([type=range]):not([type=color]),.field select{width:100%;border:1px solid #ffffff28;background:#140d18;color:#f4ebf8;border-radius:8px;padding:7px 8px;min-width:0}.field input[type=color]{width:100%;min-height:34px;border:1px solid #ffffff28;background:#140d18;border-radius:8px;padding:3px}.field input[type=range]{width:100%;margin:3px 0;accent-color:#d78eeb}.field label,.field output{color:var(--soft)}.field .rangeLabel{display:flex;justify-content:space-between;gap:3px}.check{display:flex;align-items:center;gap:7px;font-size:12px;min-height:30px}.check input{accent-color:#d78eeb}.inline{display:flex;align-items:center;gap:8px;min-width:0}.filewrap{position:relative;overflow:hidden;cursor:pointer;font-size:12px}.filewrap:focus-within{outline:2px solid var(--accent)}.filewrap input{position:absolute;width:1px!important;height:1px;opacity:0;left:0}.asset-name{font-size:11px;color:var(--soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(39px,1fr));gap:5px;max-height:119px;overflow:auto;padding:5px;border-radius:9px;background:#ffffff06}.gallery button{height:39px;border:1px solid transparent;border-radius:8px;background:none;display:grid;place-items:center;padding:2px}.gallery button:hover,.gallery button[aria-pressed=true]{border-color:#dfa8f4;background:#daa2e62e}.err{color:#ffc1cf;font-size:12px}.note{color:var(--soft);font-size:11px}.toast{position:fixed;z-index:20;max-width:min(390px,calc(100vw - 20px));top:12px;right:12px;background:#271a2e;border:1px solid #e9b2f550;border-radius:9px;color:#f9eefd;box-shadow:0 8px 30px #10081797;padding:9px 12px;font-size:12px;pointer-events:none;overflow-wrap:anywhere}
 @media(max-width:460px){.guide{padding:14px 16px}.desktop-tag{left:14px}.dialogtop,.dialogbody{padding-left:13px;padding-right:13px}.dialogfoot{padding-right:13px}.fields{gap:8px}.field input[type=text]{font-size:16px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:0s!important}}
 /* The web preview stays intact if this file is opened outside Tauri. */
@@ -67,6 +67,7 @@ html.native-dock,html.native-dock body,html.native-dock #desktop{background:tran
 <section id="island" class="island" data-phase="closed" aria-label="Stack dock">
   <div id="dockGlass" class="glass"></div><div id="gsGlass" class="glass" style="opacity:0"></div>
   <div id="dockView" class="dock-view"></div><div id="gsView" class="gs-view" inert aria-hidden="true"></div>
+  <div id="launchGlass" class="glass" hidden></div><div id="launchView" class="launch-view" role="status" hidden></div>
 </section>
 </main>
 <div class="menu" id="menu" hidden></div>
@@ -77,7 +78,7 @@ html.native-dock,html.native-dock body,html.native-dock #desktop{background:tran
       const FOLDER_ICONS = {
         'gamepad-purple': {
           label: 'Gamepad Violet',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          svg: `<svg viewBox="2 2 60 60" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="gpGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stop-color="#c026d3"/>
@@ -97,7 +98,7 @@ html.native-dock,html.native-dock body,html.native-dock #desktop{background:tran
         },
         'dev-cyan': {
           label: 'Dev Terminal',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          svg: `<svg viewBox="2 2 60 60" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="devGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stop-color="#06b6d4"/>
@@ -112,7 +113,7 @@ html.native-dock,html.native-dock body,html.native-dock #desktop{background:tran
         },
         'media-amber': {
           label: 'Web & Media',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          svg: `<svg viewBox="2 2 60 60" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="medGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stop-color="#f97316"/>
@@ -448,8 +449,8 @@ const $=id=>document.getElementById(id), E=(tag,cls='',text='')=>{const x=docume
 const B=(label,cls='',fn)=>{const b=E('button',cls,label);b.type='button';if(fn)b.onclick=fn;return b};
 const cap=s=>s[0].toUpperCase()+s.slice(1), clamp=(x,a,b)=>Math.max(a,Math.min(x,b));
 const uid=()=>Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
-const dockDefaults={opacity:76,blur:23,border:true,shadow:true,radius:26,icon:40,gap:6,pad:8,labels:false,color:'#101019',motion:true,borderColor:'#ffffff',borderOpacity:23,borderWidth:1,roundIcons:true};
-const gsDefaults={opacity:84,blur:24,border:true,shadow:true,radius:22,icon:52,gap:7,pad:15,labels:true,reflections:true,color:'#0e0e16',guides:false,borderColor:'#ffffff',borderOpacity:23,borderWidth:1,titleIcon:25,roundIcons:true};
+const dockDefaults={opacity:76,border:true,shadow:true,radius:26,icon:40,gap:6,pad:8,labels:false,color:'#101019',motion:true,borderColor:'#ffffff',borderOpacity:23,borderWidth:1,roundIcons:true};
+const gsDefaults={opacity:84,border:true,shadow:true,radius:22,icon:52,gap:7,pad:15,labels:true,reflections:true,color:'#0e0e16',guides:false,borderColor:'#ffffff',borderOpacity:23,borderWidth:1,titleIcon:25,roundIcons:true};
 const storageKey='dynamic-island-stack-dock-custom-v1';
 const headingHeight=42,headingIconSize=25;
 const triggerSize=(f,d=state.dock)=>f.triggerSize||d.icon;
@@ -464,7 +465,21 @@ function fresh(){
  })};
 }
 let state=fresh();
-try{const x=JSON.parse(localStorage.getItem(storageKey));if(x?.folders?.length&&x.dock&&['top','bottom','left','right'].includes(x.edge))state=x}catch{}
+try {
+ const saved=JSON.parse(localStorage.getItem(storageKey));
+ if(saved?.folders?.length&&saved.dock&&['top','bottom','left','right'].includes(saved.edge)){
+  state=saved;
+  // Drop the old background effect from saved layouts without resetting them.
+  let migrated=false;
+  for(const appearance of [state.dock,...state.folders.map(folder=>folder?.style)]){
+   if(appearance&&Object.hasOwn(appearance,'blur')){
+    delete appearance.blur;
+    migrated=true;
+   }
+  }
+  if(migrated)localStorage.setItem(storageKey,JSON.stringify(state));
+ }
+}catch{}
 const desktop=$('desktop'), island=$('island'), dockView=$('dockView'), gsView=$('gsView'), dockGlass=$('dockGlass'), gsGlass=$('gsGlass'), menu=$('menu'), dialog=$('dialog'), form=$('form');
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
 const nativeAPI=window.__TAURI__?.window;
@@ -472,7 +487,7 @@ const nativeCore=window.__TAURI__?.core;
 let nativeWindow=null,nativeArea=null,nativeHost={x:0,y:0},nativeQueue=Promise.resolve(),nativeBusy=false;
 let fixedHost=false,nativeRegion=null;
 let surfaceWanted=false,surfaceRequest=0;
-let nativeBlurPending=false,nativeBlurTimer=0;
+let focusLossPending=false,focusLossTimer=0;
 const nativeMargin=5;
 function nativeFailure(error){
  console.error('Stack Dock window:',error);
@@ -499,7 +514,6 @@ function nativeCover(...boxes){
 const sameNativeBox=(a,b)=>a&&['x','y','w','h'].every(k=>a[k]===b[k]);
 async function setNativeRegion(target){
  if(sameNativeBox(nativeRegion,target))return;
- // Region coordinates are physical pixels relative to the fixed window.
  const px=value=>Math.round(value*nativeArea.scale);
  const x=px(target.x),y=px(target.y);
  await nativeCore.invoke('set_dock_region',{x,y,width:px(target.x+target.w)-x,height:px(target.y+target.h)-y});
@@ -555,21 +569,23 @@ function settleViewport(target){
   requestAnimationFrame(check);
  });
 }
-function queueNativeBlur(){
- nativeBlurPending=true;clearTimeout(nativeBlurTimer);
- nativeBlurTimer=setTimeout(async()=>{
-  if(!nativeBlurPending||nativeBusy||surfaceWanted||dialog.open||phase==='opening')return;
+function queueFocusLoss(){
+ if(launch.pending)return;
+ focusLossPending=true;clearTimeout(focusLossTimer);
+ focusLossTimer=setTimeout(async()=>{
+  if(!focusLossPending||nativeBusy||surfaceWanted||dialog.open||phase==='opening'||launch.pending)return;
   const focused=await nativeWindow?.isFocused?.().catch(()=>undefined);
-  if(!nativeBlurPending||nativeBusy||surfaceWanted||dialog.open||phase==='opening')return;
-  nativeBlurPending=false;
+  if(!focusLossPending||nativeBusy||surfaceWanted||dialog.open||phase==='opening'||launch.pending)return;
+  focusLossPending=false;
   if(focused===true)return;
   if(!menu.hidden)closeMenu();
   if(phase==='open')closeStack(false);
  },65);
 }
-function fitNative(){
+function fitNative(grid){
  if(!nativeWindow||nativeBusy||surfaceWanted||!menu.hidden||dialog.open||!['closed','open'].includes(phase))return;
- moveHost(phase==='open'&&active()?(fixedHost?nativeCover(gridBox(active())):nativeCover(dockBox(),gridBox(active()))):nativeCover(dockBox()));
+ if(!grid||!Number.isFinite(grid.w))grid=undefined;
+ moveHost(phase==='open'&&active()?(fixedHost?nativeCover(grid||gridBox(active())):nativeCover(dockBox(),grid||gridBox(active()))):nativeCover(dockBox()));
 }
 function expandForControls(callback){
  if(!nativeWindow){callback(0,0);return}
@@ -591,12 +607,19 @@ function art(key,source,size,image='',round=false){
  else{n.innerHTML=(Object.hasOwn(source,key)?source[key]:Object.values(source)[0]).svg}
  return n;
 }
-function dockIconRadius(f,s=state.dock,mode=f.dockIconShape){
- return (mode==='rounded'||(mode!=='raw'&&s.roundIcons!==false))?'50%':'0px';
+const iconCornerValue=(value,fallback)=>Number.isFinite(value)?clamp(value,0,50):fallback;
+const dockRoundness=s=>s.roundIcons===false?0:iconCornerValue(s.iconCorner,50);
+const gridRoundness=s=>s.roundIcons===false?0:iconCornerValue(s.iconCorner,25);
+const roundnessCSS=v=>v===0?'0px':v+'%';
+function dockIconRadius(f,s=state.dock,override=f.dockIconCorner){
+ const fallback=f.dockIconShape==='raw'?0:f.dockIconShape==='rounded'?50:dockRoundness(s);
+ return roundnessCSS(iconCornerValue(override,fallback));
 }
-function gridIconRadius(s,heading=false){
- if(s.roundIcons===false)return '0px';
- return heading?'50%':Math.max(0,Math.min(50,Number.isFinite(s.iconCorner)?s.iconCorner:25))+'%';
+function gridIconRadius(s){return roundnessCSS(gridRoundness(s))}
+function highlightArt(node,s,iconRadius){
+ const value=iconCornerValue(s.highlightCorner,Number.parseFloat(iconRadius)||0);
+ node.style.setProperty('--highlight-round',roundnessCSS(value));
+ return node;
 }
 function dims(){
  const top=nativeArea?.gutter??0,w=nativeArea?.w??desktop.clientWidth,h=(nativeArea?.h??desktop.clientHeight)-top;
@@ -605,7 +628,7 @@ function dims(){
 function vertical(){return state.edge==='left'||state.edge==='right'}
 function metrics(f){
  const s=f.style, cols=f.cols, rows=f.rows;
- return {cols,rows,cw:Math.max(s.icon+16,s.labels?76:45),ch:s.icon+(s.labels?36:12)+(s.reflections?13:0),gap:s.gap,pad:s.pad};
+ return {cols,rows,cw:s.icon,ch:s.icon+(s.reflections?13:0),gap:s.gap,pad:s.pad};
 }
 function box(w,h,r){
  const d=dims(), a=state.align==='start'?0:state.align==='end'?1:.5;
@@ -616,11 +639,10 @@ function box(w,h,r){
 }
 function dockBox(){
  const s=state.dock,sizes=state.folders.map(f=>triggerSize(f)),n=sizes.length,gap=(n-1)*s.gap,pad=s.pad*2;
- const max=Math.max(...sizes),sum=sizes.reduce((a,b)=>a+b,0),hExtra=s.labels?29:14;
- return box(vertical()?max+14+pad:sum+n*14+gap+pad,vertical()?sum+n*hExtra+gap+pad:max+hExtra+pad,s.radius);
+ const max=Math.max(...sizes),sum=sizes.reduce((a,b)=>a+b,0),hExtra=s.labels?17:0;
+ return box(vertical()?max+pad:sum+gap+pad,vertical()?sum+n*hExtra+gap+pad:max+hExtra+pad,s.radius);
 }
-function gridBox(f){
- const m=metrics(f);
+function gridBox(f,m=metrics(f)){
  return box(m.cols*m.cw+(m.cols-1)*m.gap+2*m.pad,m.rows*m.ch+(m.rows-1)*m.gap+2*m.pad+headingSpace(f.style),f.style.radius);
 }
 function boxFrame(b){return {left:(b.x-nativeHost.x)+'px',top:(b.y-nativeHost.y)+'px',width:b.w+'px',height:b.h+'px',borderRadius:b.r+'px'}}
@@ -633,8 +655,6 @@ function styleGlass(g,s){
  g.style.setProperty('--edge','rgba('+stroke+','+alpha+')');
  g.style.setProperty('--border-w',width+'px');
  g.style.setProperty('--shine',width?'rgba('+stroke+','+alpha*.52+')':'transparent');
- // A fully clear background really is clear, even if blur is configured.
- g.style.setProperty('--blur',s.opacity?s.blur+'px':'0px');
 }
 function shadow(s){
  if(!s.shadow||s.opacity<=0)return 'none';
@@ -690,8 +710,9 @@ function renderDock(){
  for(const f of state.folders){
   const b=B('','folder-btn',ev=>{if(performance.now()<suppressClick)return;openStack(f.id,ev.detail===0)});
   const size=triggerSize(f);
-  b.style.setProperty('--bw',(size+14)+'px');b.style.setProperty('--bh',(size+(s.labels?29:14))+'px');
-  b.dataset.folder=f.id;b.setAttribute('aria-label',f.name);b.setAttribute('aria-controls','gsView');b.title=f.name;b.append(art(f.icon,FOLDER_ICONS,size,f.image,dockIconRadius(f,s)));
+  b.style.setProperty('--bw',size+'px');b.style.setProperty('--bh',(size+(s.labels?17:0))+'px');
+  const radius=dockIconRadius(f,s);
+  b.dataset.folder=f.id;b.setAttribute('aria-label',f.name);b.setAttribute('aria-controls','gsView');b.title=f.name;b.append(highlightArt(art(f.icon,FOLDER_ICONS,size,f.image,radius),s,radius));
   if(s.labels)b.append(E('span','',f.name));fs.append(b)
  }
  dockView.replaceChildren(fs);fs.scrollLeft=sx;fs.scrollTop=sy;
@@ -704,7 +725,7 @@ function renderGrid(f,retain=true){
  gsView.style.setProperty('--pad',m.pad+'px');gsView.style.setProperty('--heading-h',headingSpace(s)+'px');
  const heading=E('header','gs-heading'),badge=E('div','gs-heading-inner'),name=E('h2','',f.name);
  name.title=f.name;badge.style.height=(headingSize(s)+3)+'px';
- badge.append(art(f.icon,FOLDER_ICONS,headingSize(s),f.image,gridIconRadius(s,true)),name);heading.append(badge);
+ badge.append(art(f.icon,FOLDER_ICONS,headingSize(s),f.image,gridIconRadius(s)),name);heading.append(badge);
  const sc=E('div','scroll'),grid=E('div','grid');
  sc.setAttribute('aria-label',f.name+' grid stack');gsView.setAttribute('aria-label',f.name+' grid stack');
  for(const [k,v] of Object.entries({cols:m.cols,cellw:m.cw+'px',cellh:m.ch+'px',gap:m.gap+'px'}))grid.style.setProperty('--'+k,v);
@@ -715,7 +736,8 @@ function renderGrid(f,retain=true){
   else if(t){
    const b=B('','tile',ev=>{if(phase==='open'&&performance.now()>=suppressClick)launch(t)});
    b.dataset.tile=t.id;b.setAttribute('aria-label',t.name);b.title=t.name;
-   b.append(art(t.icon,APP_ICONS,s.icon,t.image,gridIconRadius(s)));
+   const radius=gridIconRadius(s);
+   b.append(highlightArt(art(t.icon,APP_ICONS,s.icon,t.image,radius),s,radius));
    if(s.reflections){const refl=E('span','reflect');refl.style.setProperty('--size',s.icon+'px');refl.setAttribute('aria-hidden','true');refl.append(art(t.icon,APP_ICONS,s.icon,t.image,gridIconRadius(s)));b.append(refl)}
    if(s.labels)b.append(E('span','caption',t.name));cell.append(b);
   }
@@ -730,22 +752,25 @@ function views(open){
  island.style.boxShadow=shadow(open?active().style:state.dock);
 }
 function morph(target,opening,finish){
+ if(!state.dock.motion||reduced.matches||!island.animate){
+  stopMotion();applyBox(target);views(opening);finish();return;
+ }
  const f=active(),source=opening?dockIcon(f?.id):gsView.querySelector('.gs-heading .art');
  const fromIcon=(flight?.node||source)?.getBoundingClientRect();
  const from=readBox(), previousShadow=getComputedStyle(island).boxShadow, gg=Number(getComputedStyle(gsGlass).opacity),dg=Number(getComputedStyle(dockGlass).opacity),
        gv=Number(getComputedStyle(gsView).opacity),dv=Number(getComputedStyle(dockView).opacity);
  const ticket=stopMotion();
  applyBox(target);views(opening);
- if(!state.dock.motion||reduced.matches||!island.animate){finish();return}
- const duration=opening?420:325, easing=opening?'cubic-bezier(.19,.84,.26,1)':'cubic-bezier(.38,.03,.32,1)';
+ const speed=100/clamp(Number.isFinite(state.dock.motionSpeed)?state.dock.motionSpeed:100,25,250);
+ const duration=(opening?420:325)*speed, easing=opening?'cubic-bezier(.19,.84,.26,1)':'cubic-bezier(.38,.03,.32,1)';
  const destination=opening?gsView.querySelector('.gs-heading .art'):dockIcon(f?.id);
  const iconMotion=startFlight(f,fromIcon,destination,source,duration,opening?'cubic-bezier(.24,.74,.2,1)':easing);
  const hull=island.animate([{...boxFrame(from),boxShadow:previousShadow},{...boxFrame(target),boxShadow:island.style.boxShadow}],{duration,easing});
- const a=(node,start,end,options)=>node.animate([{opacity:start},{opacity:end}],{fill:'backwards',easing:'ease-out',...options});
+ const a=(node,start,end,{duration,delay})=>node.animate([{opacity:start},{opacity:end}],{fill:'backwards',easing:'ease-out',duration:duration*speed,delay:delay*speed});
  // Surface and content crossfade independently. The GS fill never uses dock opacity.
- const fadeG=a(gsGlass,gg,opening?1:0,{duration:opening?305:235,delay:opening?28:0});
+ const fadeG=a(gsGlass,gg,opening?1:0,{duration:opening?265:235,delay:0});
  const fadeD=a(dockGlass,dg,opening?0:1,{duration:opening?225:200,delay:opening?0:95});
- const fadeV=a(gsView,gv,opening?1:0,{duration:opening?180:140,delay:opening?114:0});
+ const fadeV=a(gsView,gv,opening?1:0,{duration:opening?185:140,delay:opening?45:0});
  const fadeDock=a(dockView,dv,opening?0:1,{duration:opening?145:145,delay:opening?0:135});
  tracks=[hull,fadeG,fadeD,fadeV,fadeDock];
  if(iconMotion)tracks.push(iconMotion);
@@ -760,11 +785,11 @@ function openStack(id,keyboard=false){
  if(phase!=='closed'||nativeBusy||dialog.open)return;
  const f=state.folders.find(x=>x.id===id);if(!f)return;
  closeMenu();lastId=activeId=id;gsView.style.opacity='0';gsGlass.style.opacity='0';renderGrid(f,false);
- const goal=gridBox(f);
- nativeBlurPending=false;
+ const goal=gridBox(f,currentMetrics);
+ focusLossPending=false;
  const begin=()=>{
    setPhase('opening');
-   morph(goal,true,()=>{setPhase('open');if(keyboard)(gsView.querySelector('.tile')||gsView).focus({preventScroll:true});fitNative();if(nativeBlurPending)queueNativeBlur()});
+   morph(goal,true,()=>{setPhase('open');if(keyboard)(gsView.querySelector('.tile')||gsView).focus({preventScroll:true});fitNative(goal);if(focusLossPending)queueFocusLoss()});
  };
  if(!nativeWindow){begin();return}
  // Reserve the whole animation path before moving the icon or fading in the grid.
@@ -774,14 +799,16 @@ function openStack(id,keyboard=false){
   try{if(await nativeWindow.isFocused()===false)await nativeWindow.setFocus()}
   catch(error){console.warn('Could not request dock focus:',error)}
  };
- focus().then(()=>moveHost(nativeCover(dockBox(),goal))).then(ok=>{
+ const ready=moveHost(nativeCover(dockBox(),goal));
+ void focus();
+ ready.then(ok=>{
    nativeBusy=false;
    if(ok)begin();
    else{activeId=null;gsView.replaceChildren();currentMetrics=null}
  });
 }
 function closeStack(refocus=true){
- if(!['opening','open'].includes(phase)||nativeBusy)return;
+ if(!['opening','open'].includes(phase)||nativeBusy||launch.pending)return;
  closeMenu();clearPointer();
  const goal=dockBox();
  const begin=()=>{setPhase('closing');morph(goal,false,()=>finishClose(refocus))};
@@ -792,12 +819,14 @@ function closeStack(refocus=true){
  moveHost(next).then(ok=>{nativeBusy=false;if(ok)begin()});
 }
 function refresh(){
+ let grid;
  if(phase==='closed'){renderDock();applyBox(dockBox());views(false)}
- else if(phase==='open'&&active()){renderGrid(active());applyBox(gridBox(active()));views(true)}
- fitNative();
+ else if(phase==='open'&&active()){
+  const f=active();
+  renderGrid(f);grid=gridBox(f,currentMetrics);applyBox(grid);views(true);
+ }
+ fitNative(grid);
 }
-let launchingShortcut = false;
-
 async function launch(t) {
   if (phase !== 'open' || launch.pending) return;
 
@@ -811,6 +840,9 @@ async function launch(t) {
     return;
   }
 
+  const source=[...gsView.querySelectorAll('.tile')].find(b=>b.dataset.tile===t.id)?.querySelector('.art');
+  const start=source?.getBoundingClientRect();
+  const sourceArt=source?.cloneNode(true);
   launch.pending = true;
   try {
     if (kind === 'program') {
@@ -831,13 +863,16 @@ async function launch(t) {
       throw new Error('This shortcut type is not supported yet.');
     }
 
-    closeStack(false);
+    launch.pending=false;
+    focusLossPending=false;
+    if(!await showLaunchIndicator(t,start,sourceArt,source))closeStack(false);
   } catch (error) {
     dialogBuild('Could not open ' + t.name, String(error), 'OK', () => {}, () => {});
   } finally {
     launch.pending = false;
   }
 }
+async function showLaunchIndicator(){return false}
 function positionName(edge,a){const side=a==='center'?'Center':a==='start'?(verticalEdge(edge)?'Top':'Left'):(verticalEdge(edge)?'Bottom':'Right');return cap(edge)+' · '+side}
 function verticalEdge(edge){return edge==='left'||edge==='right'}
 function entryAt(f,p){return f.slots.find(t=>t.r===p.r&&t.c===p.c)}
@@ -924,7 +959,11 @@ function showMenuHere(x,y,build,position=false){
 function mt(s){menu.append(E('div','menu-title',s))}
 function sep(){menu.append(E('hr'))}
 function mi(label,fn,options={}){
- const b=B(label,options.danger?'danger':'',()=>{closeMenu(true);fn()});b.setAttribute('aria-label',label);b.disabled=!!options.disabled;if(options.hint)b.append(E('small','',options.hint));menu.append(b);return b;
+ const b=B(label,options.danger?'danger':'',event=>{
+  const r=b.getBoundingClientRect();
+  const anchor=event.detail>0?{x:event.clientX,y:event.clientY}:{x:r.left+r.width/2,y:r.top+r.height/2};
+  closeMenu(true);fn(anchor);
+ });b.setAttribute('aria-label',label);b.disabled=!!options.disabled;if(options.hint)b.append(E('small','',options.hint));menu.append(b);return b;
 }
 function showPositions(x,y){
  showMenu(x,y,()=>{
@@ -945,7 +984,7 @@ function dockMenu(x,y,f){
   mt(f?f.name:'Dock');
   mi('Settings…',()=>editSettings(f,f?'folder':'dock'));
   if(f){mi('Move folder earlier',()=>moveFolder(f,-1),{disabled:state.folders.indexOf(f)===0});mi('Move folder later',()=>moveFolder(f,1),{disabled:state.folders.indexOf(f)===state.folders.length-1});sep()}
-  mi('Position',()=>{const r=menu.getBoundingClientRect();showPositions(r.left||12,r.top||12)},{hint:'›'});mi('New folder…',()=>editSettings(null,'folder',true));
+  mi('Position',({x,y})=>showPositions(x,y),{hint:'›'});mi('New folder…',()=>editSettings(null,'folder',true));
   if(f&&state.folders.length>1){sep();mi('Remove folder…',()=>confirm('Remove '+f.name+'?','This removes the folder and its shortcuts from the demo.',()=>{state.folders=state.folders.filter(a=>a!==f);persist();refresh()}),{danger:true})}
   sep();mi('Reset demo…',()=>confirm('Reset demo?','This restores the starter folders and appearance. It only changes this demo.',()=>{state=fresh();persist();refresh()}),{danger:true});
  });
@@ -1086,8 +1125,9 @@ function section(body,title){
  const fs=E('fieldset','section'),grid=E('div','fields');fs.append(E('legend','',title),grid);body.append(fs);return grid
 }
 function field(parent,label,type,value,opts={}){
- const l=E('label','field'),title=E('span','',label),n=E('input');n.setAttribute('aria-label',label);n.type=type;n.value=value??'';
+ const l=E('label','field'),title=E('span','',label),n=E('input');n.setAttribute('aria-label',label);n.type=type;
  for(const [k,v] of Object.entries(opts))if(k!=='datasetUnit')n[k]=v;
+ n.value=value??'';
  if(type==='range'){
   const bar=E('span','rangeLabel'),out=E('output','',n.value+('%'===opts.datasetUnit?'%':opts.datasetUnit||''));
   bar.append(title,out);l.append(bar);n.oninput=()=>out.textContent=n.value+(opts.datasetUnit||'');
@@ -1105,7 +1145,6 @@ function appearance(body,s,isGrid){
  const background=section(body,'Background and shape');
  const color=field(background,'Background color','color',s.color);
  const opacity=field(background,'Background opacity','range',s.opacity,{min:0,max:100,datasetUnit:'%'});
- const blur=px(background,'Background blur',s.blur,0,32);
  const radius=px(background,'Corner radius',s.radius,0,56);
  const frame=section(body,'Border and shadow');
  const border=check(frame,'Show border',s.border),shadow=check(frame,'Show shadow',s.shadow);
@@ -1122,7 +1161,7 @@ function appearance(body,s,isGrid){
  const extra=isGrid?check(spacing,'Icon reflections',s.reflections):check(spacing,'Animate transitions',s.motion);
  const titleIcon=isGrid?px(spacing,'Title icon size',headingSize(s),16,44):null;
  const guides=isGrid?check(spacing,'Show spacer guides',s.guides):null;
- return ()=>({...s,color:color.value,opacity:+opacity.value,blur:+blur.value,radius:+radius.value,icon:+icon.value,gap:+gap.value,pad:+pad.value,border:border.checked,shadow:shadow.checked,labels:labels.checked,borderColor:borderColor.value,borderOpacity:+borderOpacity.value,borderWidth:+borderWidth.value,...(isGrid?{reflections:extra.checked,titleIcon:+titleIcon.value,guides:guides.checked}:{motion:extra.checked})});
+ return ()=>({...s,color:color.value,opacity:+opacity.value,radius:+radius.value,icon:+icon.value,gap:+gap.value,pad:+pad.value,border:border.checked,shadow:shadow.checked,labels:labels.checked,borderColor:borderColor.value,borderOpacity:+borderOpacity.value,borderWidth:+borderWidth.value,...(isGrid?{reflections:extra.checked,titleIcon:+titleIcon.value,guides:guides.checked}:{motion:extra.checked})});
 }
 function iconPicker(body,source,initial,image,size,round,error,onChange=()=>{}){
  let key=Object.hasOwn(source,initial)?initial:Object.keys(source)[0],picture=image||'',busy=false,token=0;
@@ -1160,22 +1199,25 @@ function editSettings(selected=null,initial='dock',creating=false){
   if(type==='dock'){draw.dataset.edge=edge.value;draw.dataset.align=alignment.value;if(verticalEdge(edge.value))row.style.flexDirection='column'}
   const k=type==='gs'?.53:type==='dock'&&verticalEdge(edge.value)?.4:.55, pad=Math.round(s.pad*k);
   hull.style.borderRadius=Math.round(s.radius*k)+'px';hull.style.padding=pad+'px';
+  hull.style.setProperty('--sd-hover',(s.hoverOpacity??14)/100);
   hull.style.boxShadow=shadow(s);styleGlass(glass,s);hull.append(glass);
   row.style.gap=Math.round(s.gap*k)+'px';
   const readIcon=entry=>{try{return cache.get(entry.id)?.icon()||entry}catch{return entry}};
   if(type==='gs'){
    const title=E('div','sample-row sample-name');
    const ico=readIcon(f);
-   title.style.gap='5px';title.append(art(ico.icon,FOLDER_ICONS,Math.round(headingSize(s)*.66),ico.image,gridIconRadius(s,true)),E('span','',cache.get(f.id)?.name.value||f.name||'New folder'));hull.append(title);
+   title.style.gap='5px';title.append(art(ico.icon,FOLDER_ICONS,Math.round(headingSize(s)*.66),ico.image,gridIconRadius(s)),E('span','',cache.get(f.id)?.name.value||f.name||'New folder'));hull.append(title);
    f.slots.filter(t=>t.type==='item').slice(0,3).forEach(t=>{
-    const item=E('div','sample-item');item.append(art(t.icon,APP_ICONS,Math.round(s.icon*k),t.image,gridIconRadius(s)));
+    const item=E('div','sample-item'),radius=gridIconRadius(s);item.append(highlightArt(art(t.icon,APP_ICONS,Math.round(s.icon*k),t.image,radius),s,radius));
     if(s.labels)item.append(E('small','',t.name));row.append(item);
    });
   }else{
    (type==='folder'?[f]:state.folders.slice(0,3)).forEach(entry=>{
     const controls=cache.get(entry.id),ico=readIcon(entry);
     const size=controls?(controls.useSize.checked?+controls.size.value:s.icon):triggerSize(entry,s);
-    const item=E('div','sample-item');item.append(art(ico.icon,FOLDER_ICONS,Math.round(size*k),ico.image,dockIconRadius(entry,s,controls?.dockShape.value||entry.dockIconShape)));
+    const override=controls?.ownCorner.checked?+controls.dockCorner.value:controls?dockRoundness(s):undefined;
+    const item=E('div','sample-item'),radius=dockIconRadius(entry,s,override);
+    item.append(highlightArt(art(ico.icon,FOLDER_ICONS,Math.round(size*k),ico.image,radius),s,radius));
     if(s.labels)item.append(E('small','',controls?.name.value||entry.name||'New folder'));row.append(item);
    });
   }
@@ -1184,6 +1226,10 @@ function editSettings(selected=null,initial='dock',creating=false){
  function draw(){
   if(!dialog.open||!collectDock)return;
   const controls=cache.get(folder.id),d=collectDock();
+  if(controls&&!controls.ownCorner.checked){
+   controls.dockCorner.value=dockRoundness(d);
+   controls.dockCorner.parentElement.querySelector('output').textContent=controls.dockCorner.value*2+'%';
+  }
   if(tab==='dock')preview(previews.get('dock'),d,folder,'dock');
   else if(tab==='folder')preview(controls.folderPreview,d,folder,'folder');
   else preview(controls.gsPreview,controls.style(),folder,'gs');
@@ -1220,7 +1266,12 @@ function editSettings(selected=null,initial='dock',creating=false){
    const name=field(identity,'Folder name','text',f.name,{maxLength:40});
    const useSize=check(identity,'Override dock icon size',f.triggerSize);
    const size=field(identity,'Custom folder icon size','range',f.triggerSize||state.dock.icon,{min:24,max:74,datasetUnit:' px'});
-   const dockShape=select(identity,'Dock icon corners',[['default','Use dock setting'],['rounded','Rounded'],['raw','Original shape']],f.dockIconShape||'default');
+   const ownCorner=check(identity,'Override dock icon roundness',Number.isFinite(f.dockIconCorner)||['raw','rounded'].includes(f.dockIconShape));
+   const dockCorner=field(identity,'Dock icon roundness','range',Number.parseFloat(dockIconRadius(f,collectDock())),{min:0,max:50,datasetUnit:'%'});
+   const cornerOutput=dockCorner.parentElement.querySelector('output');
+   dockCorner.oninput=()=>cornerOutput.textContent=dockCorner.value*2+'%';
+   dockCorner.oninput();
+   dockCorner.disabled=!ownCorner.checked;ownCorner.onchange=()=>{dockCorner.disabled=!ownCorner.checked;};
    size.disabled=!useSize.checked;useSize.onchange=()=>{size.disabled=!useSize.checked;if(useSize.checked&&size.value==state.dock.icon){size.value=collectDock().icon;size.dispatchEvent(new Event('input'))}};
    const icon=iconPicker(folderPane,FOLDER_ICONS,f.icon,f.image,37,true,error,()=>queueMicrotask(draw),null,f);
    gs.append(E('p','note','These settings apply only to this folder’s expanded grid. Its background remains independent from the dock.'));
@@ -1230,7 +1281,7 @@ function editSettings(selected=null,initial='dock',creating=false){
    const rows=field(layout,'Rows','number',f.rows,{min:1,max:MAX_ROWS});
    gs.append(E('p','note','Right-click or drop onto an exact cell. Auto-fill wraps across columns. Row-wise keeps later rows grouped.'));
    const style=appearance(gs,{...gsDefaults,...f.style},true);
-   const c={f,folderPane,gs,name,useSize,size,dockShape,icon,mode,cols,rows,style,folderPreview,gsPreview};cache.set(f.id,c);return c;
+   const c={f,folderPane,gs,name,useSize,size,ownCorner,dockCorner,icon,mode,cols,rows,style,folderPreview,gsPreview};cache.set(f.id,c);return c;
   }
   function show(key){
    tab=key;error.hidden=true;const c=key==='dock'?null:ensure(folder),node=key==='dock'?dock:key==='folder'?c.folderPane:c.gs;
@@ -1256,12 +1307,12 @@ function editSettings(selected=null,initial='dock',creating=false){
    const shape={...c.f,slots:c.f.slots.map(t=>({...t}))};reflow(shape,cols,c.mode.value);
    if(shape.slots.some(t=>t.r>=MAX_ROWS))invalid(c,'gs',c.cols,'This column count would exceed '+MAX_ROWS+' rows. Try more columns.');
    const minimum=1+Math.max(0,...shape.slots.map(t=>t.r));
-   changes.push([c.f,{name,...icon,dockIconShape:c.dockShape.value,triggerSize:c.useSize.checked?+c.size.value:0,cols:shape.cols,rows:Math.max(rows,minimum),mode:shape.mode,slots:shape.slots,style:c.style()}]);
+   changes.push([c.f,{name,...icon,dockIconShape:undefined,dockIconCorner:c.ownCorner.checked?+c.dockCorner.value:undefined,triggerSize:c.useSize.checked?+c.size.value:0,cols:shape.cols,rows:Math.max(rows,minimum),mode:shape.mode,slots:shape.slots,style:c.style()}]);
   }
   for(const [f,v] of changes)Object.assign(f,v);
   if(creating)state.folders.push(newFolder);
   state.dock=collectDock();state.edge=edge.value;state.align=alignment.value;
-  persist();return ()=>{renderDock();refresh()};
+  persist();return ()=>{if(phase==='open')renderDock();refresh()};
  },true)
 }
 function guess(target){
@@ -1363,11 +1414,11 @@ async function startNative(){
     }
     root.classList.add('native-dock');
    }finally{nativeBusy=false}
-   window.addEventListener('blur',()=>{if(!dialog.open)queueNativeBlur()});
-   window.addEventListener('focus',()=>{nativeBlurPending=false});
+   window.addEventListener('blur',()=>{if(!dialog.open)queueFocusLoss()});
+   window.addEventListener('focus',()=>{focusLossPending=false});
    await win.onFocusChanged(({payload:focused})=>{
-    if(focused){nativeBlurPending=false;return}
-    if(!dialog.open)queueNativeBlur();
+    if(focused){focusLossPending=false;return}
+    if(!dialog.open)queueFocusLoss();
    }).catch(error=>console.warn('Native focus listener unavailable:',error));
  }catch(error){nativeFailure(error)}
 }
