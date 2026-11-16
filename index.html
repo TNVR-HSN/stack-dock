@@ -198,7 +198,7 @@ function shortcutIconKey(t,localType=localShortcutType(t)){
  if(kind==='program')return 'program';
  return localType==='folder'?'folder':'file';
 }
-const customShortcutImage=t=>t.iconMode!=='target'&&t.iconMode!=='default'?t.image||'':'';
+const customShortcutImage=t=>['source','target','default'].includes(t.iconMode)?'':t.image||'';
 const shortcutTypes=[['program','Program'],['file','File'],['folder','Folder'],['url','Web link']];
 function shortcutChoice(t){
  const kind=t.kind||guess(t.target||'');
@@ -442,6 +442,18 @@ const iconRotationOf=(entry,appearance)=>iconAngle(entry?.iconRotation??appearan
 function rotationSlider(parent,label,value){
  return field(parent,label,'range',iconAngle(value),{min:0,max:360,datasetUnit:'°',defaultValue:0});
 }
+function iconRotationOverride(parent,label,sliderLabel,value,inherited){
+ const toggle=check(parent,label,Number.isFinite(value));
+ const slider=rotationSlider(parent,sliderLabel,value??inherited());
+ slider.parentElement.classList.add('sd-icon-rotation-field');
+ const read=()=>toggle.checked?+slider.value:undefined;
+ read.refresh=()=>{
+  slider.parentElement.hidden=slider.disabled=!toggle.checked;
+  if(!toggle.checked){slider.value=iconAngle(inherited());slider.oninput();}
+ };
+ toggle.addEventListener('change',read.refresh);read.refresh();
+ read.toggle=toggle;read.slider=slider;return read;
+}
 function art(key,source,size,image='',round=false,angle=0){
  const n=E('span','art');n.style.setProperty('--size',size+'px');if(round)n.style.setProperty('--ir',round===true?'50%':round);n.setAttribute('aria-hidden','true');
  n.style.setProperty('--icon-angle',iconAngle(angle)+'deg');
@@ -663,7 +675,7 @@ function renderGrid(f,retain=true){
  gsView.style.setProperty('--pad-x',m.padX+'px');gsView.style.setProperty('--pad-y',m.padY+'px');gsView.style.setProperty('--heading-h',headingSpace(s)+'px');
  const heading=E('header','gs-heading'),badge=E('div','gs-heading-inner'),name=E('h2','',f.name);
  name.title=f.name;badge.style.height=(headingSize(s)+3)+'px';
- badge.append(art(f.icon,FOLDER_ICONS,headingSize(s),f.image,gridIconRadius(s),s.iconRotation),name);
+ badge.append(art(f.icon,FOLDER_ICONS,headingSize(s),f.image,gridIconRadius(s),iconRotationOf(f,state.dock)),name);
  heading.append(badge);
  if(s.settingsGear){
   heading.classList.add('has-settings');
@@ -1337,9 +1349,10 @@ function folderArrowControls(parent,initial,inherit=null){
  const x=range('Horizontal position',inherit?start.x:start.folderArrowX,dockDefaults.folderArrowX);
  const y=range('Vertical position',inherit?start.y:start.folderArrowY,dockDefaults.folderArrowY);
  const rotation=rotationSlider(parent,'Arrow rotation',inherit?start.rotation:start.folderArrowRotation);
- const reset=B('Reset position','quiet sd-arrow-actions',()=>{
+ const reset=B('Reset position and rotation','quiet sd-arrow-actions',()=>{
   x.value=dockDefaults.folderArrowX;y.value=dockDefaults.folderArrowY;
-  x.dispatchEvent(new Event('input',{bubbles:true}));y.dispatchEvent(new Event('input',{bubbles:true}));
+  rotation.value=dockDefaults.folderArrowRotation;
+  for(const slider of [x,y,rotation])slider.dispatchEvent(new Event('input',{bubbles:true}));
  });
  parent.append(reset);
  const set=(value)=>{enabled.checked=value.enabled;x.value=value.x;y.value=value.y;rotation.value=value.rotation??0;x.oninput();y.oninput();rotation.oninput();};
@@ -1425,6 +1438,7 @@ function iconPicker(body,source,initial,image,size,round,error,onChange=()=>{},p
  const read=()=>{if(busy)throw Error('Wait for the icon to load.');return {icon:chosenKey||def(),image:picture,iconMode:picture?'custom':'default'};};
  read.syncTarget=()=>{if(icon!==(chosenKey||def())){icon=chosenKey||def();show();}};
  read.chooseDefault=chooseDefault;
+ read.fields=body;
  return read;
 }
 let generalLaunchControls=()=>()=>({});
@@ -1459,7 +1473,8 @@ function editSettings(selected=null,initial='dock',creating=false){
   if(type==='gs'){
    const title=E('div','sample-row sample-name');
    const ico=readIcon(f);
-   title.style.gap='5px';title.append(art(ico.icon,FOLDER_ICONS,Math.round(headingSize(s)*.66),ico.image,gridIconRadius(s),s.iconRotation),E('span','',cache.get(f.id)?.name.value||f.name||'New folder'));hull.append(title);
+   const dockAngle=cache.get(f.id)?.rotation()??iconRotationOf(f,collectDock());
+   title.style.gap='5px';title.append(art(ico.icon,FOLDER_ICONS,Math.round(headingSize(s)*.66),ico.image,gridIconRadius(s),dockAngle),E('span','',cache.get(f.id)?.name.value||f.name||'New folder'));hull.append(title);
    const sample=f.slots.filter(t=>t.type==='item').slice(0,3);
    (sample.length?sample:[{name:'Shortcut',kind:'program',image:''}]).forEach(t=>{
     const item=E('div','sample-item'),radius=gridIconRadius(s);item.append(highlightArt(shortcutArt(t,Math.round(s.icon*k),radius,s),s,radius,k));
@@ -1585,14 +1600,6 @@ function editSettings(selected=null,initial='dock',creating=false){
    const dockCorner=field(identity,'Dock icon roundness','range',Number.parseFloat(dockIconRadius(f,collectDock())),{min:0,max:50,datasetUnit:'%',defaultValue:dockRoundness(dockDefaults),displayScale:2});
    dockCorner.disabled=!ownCorner.checked;ownCorner.onchange=()=>{dockCorner.disabled=!ownCorner.checked;};
    size.disabled=!useSize.checked;useSize.onchange=()=>{size.disabled=!useSize.checked;if(useSize.checked&&size.value==state.dock.icon){size.value=collectDock().icon;size.dispatchEvent(new Event('input'))}};
-   const rotate=check(identity,'Override dock icon rotation',Number.isFinite(f.iconRotation));
-   const rotationInput=rotationSlider(identity,'Folder icon rotation',iconRotationOf(f,collectDock()));
-   const rotation=()=>rotate.checked?+rotationInput.value:iconAngle(collectDock().iconRotation);
-   rotation.refresh=()=>{
-    rotationInput.disabled=!rotate.checked;
-    if(!rotate.checked){rotationInput.value=rotation();rotationInput.oninput();}
-   };
-   rotate.addEventListener('change',rotation.refresh);rotation.refresh();
    const arrow=folderArrowControls(settingsCard(folderPane,'Folder arrow','identity'),f.arrowOverride,()=>{
     const global=folderArrowStyle(null,collectDock());
     return {enabled:global.folderArrow,x:global.folderArrowX,y:global.folderArrowY,rotation:global.folderArrowRotation};
@@ -1607,6 +1614,11 @@ function editSettings(selected=null,initial='dock',creating=false){
    const icon=iconPicker(folderPane,FOLDER_ICONS,f.icon,f.image,37,true,error,pick=>{
     syncPalette(pick);queueMicrotask(draw);
    },f);
+   const inheritedRotation=()=>iconAngle(collectDock().iconRotation);
+   const overrideRotation=iconRotationOverride(icon.fields||folderPane,'Override dock icon rotation','Folder icon rotation',f.iconRotation,inheritedRotation);
+   const rotation=()=>overrideRotation()??inheritedRotation();
+   rotation.refresh=overrideRotation.refresh;
+   const rotate=overrideRotation.toggle;
    for(const key of FOLDER_KEYS){
     const label=FOLDER_ICONS[key].label,button=B('','',()=>icon.chooseDefault(key));
     button.setAttribute('aria-label',label+' folder icon');button.title=label;
