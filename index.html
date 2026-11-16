@@ -34,7 +34,7 @@ dialog{width:min(524px,calc(100% - 20px));max-height:calc(100dvh - 20px);padding
 .settings-tabs button:hover{background:#ffffff10}
 .settings-tabs button[aria-selected=true]{color:#fae7ff;border-color:#e4afe54d;background:#c987dc24}
 .settings-target{padding:9px 18px;flex:none;border-bottom:1px solid #ffffff16}
-.settings-target .field{grid-template-columns:auto minmax(110px,220px);align-items:center;justify-content:space-between;gap:9px}
+.settings-target .field{grid-template-columns:max-content minmax(0,220px);align-items:center;justify-content:start;gap:10px}
 .settings-body{overflow:auto;min-height:0;scrollbar-color:#b482bb75 transparent;padding:13px 18px 16px}
 .settings-pane{display:grid;gap:12px}
 .settings-pane>.note{margin:0}
@@ -80,9 +80,28 @@ dialog.settings-dialog{width:min(950px,calc(100% - 24px))}
 .settings-monitor{padding:15px 12px;border-left:1px solid var(--line);overflow:auto;text-align:center}
 .settings-monitor .settings-preview{position:relative;min-height:160px;max-height:380px;padding-inline:9px}
 .settings-monitor .note{margin:8px 0 0}
+.sd-folder-colors{margin-top:12px;padding:8px 5px 2px}
+.sd-folder-colors .note{margin:7px 0 0}
+.sd-color-swatches{display:flex;justify-content:center;gap:7px;margin-top:7px}
+.sd-color-swatches button{padding:4px;border-radius:50%;border:1px solid transparent;background:#ffffff08;display:grid;place-items:center}
+.sd-color-swatches button:hover{background:#ffffff17}
+.sd-color-swatches button[aria-pressed=true]{background:#ffffff18;border-color:#ecd4fa;box-shadow:0 0 0 2px #e2aff329}
+.sd-reset-card{grid-column:1/-1;border-color:#ef657365;background:#6b182324}
+.sd-reset-card legend{color:#ff9aa7}
+.fields>.sd-reset-warning{color:#ffbbc4}
+.fields>.sd-reset-action{justify-self:start}
+.sd-reset-actions{grid-column:1/-1;border-color:#ef657365}
+.sd-reset-danger.quiet{border-color:#ee6676a6;color:#ffe1e5;background:#8f293653}
+.sd-reset-danger.quiet:hover{background:#9f354374}
+.sd-reset-hold{position:relative;isolation:isolate;overflow:hidden;touch-action:none;user-select:none}
+.sd-reset-hold::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#a4233c,#d44256);transform-origin:left;transform:scaleX(var(--reset-progress,0));z-index:-1}
+.sd-reset-hold:not(.sd-holding)::before{transition:transform .22s ease-out}
+@media(prefers-reduced-motion:reduce){.sd-reset-hold::before{transition:none!important}}
 .settings-pane{grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;align-items:start}
 .settings-pane>.section{align-self:stretch}
 .settings-pane .fields>.note{grid-column:1/-1;margin:2px 0}
+.settings-pane .sd-layout-confirm{grid-column:1/-1;min-width:0}
+.sd-layout-status{overflow-wrap:anywhere}
 .settings-pane .fields{align-content:start}
 .settings-pane .gs-dimensions{grid-template-columns:repeat(2,minmax(0,1fr))}
 .settings-groups{flex-wrap:wrap}
@@ -122,303 +141,70 @@ dialog.sd-movable.sd-dialog-placed:modal{margin:0;right:auto;bottom:auto;left:va
 <div class="toast" id="toast" role="status" hidden></div>
 <script>
 'use strict';
-      const FOLDER_ICONS = {
-        'gamepad-purple': {
-          label: 'Gamepad Violet',
-          svg: `<svg viewBox="2 2 60 60" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="gpGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#c026d3"/>
-                <stop offset="50%" stop-color="#9333ea"/>
-                <stop offset="100%" stop-color="#6b21a8"/>
-              </linearGradient>
-            </defs>
-            <circle cx="32" cy="32" r="30" fill="url(#gpGrad)"/>
-            <circle cx="32" cy="32" r="29" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
-            <path d="M21 25h22c4.4 0 7.5 3.6 8.2 8l1.2 7.5c.5 3.2-1.8 5.5-4.6 5.5-1.9 0-3.5-1-4.6-2.5l-2.6-3.5H23.4l-2.6 3.5c-1.1 1.5-2.7 2.5-4.6 2.5-2.8 0-5.1-2.3-4.6-5.5l1.2-7.5c.7-4.4 3.8-8 8.2-8z" fill="#13091f"/>
-            <path d="M21 29v6M18 32h6" stroke="#e879f9" stroke-width="2.4" stroke-linecap="round"/>
-            <circle cx="43" cy="30" r="1.6" fill="#e879f9"/>
-            <circle cx="46" cy="33" r="1.6" fill="#c084fc"/>
-            <circle cx="40" cy="33" r="1.6" fill="#c084fc"/>
-            <circle cx="43" cy="36" r="1.6" fill="#e879f9"/>
-          </svg>`
-        },
-        'dev-cyan': {
-          label: 'Dev Terminal',
-          svg: `<svg viewBox="2 2 60 60" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="devGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#06b6d4"/>
-                <stop offset="100%" stop-color="#2563eb"/>
-              </linearGradient>
-            </defs>
-            <circle cx="32" cy="32" r="30" fill="url(#devGrad)"/>
-            <circle cx="32" cy="32" r="29" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
-            <rect x="16" y="19" width="32" height="26" rx="6" fill="#091326"/>
-            <path d="M22 27l5 5-5 5M31 37h10" stroke="#38bdf8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          </svg>`
-        },
-        'media-amber': {
-          label: 'Web & Media',
-          svg: `<svg viewBox="2 2 60 60" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="medGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#f97316"/>
-                <stop offset="100%" stop-color="#e11d48"/>
-              </linearGradient>
-            </defs>
-            <circle cx="32" cy="32" r="30" fill="url(#medGrad)"/>
-            <circle cx="32" cy="32" r="29" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
-            <circle cx="32" cy="32" r="15" fill="#1c0a12"/>
-            <polygon points="29,25 40,32 29,39" fill="#fb923c"/>
-          </svg>`
-        },
-        'folder-emerald': {
-          label: 'Emerald Stack',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="emGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#10b981"/>
-                <stop offset="100%" stop-color="#047857"/>
-              </linearGradient>
-            </defs>
-            <circle cx="32" cy="32" r="30" fill="url(#emGrad)"/>
-            <path d="M17 24c0-2.2 1.8-4 4-4h8l3 3h11c2.2 0 4 1.8 4 4v14c0 2.2-1.8 4-4 4H21c-2.2 0-4-1.8-4-4V24z" fill="#052018"/>
-            <rect x="21" y="28" width="22" height="3" rx="1.5" fill="#34d399"/>
-          </svg>`
-        },
-        'star-indigo': {
-          label: 'Favorites',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="stGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#6366f1"/>
-                <stop offset="100%" stop-color="#4338ca"/>
-              </linearGradient>
-            </defs>
-            <circle cx="32" cy="32" r="30" fill="url(#stGrad)"/>
-            <polygon points="32,16 36.8,26.2 48,27.6 39.8,35.4 41.9,46.5 32,41.1 22.1,46.5 24.2,35.4 16,27.6 27.2,26.2" fill="#eef2ff"/>
-          </svg>`
-        },
-        'apps-slate': {
-          label: 'Apps Grid',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="apGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#475569"/>
-                <stop offset="100%" stop-color="#1e293b"/>
-              </linearGradient>
-            </defs>
-            <circle cx="32" cy="32" r="30" fill="url(#apGrad)"/>
-            <rect x="20" y="20" width="10" height="10" rx="2.5" fill="#f8fafc"/>
-            <rect x="34" y="20" width="10" height="10" rx="2.5" fill="#94a3b8"/>
-            <rect x="20" y="34" width="10" height="10" rx="2.5" fill="#94a3b8"/>
-            <rect x="34" y="34" width="10" height="10" rx="2.5" fill="#38bdf8"/>
-          </svg>`
-        }
-      };
-
-      /* Helper to generate crisp custom SVG app/game tiles */
-      function makeBadgeSvg(bg1, bg2, accent, text, subShape = '') {
-        return `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="g_${text.replace(/[^a-zA-Z0-9]/g, '')}_${bg1.replace('#', '')}" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="${bg1}"/>
-              <stop offset="100%" stop-color="${bg2}"/>
-            </linearGradient>
-          </defs>
-          <rect width="64" height="64" rx="14" fill="url(#g_${text.replace(/[^a-zA-Z0-9]/g, '')}_${bg1.replace('#', '')})"/>
-          <rect x="1" y="1" width="62" height="62" rx="13" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
-          ${subShape}
-          <text x="32" y="39" text-anchor="middle" font-family="Inter, Segoe UI, sans-serif" font-weight="800" font-size="${text.length > 3 ? '15' : text.length === 3 ? '18' : '22'}" fill="${accent}" letter-spacing="-0.5">${text}</text>
-        </svg>`;
-      }
-
-      const APP_ICONS = {
-        'nfs-gold': {
-          label: 'NFS Gold',
-          svg: makeBadgeSvg('#292012', '#120e07', '#facc15', 'NFS', '<path d="M8 46L56 18" stroke="rgba(250,204,21,0.25)" stroke-width="6"/>')
-        },
-        'nfs-cyan': {
-          label: 'NFS Neon',
-          svg: makeBadgeSvg('#0c2438', '#08121e', '#38bdf8', 'NFS', '<circle cx="48" cy="16" r="14" fill="rgba(56,189,248,0.18)"/>')
-        },
-        'blur': {
-          label: 'Blur Racing',
-          svg: makeBadgeSvg('#065f46', '#064e3b', '#ffffff', 'blur', '<circle cx="32" cy="32" r="22" fill="none" stroke="#34d399" stroke-width="3" stroke-dasharray="10 6"/>')
-        },
-        'forza': {
-          label: 'Forza',
-          svg: makeBadgeSvg('#be123c', '#4c0519', '#fda4af', 'FH5', '<polygon points="10,50 26,14 34,14 18,50" fill="rgba(255,255,255,0.14)"/>')
-        },
-        'trackmania': {
-          label: 'Trackmania',
-          svg: makeBadgeSvg('#15803d', '#052e16', '#bef264', 'TM', '<path d="M12 44c12-18 28-18 40 0" stroke="#84cc16" stroke-width="3" fill="none"/>')
-        },
-        'cyberpunk': {
-          label: 'Cyberpunk',
-          svg: makeBadgeSvg('#facc15', '#ca8a04', '#09090b', '2077', '<rect x="6" y="6" width="52" height="8" fill="#06b6d4"/>')
-        },
-        'valorant': {
-          label: 'Valorant',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <rect width="64" height="64" rx="14" fill="#dc2626"/>
-            <path d="M16 20l15 24h7L23 20h-7zm32 0L37 37h7l4-6.5V20z" fill="#fff"/>
-          </svg>`
-        },
-        'elden': {
-          label: 'Elden Ring',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <rect width="64" height="64" rx="14" fill="#1c1917"/>
-            <circle cx="32" cy="28" r="11" fill="none" stroke="#eab308" stroke-width="2.5"/>
-            <circle cx="25" cy="36" r="10" fill="none" stroke="#ca8a04" stroke-width="2.2"/>
-            <circle cx="39" cy="36" r="10" fill="none" stroke="#ca8a04" stroke-width="2.2"/>
-            <line x1="32" y1="14" x2="32" y2="50" stroke="#fde047" stroke-width="2"/>
-          </svg>`
-        },
-        'ghostrunner': {
-          label: 'Ghostrunner',
-          svg: makeBadgeSvg('#991b1b', '#18181b', '#f87171', 'GR2', '<path d="M14 48L50 16" stroke="#ef4444" stroke-width="3"/>')
-        },
-        'control': {
-          label: 'Control',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <rect width="64" height="64" rx="14" fill="#111827"/>
-            <polygon points="32,48 16,20 48,20" fill="#dc2626"/>
-            <circle cx="32" cy="30" r="5" fill="#111827"/>
-          </svg>`
-        },
-        'rdr2': {
-          label: 'RDR2',
-          svg: makeBadgeSvg('#b91c1c', '#450a0a', '#fef2f2', 'RDR2', '<circle cx="32" cy="32" r="24" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>')
-        },
-        'genshin': {
-          label: 'Genshin',
-          svg: makeBadgeSvg('#3b82f6', '#1d4ed8', '#ffffff', 'GI', '<polygon points="32,12 37,27 52,32 37,37 32,52 27,37 12,32 27,27" fill="rgba(255,255,255,0.24)"/>')
-        },
-        'hollow': {
-          label: 'Hollow Knight',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <rect width="64" height="64" rx="14" fill="#0f172a"/>
-            <path d="M22 14c-2 6-1 12 2 16-3 3-4 7-4 11 0 6 5 10 12 10s12-4 12-10c0-4-1-8-4-11 3-4 4-10 2-16-3 4-5 8-5 11h-10c0-3-2-7-5-11z" fill="#f8fafc"/>
-            <ellipse cx="27" cy="39" rx="2.6" ry="3.6" fill="#0f172a"/>
-            <ellipse cx="37" cy="39" rx="2.6" ry="3.6" fill="#0f172a"/>
-          </svg>`
-        },
-        'silksong': {
-          label: 'Silksong',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <rect width="64" height="64" rx="14" fill="#450a0a"/>
-            <path d="M20 13l7 18c-3 2-5 6-5 10 0 6 4 10 10 10s10-4 10-10c0-4-2-8-5-10l7-18-12 13-12-13z" fill="#fff1f2"/>
-            <ellipse cx="28" cy="40" rx="2.4" ry="3.5" fill="#450a0a"/>
-            <ellipse cx="36" cy="40" rx="2.4" ry="3.5" fill="#450a0a"/>
-          </svg>`
-        },
-        'celeste': {
-          label: 'Celeste',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <rect width="64" height="64" rx="14" fill="#1e1b4b"/>
-            <polygon points="10,50 28,22 42,50" fill="#38bdf8"/>
-            <polygon points="26,50 40,26 54,50" fill="#f43f5e"/>
-          </svg>`
-        },
-        'deadcells': {
-          label: 'Dead Cells',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <rect width="64" height="64" rx="14" fill="#18181b"/>
-            <path d="M32 13c7 9 13 15 13 24a13 13 0 01-26 0c0-6 4-11 7-15 0 4 2 6 4 6-1-5 0-10 2-15z" fill="#f97316"/>
-            <circle cx="32" cy="39" r="5" fill="#fde047"/>
-          </svg>`
-        },
-        'hades': {
-          label: 'Hades II',
-          svg: makeBadgeSvg('#065f46', '#022c22', '#6ee7b7', 'H2', '<path d="M32 12v40M20 24h24" stroke="rgba(110,231,183,0.3)" stroke-width="3"/>')
-        },
-        'ori': {
-          label: 'Ori',
-          svg: makeBadgeSvg('#0284c7', '#1e3a8a', '#e0f2fe', 'ORI', '<circle cx="32" cy="32" r="20" fill="none" stroke="rgba(224,242,254,0.35)" stroke-width="2"/>')
-        },
-        'vscode': {
-          label: 'VS Code',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <rect width="64" height="64" rx="14" fill="#0f172a"/>
-            <path d="M44 15l-20 18-9-7-4 3 10 9-10 9 4 3 9-7 20 18 8-4V19l-8-4zm0 11v24L31 38l13-12z" fill="#38bdf8"/>
-          </svg>`
-        },
-        'terminal': {
-          label: 'Terminal',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <rect width="64" height="64" rx="14" fill="#1e293b"/>
-            <path d="M18 23l10 9-10 9M32 41h14" stroke="#e2e8f0" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          </svg>`
-        },
-        'docker': {
-          label: 'Docker',
-          svg: makeBadgeSvg('#0284c7', '#0369a1', '#ffffff', 'DKR', '<rect x="16" y="18" width="8" height="6" rx="1" fill="rgba(255,255,255,0.35)"/><rect x="26" y="18" width="8" height="6" rx="1" fill="rgba(255,255,255,0.35)"/>')
-        },
-        'git': {
-          label: 'GitKraken',
-          svg: makeBadgeSvg('#14b8a6', '#0f766e', '#ffffff', 'GIT', '')
-        },
-        'x64dbg': {
-          label: 'x64dbg',
-          svg: makeBadgeSvg('#334155', '#0f172a', '#38bdf8', 'x64', '')
-        },
-        'postman': {
-          label: 'Postman',
-          svg: makeBadgeSvg('#f97316', '#c2410c', '#ffffff', 'API', '')
-        },
-        'figma': {
-          label: 'Figma',
-          svg: makeBadgeSvg('#7c3aed', '#4c1d95', '#f5d0fe', 'FIG', '')
-        },
-        'web': {
-          label: 'Web / Globe',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <rect width="64" height="64" rx="14" fill="#2563eb"/>
-            <circle cx="32" cy="32" r="17" fill="none" stroke="#fff" stroke-width="2.5"/>
-            <ellipse cx="32" cy="32" rx="8" ry="17" fill="none" stroke="#fff" stroke-width="2"/>
-            <line x1="15" y1="32" x2="49" y2="32" stroke="#fff" stroke-width="2"/>
-          </svg>`
-        },
-        'github': {
-          label: 'GitHub',
-          svg: makeBadgeSvg('#27272a', '#09090b', '#ffffff', 'GH', '')
-        },
-        'youtube': {
-          label: 'YouTube',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <rect width="64" height="64" rx="14" fill="#dc2626"/>
-            <polygon points="26,21 44,32 26,43" fill="#ffffff"/>
-          </svg>`
-        },
-        'spotify': {
-          label: 'Spotify',
-          svg: `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <rect width="64" height="64" rx="14" fill="#16a34a"/>
-            <path d="M20 26c9-3 18-2 25 2M22 33c7-2 15-1 20 2M24 40c5-1.5 11-1 15 1.5" stroke="#052e16" stroke-width="3.2" stroke-linecap="round" fill="none"/>
-          </svg>`
-        },
-        'obs': {
-          label: 'OBS Studio',
-          svg: makeBadgeSvg('#1e1b4b', '#09090b', '#a5b4fc', 'OBS', '<circle cx="32" cy="32" r="20" fill="none" stroke="#6366f1" stroke-width="2.5"/>')
-        },
-        'discord': {
-          label: 'Discord',
-          svg: makeBadgeSvg('#4f46e5', '#312e81', '#ffffff', 'DSC', '')
-        },
-        'blender': {
-          label: 'Blender',
-          svg: makeBadgeSvg('#ea580c', '#9a3412', '#ffffff', '3D', '')
-        }
-      };
+// Small, built-in defaults. User-supplied icons are stored separately from these.
+let folderGradientId=0;
+const dockFolderIcon=(label,light,dark,folder,accent)=>({label,svg:()=>{
+ const id='sd-folder-gradient-'+(++folderGradientId);
+ return `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="${id}" x1="0%" y1="0%" x2="100%" y2="100%">
+   <stop stop-color="${light}"/><stop offset="1" stop-color="${dark}"/>
+  </linearGradient></defs>
+  <circle cx="32" cy="32" r="30" fill="url(#${id})"/>
+  <circle cx="32" cy="32" r="29.25" fill="none" stroke="white" stroke-opacity=".23" stroke-width="1.5"/>
+  <path d="M17 24c0-2.2 1.8-4 4-4h8l3 3h11c2.2 0 4 1.8 4 4v14c0 2.2-1.8 4-4 4H21c-2.2 0-4-1.8-4-4V24z" fill="${folder}"/>
+  <rect x="21" y="28" width="22" height="3" rx="1.5" fill="${accent}"/>
+ </svg>`;
+}});
+const FOLDER_ICONS={
+ 'folder-emerald':dockFolderIcon('Emerald','#16c792','#047857','#05271e','#68e7ad'),
+ 'folder-azure':dockFolderIcon('Blue','#39bdf7','#145599','#092440','#86ddff'),
+ 'folder-violet':dockFolderIcon('Violet','#af83ff','#6236aa','#281540','#d9bcff')
+};
+const FOLDER_KEYS=Object.keys(FOLDER_ICONS);
+const folderIconKey=index=>FOLDER_KEYS[index % FOLDER_KEYS.length];
+const APP_ICONS={
+ file:{svg:`<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+ <path d="M17 8h20l12 12v31a5 5 0 0 1-5 5H17a5 5 0 0 1-5-5V13a5 5 0 0 1 5-5z" fill="#cbd5e1"/>
+ <path d="M37 8v12h12" fill="#7888a3"/><path d="M22 31h17m-17 8h13" stroke="#51627e" stroke-width="3" stroke-linecap="round"/>
+ </svg>`},
+ folder:{svg:`<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+ <path d="M7 46V20a5 5 0 0 1 5-5h15l6 6h18a5 5 0 0 1 5 5v20a5 5 0 0 1-5 5H12a5 5 0 0 1-5-5z" fill="#de8a24"/>
+ <path d="M8 34a5 5 0 0 1 5-5h44a3 3 0 0 1 3 4l-5 14a6 6 0 0 1-6 4H12a5 5 0 0 1-5-5z" fill="#ffd377"/>
+ </svg>`},
+ web:{svg:`<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+ <circle cx="32" cy="32" r="25" fill="#206ca7"/><g fill="none" stroke="#bae6fd" stroke-width="3">
+ <circle cx="32" cy="32" r="21"/><ellipse cx="32" cy="32" rx="10" ry="21"/><path d="M13 24h38m-38 16h38"/></g>
+ </svg>`},
+ program:{svg:`<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+ <rect x="7" y="7" width="50" height="50" rx="13" fill="#303f89"/>
+ <path d="M18 44v-6a12 12 0 0 1 12-12h13m-8-8 8 8-8 8" fill="none" stroke="#e0e7ff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+ </svg>`}
+};
+const localShortcutType=t=>t.localType || (/[/\\]$/.test(t.target?.trim().replace(/^"|"$/g,''))?'folder':undefined);
+function shortcutIconKey(t,localType=localShortcutType(t)){
+ const kind=t.kind||guess(t.target||'');
+ if(kind==='url'||kind==='uri')return 'web';
+ if(kind==='program')return 'program';
+ return localType==='folder'?'folder':'file';
+}
+const customShortcutImage=t=>t.iconMode!=='target'&&t.iconMode!=='default'?t.image||'':'';
+const shortcutTypes=[['program','Program'],['file','File'],['folder','Folder'],['url','Web link']];
+function shortcutChoice(t){
+ const kind=t.kind||guess(t.target||'');
+ return kind==='local'?(localShortcutType(t)||'file'):kind==='uri'?'url':kind;
+}
+function shortcutFromChoice(choice,target){
+ return {target,kind:choice==='file'||choice==='folder'?'local':choice,
+  localType:choice==='file'||choice==='folder'?choice:undefined};
+}
 
 const $=id=>document.getElementById(id), E=(tag,cls='',text='')=>{const x=document.createElement(tag);if(cls)x.className=cls;if(text)x.textContent=text;return x};
 const B=(label,cls='',fn)=>{const b=E('button',cls,label);b.type='button';if(fn)b.onclick=fn;return b};
 const cap=s=>s[0].toUpperCase()+s.slice(1), clamp=(x,a,b)=>Math.max(a,Math.min(x,b));
 const uid=()=>Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
-const generalDefaults={hoverNames:true,hoverTargets:true,hoverDelay:1500,collapseOnFocusLoss:true};
-const iconEffectDefaults={highlightEnabled:true,hitExpand:false,hitPadding:8,hoverLabels:true,hoverLabelBackground:true,hoverLabelSize:12,customHoverDelay:false,hoverDetailsDelay:1500,hoverMode:0,hoverScale:125,hoverLift:10,hoverAngle:10,hoverDuration:160,hoverCurve:1,groundShadowOffset:0,gapSplit:false,padSplit:false,highlightArea:0,reflectionIntensity:55,reflectionArea:10,groundShadow:false,groundShadowIntensity:65};
+const generalDefaults={hoverNames:true,hoverTargets:true,hoverDelay:1500,collapseOnFocusLoss:true,imageThumbnails:false};
+const showHoverName=(style,prefs,enabled)=>enabled&&!style.labels&&prefs?.hoverNames!==false;
+const iconEffectDefaults={highlightEnabled:true,highlightFill:0,highlightSoft:false,hitExpand:false,hitPadding:8,hoverLabels:true,hoverLabelBackground:true,hoverLabelSize:12,customHoverDelay:false,hoverDetailsDelay:1500,hoverMode:0,hoverScale:125,hoverLift:10,hoverAngle:10,hoverDuration:160,hoverCurve:1,groundShadowOffset:0,gapSplit:false,padSplit:false,highlightArea:0,reflectionIntensity:55,reflectionArea:10,groundShadow:false,groundShadowIntensity:65};
 const dockDefaults={...iconEffectDefaults,gapX:6,gapY:6,padX:8,padY:8,reflections:false,opacity:76,border:true,shadow:true,radius:26,icon:40,gap:6,pad:8,labels:false,color:'#101019',motion:true,borderColor:'#ffffff',borderOpacity:23,borderWidth:1,roundIcons:true};
 const gsDefaults={...iconEffectDefaults,gapX:7,gapY:7,padX:15,padY:15,opacity:84,border:true,shadow:true,radius:22,icon:52,gap:7,pad:15,labels:true,reflections:true,color:'#0e0e16',borderColor:'#ffffff',borderOpacity:23,borderWidth:1,titleIcon:25,roundIcons:true,settingsGear:false};
 const storageKey='dynamic-island-stack-dock-custom-v1';
@@ -445,7 +231,16 @@ try {
    }
   }
    // Keep each shortcut at its saved coordinates. Old gaps become ordinary empty cells.
-  for(const folder of state.folders){
+  for(const [index,folder] of state.folders.entries()){
+   if(!Object.hasOwn(FOLDER_ICONS,folder.icon)){folder.icon=folderIconKey(index);migrated=true;}
+   for(const item of folder.slots){
+    const key=shortcutIconKey(item);
+    if(item.icon!==key){item.icon=key;migrated=true;}
+    if(item.iconMode==='target'){
+     Object.assign(item,{image:'',iconPath:'',iconMode:'default',iconIndex:0,iconCount:0});
+     migrated=true;
+    }
+   }
    if(Object.hasOwn(folder,'mode')){delete folder.mode;migrated=true;}
    if(folder.style&&Object.hasOwn(folder.style,'guides')){delete folder.style.guides;migrated=true;}
    if(folder.slots.some(slot=>slot.type!=='item')){
@@ -581,8 +376,16 @@ function notify(message){const t=$('toast');t.textContent=message;t.hidden=false
 function art(key,source,size,image='',round=false){
  const n=E('span','art');n.style.setProperty('--size',size+'px');if(round)n.style.setProperty('--ir',round===true?'50%':round);n.setAttribute('aria-hidden','true');
  if(/^data:image\/(png|jpeg|gif|webp);base64,/i.test(image)){const img=E('img');img.src=image;img.alt='';img.draggable=false;n.append(img)}
- else{n.innerHTML=(Object.hasOwn(source,key)?source[key]:Object.values(source)[0]).svg}
+ else{const {svg}=Object.hasOwn(source,key)?source[key]:Object.values(source)[0];n.innerHTML=typeof svg==='function'?svg():svg}
  return n;
+}
+// The desktop bridge resolves old local paths and optional thumbnails as icons come into view.
+let resolveShortcutVisual=null;
+function shortcutArt(t,size,radius){
+ const image=customShortcutImage(t);
+ const node=art(shortcutIconKey(t),APP_ICONS,size,image,radius);
+ if(!image&&resolveShortcutVisual)resolveShortcutVisual(node,t,size,radius);
+ return node;
 }
 const iconCornerValue=(value,fallback)=>Number.isFinite(value)?clamp(value,0,50):fallback;
 const dockRoundness=s=>s.roundIcons===false?0:iconCornerValue(s.iconCorner,50);
@@ -598,6 +401,10 @@ function highlightArt(node,s,iconRadius,scale=1){
  node.style.setProperty('--highlight-round',roundnessCSS(value));
  node.style.setProperty('--sd-highlight-enabled',s.highlightEnabled===false?0:1);
  node.style.setProperty('--highlight-area',Math.round((s.highlightArea??0)*scale)+'px');
+ const fill=clamp((s.highlightFill??0)/100,0,1);
+ const softWidth=(parseFloat(node.style.getPropertyValue('--size'))||30)*(.12+fill*.9);
+ node.style.setProperty('--sd-highlight-fill',s.highlightSoft?'transparent':'rgb(255 255 255 / '+fill+')');
+ node.style.setProperty('--sd-highlight-inset',s.highlightSoft?'inset 0 0 '+softWidth+'px '+(softWidth*.14)+'px rgb(255 255 255 / '+(.32+fill*.66)+')':'inset 0 0 0 2px #fff');
  return node;
 }
 function dims(){
@@ -621,7 +428,7 @@ function effectsHeight(s,size,scale=1){
  const shadow=s.groundShadow&&s.groundShadowIntensity!==0?Math.max(0,shadowOffset(s,scale)+shadowHeight(scale)):0;
  return Math.max(reflectionHeight(s,size,scale),shadow);
 }
-function iconEffects(btn,key,source,size,image,radius,s,scale=1){
+function iconEffects(btn,key,source,size,image,radius,s,scale=1,entry){
  const height=effectsHeight(s,size,scale);
  const hasShadow=s.groundShadow&&s.groundShadowIntensity!==0;
  if(!height&&!hasShadow)return;
@@ -634,7 +441,7 @@ function iconEffects(btn,key,source,size,image,radius,s,scale=1){
  if(hasShadow)fx.append(E('div','ground-shadow'));
  if(reflectionHeight(s,size,scale)){
   const reflection=E('div','reflect');
-  reflection.append(art(key,source,size,image,radius));fx.append(reflection);
+  reflection.append(entry?shortcutArt(entry,size,radius):art(key,source,size,image,radius));fx.append(reflection);
  }
  btn.append(fx);
 }
@@ -757,8 +564,8 @@ function renderGrid(f,retain=true){
    const b=B('','tile',ev=>{if(phase==='open'&&performance.now()>=suppressClick)launch(t)});
    b.dataset.tile=t.id;b.setAttribute('aria-label',t.name);
    const radius=gridIconRadius(s);
-   b.append(highlightArt(art(t.icon,APP_ICONS,s.icon,t.image,radius),s,radius));
-   iconEffects(b,t.icon,APP_ICONS,s.icon,t.image,radius,s);
+   b.append(highlightArt(shortcutArt(t,s.icon,radius),s,radius));
+   iconEffects(b,shortcutIconKey(t),APP_ICONS,s.icon,customShortcutImage(t),radius,s,1,t);
    if(s.labels)b.append(E('span','caption',t.name));cell.append(b);
   }
   grid.append(cell);
@@ -1079,7 +886,7 @@ document.addEventListener('pointermove',e=>{
  if(!press||e.pointerId!==press.id)return;
  if(!drag&&Math.hypot(e.clientX-press.x,e.clientY-press.y)>7){
    clearTimeout(press.timer);
-   if(phase==='open'&&press.item){const s=active().style,ghost=E('div','drag-ghost');ghost.append(art(press.item.icon,APP_ICONS,s.icon,press.item.image,gridIconRadius(s)));document.body.append(ghost);press.tile.classList.add('dragging');drag={ghost,tile:press.tile,item:press.item}}
+   if(phase==='open'&&press.item){const s=active().style,ghost=E('div','drag-ghost');ghost.append(shortcutArt(press.item,s.icon,gridIconRadius(s)));document.body.append(ghost);press.tile.classList.add('dragging');drag={ghost,tile:press.tile,item:press.item}}
    else{press=null;return}
  }
  if(drag){
@@ -1101,7 +908,7 @@ document.addEventListener('pointercancel',clearPointer);
 window.addEventListener('blur',clearPointer);
 function dropEntries(dt){
  const files=[...dt.files];
- if(files.length)return files.map(file=>({id:uid(),type:'item',name:file.name.replace(/\.[^.]+$/,''),target:file.name,kind:'local',args:'',cwd:'',icon:'web',image:''}));
+ if(files.length)return files.map(file=>({id:uid(),type:'item',name:file.name.replace(/\.[^.]+$/,''),target:file.name,kind:'local',localType:'file',args:'',cwd:'',icon:'file',image:''}));
  const uri=dt.getData('text/uri-list').split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith('#'));
  const txt=dt.getData('text/plain').trim(),links=uri.length?uri:[txt];
  return links.map(l=>{try{const u=new URL(l);if(!['http:','https:'].includes(u.protocol))return null;return {id:uid(),type:'item',name:u.hostname,target:u.href,kind:'url',args:'',cwd:'',icon:'web',image:''}}catch{return null}}).filter(Boolean)
@@ -1203,6 +1010,109 @@ function settingsCard(body,title,group){
  fields.parentElement.dataset.group=group;
  return fields;
 }
+let populateLayoutBackup;
+function addResetSection(general){
+ const panel=settingsCard(general,'Reset to defaults','backup');
+ panel.parentElement.classList.add('sd-reset-card');
+ panel.append(E('p','note sd-reset-warning','This removes all dock folders, shortcuts, custom icons and settings, restores the empty default layout, and turns off Windows sign-in startup. Your files and saved backups are not deleted. Export your layout first if you want to keep it.'));
+ const prompt=B('Reset StackDock…','quiet sd-reset-danger sd-reset-action',()=>{
+  confirmation.hidden=false;prompt.hidden=true;status.textContent='';cancel.focus({preventScroll:true});
+ });
+ const confirmation=E('fieldset','section sd-reset-actions');confirmation.hidden=true;
+ const fields=E('div','fields');
+ const cancel=B('Cancel reset','quiet',()=>{
+  stopHold();confirmation.hidden=true;prompt.hidden=false;status.textContent='';prompt.focus({preventScroll:true});
+ });
+ const hold=B('Hold to reset · 3 seconds','quiet sd-reset-danger sd-reset-hold');
+ const status=E('p','note sd-reset-warning');status.setAttribute('role','status');status.setAttribute('aria-atomic','true');
+ fields.append(E('p','note','Press and hold for three seconds to confirm. Releasing early cancels the hold. With a keyboard, hold Space or Enter.'),cancel,hold);
+ confirmation.append(E('legend','','Permanently reset StackDock?'),fields);
+ panel.append(prompt,confirmation,status);
+
+ const duration=3000;
+ let started=0,frame=null,heldBy=null,running=false;
+ const isVisible=()=>dialog.open&&hold.isConnected&&!hold.closest('[hidden]')&&!document.hidden;
+ function stopHold(){
+  if(frame!==null)cancelAnimationFrame(frame);
+  frame=null;heldBy=null;hold.classList.remove('sd-holding');hold.style.removeProperty('--reset-progress');
+  if(!running)hold.textContent='Hold to reset · 3 seconds';
+ }
+ async function commitReset(){
+  stopHold();
+  running=true;hold.disabled=cancel.disabled=true;hold.textContent='Resetting…';
+  const controls=[...dialog.querySelectorAll('.dialogtop button,.dialogfoot button,.settings-tabs button,.settings-groups button,.settings-workspace button')];
+  const disabled=controls.map(control=>[control,control.disabled]);
+  for(const control of controls)control.disabled=true;
+  const preventClose=event=>event.preventDefault();
+  dialog.addEventListener('cancel',preventClose);
+  let startupOff=false,canRestoreStartup=false;
+  try{
+   const next=fresh();
+   if(nativeCore?.invoke){
+    const startup=await nativeCore.invoke('stack_dock_startup',{enabled:null});
+   if(startup.enabled){
+     canRestoreStartup=startup.canEnable;
+     await nativeCore.invoke('stack_dock_startup',{enabled:false});startupOff=true;
+   }
+   }
+   localStorage.setItem(storageKey,JSON.stringify(next));
+   state=next;lastId=null;
+   dialog.close();
+   if(phase==='open')finishClose(false);else refresh();
+  }catch(error){
+   let startupChanged=startupOff;
+   if(startupOff&&canRestoreStartup){
+    try{await nativeCore.invoke('stack_dock_startup',{enabled:true});startupChanged=false;}catch{}
+   }
+   status.textContent='Could not complete the reset. '+String(error)+(startupChanged?' Windows sign-in startup was turned off.':'');
+  }finally{
+   dialog.removeEventListener('cancel',preventClose);
+   for(const [control,wasDisabled] of disabled)control.disabled=wasDisabled;
+   running=false;hold.disabled=cancel.disabled=false;
+   stopHold();
+   if(isVisible())hold.focus({preventScroll:true});
+  }
+ }
+ function tick(now){
+  if(!heldBy||!isVisible()||!document.hasFocus()||document.activeElement!==hold){stopHold();return;}
+  const progress=clamp((now-started)/duration,0,1);
+  hold.style.setProperty('--reset-progress',progress);
+  const text=progress===1?'Resetting…':'Keep holding · '+Math.ceil((1-progress)*3)+' s';
+  if(hold.textContent!==text)hold.textContent=text;
+  if(progress===1){void commitReset();return;}
+  frame=requestAnimationFrame(tick);
+ }
+ function begin(input){
+  if(running||heldBy||!isVisible())return;
+  status.textContent='';heldBy=input;started=performance.now();hold.classList.add('sd-holding');
+  frame=requestAnimationFrame(tick);
+ }
+ hold.addEventListener('pointerdown',event=>{
+  if(event.button!==0||!event.isPrimary||heldBy)return;
+  hold.focus({preventScroll:true});
+  begin({pointer:event.pointerId});
+  if(heldBy)hold.setPointerCapture(event.pointerId);
+ });
+ hold.addEventListener('pointermove',event=>{
+  if(heldBy?.pointer!==event.pointerId)return;
+  const rect=hold.getBoundingClientRect();
+  if(!event.buttons||event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)stopHold();
+ });
+ for(const type of ['pointerup','pointercancel','lostpointercapture'])hold.addEventListener(type,event=>{
+  if(heldBy?.pointer===event.pointerId)stopHold();
+ });
+ hold.addEventListener('keydown',event=>{
+  if(event.key!==' '&&event.key!=='Enter')return;
+  event.preventDefault();
+  if(!event.repeat)begin({key:event.key});
+ });
+ hold.addEventListener('keyup',event=>{
+  if(heldBy?.key===event.key){event.preventDefault();stopHold();}
+ });
+ hold.addEventListener('blur',stopHold);
+ // A click by itself, including a synthetic click, never resets the layout.
+ hold.addEventListener('click',event=>event.preventDefault());
+}
 function appearance(body,s,isGrid){
  const px=(p,n,v,min,max)=>field(p,n,'range',v,{min,max,datasetUnit:' px'});
  const background=settingsCard(body,'Panel background','surface');
@@ -1244,15 +1154,16 @@ function appearance(body,s,isGrid){
  return ()=>({...s,color:color.value,opacity:+opacity.value,radius:+radius.value,icon:+icon.value,...gap(),...pad(),border:border.checked,shadow:shadow.checked,labels:labels.checked,borderColor:borderColor.value,borderOpacity:+borderOpacity.value,borderWidth:+borderWidth.value,...(isGrid?{titleIcon:+titleIcon.value}:{})});
 }
 // The browser version uses a local file chooser. The desktop bridge adds path and EXE support.
-function iconPicker(body,source,initial,image,size,round,error,onChange=()=>{}){
- const def=source===APP_ICONS?'web':'folder-emerald';
- let icon=Object.hasOwn(source,initial)?initial:def,picture=image||'',busy=false,token=0;
+function iconPicker(body,source,initial,image,size,round,error,onChange=()=>{},prior={},readDefault=null){
+ const def=()=>readDefault?.()||(source===FOLDER_ICONS&&Object.hasOwn(source,initial)?initial:Object.keys(source)[0]);
+ let chosenKey=null,icon=def(),picture=image||'',busy=false,token=0;
  const row=E('div','inline'),preview=E('span'),file=E('input'),name=E('span','asset-name');
  const label=E('label','quiet filewrap','Browse icon');
  file.type='file';file.accept='image/*,.ico';file.setAttribute('aria-label','Browse icon');
  label.append(file);
  const show=()=>{preview.replaceChildren(art(icon,source,size,picture,round));onChange({icon,image:picture});};
- const reset=B('Reset icon','quiet',()=>{token++;busy=false;icon=def;picture=file.value=name.textContent='';show();});
+ const reset=B('Reset icon','quiet',()=>chooseDefault(chosenKey));
+ function chooseDefault(key){token++;busy=false;chosenKey=key;icon=key||def();picture=file.value=name.textContent='';show();}
  file.onchange=async()=>{
   const blob=file.files[0];if(!blob)return;
   const ticket=++token,url=URL.createObjectURL(blob);busy=true;error.hidden=true;
@@ -1268,16 +1179,22 @@ function iconPicker(body,source,initial,image,size,round,error,onChange=()=>{}){
   }finally{URL.revokeObjectURL(url);if(ticket===token)busy=false;}
  };
  row.append(preview,label,reset,name);body.append(row);show();
- return ()=>{if(busy)throw Error('Wait for the icon to load.');return {icon,image:picture};};
+ const read=()=>{if(busy)throw Error('Wait for the icon to load.');return {icon:chosenKey||def(),image:picture,iconMode:picture?'custom':'default'};};
+ read.syncTarget=()=>{if(icon!==(chosenKey||def())){icon=chosenKey||def();show();}};
+ read.chooseDefault=chooseDefault;
+ return read;
 }
 let generalLaunchControls=()=>()=>({});
 let stylePreviewIcon=()=>{};
 function editSettings(selected=null,initial='dock',creating=false){
- const newFolder={id:uid(),name:'',icon:'folder-emerald',image:'',cols:5,rows:3,slots:[],style:{...gsDefaults}};
+ const savedColor=state.general?.nextFolderColor;
+ const nextFolderColor=Number.isInteger(savedColor)&&savedColor>=0&&savedColor<FOLDER_KEYS.length
+  ?savedColor:state.folders.length%FOLDER_KEYS.length;
+ const newFolder={id:uid(),name:'',icon:folderIconKey(nextFolderColor),image:'',cols:5,rows:3,slots:[],style:{...gsDefaults}};
  const folders=creating?[newFolder]:state.folders;
  let folder=selected||active()||folders[0],tab=initial,collectDock,collectGeneral,applyStartup,edge,alignment,activate,targetWrap,tablist,scroll;
  const cache=new Map(),previews=new Map(),labels={general:'General',dock:'Dock',folder:'Folder',gs:'Grid Stack'};
- const groups={general:[['behavior','Behavior'],['launch','Launch indicator']],dock:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects']],
+ const groups={general:[['behavior','Behavior'],['launch','Launch indicator'],['backup','Layout Backup']],dock:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects']],
   folder:[['identity','Folder icon']],gs:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects']]};
  const activeGroups={};
  let groupBar,previewSlot;
@@ -1301,9 +1218,9 @@ function editSettings(selected=null,initial='dock',creating=false){
    const ico=readIcon(f);
    title.style.gap='5px';title.append(art(ico.icon,FOLDER_ICONS,Math.round(headingSize(s)*.66),ico.image,gridIconRadius(s)),E('span','',cache.get(f.id)?.name.value||f.name||'New folder'));hull.append(title);
    const sample=f.slots.filter(t=>t.type==='item').slice(0,3);
-   (sample.length?sample:[{name:'Shortcut',icon:'web',image:''}]).forEach(t=>{
-    const item=E('div','sample-item'),radius=gridIconRadius(s);item.append(highlightArt(art(t.icon,APP_ICONS,Math.round(s.icon*k),t.image,radius),s,radius,k));
-    iconEffects(item,t.icon,APP_ICONS,Math.round(s.icon*k),t.image,radius,s,k);
+   (sample.length?sample:[{name:'Shortcut',kind:'program',image:''}]).forEach(t=>{
+    const item=E('div','sample-item'),radius=gridIconRadius(s);item.append(highlightArt(shortcutArt(t,Math.round(s.icon*k),radius),s,radius,k));
+    iconEffects(item,shortcutIconKey(t),APP_ICONS,Math.round(s.icon*k),customShortcutImage(t),radius,s,k,t);
     stylePreviewIcon(item,s,k,t.name);if(s.labels)item.append(E('small','',t.name));row.append(item);
    });
   }else{
@@ -1376,10 +1293,22 @@ function editSettings(selected=null,initial='dock',creating=false){
   const names=check(tips,'Show full icon name on hover',prefs.hoverNames);
   const targets=check(tips,'Show shortcut path or URL after a pause',prefs.hoverTargets);
   const delay=field(tips,'Default details delay','range',prefs.hoverDelay,{min:0,max:5000,step:100,datasetUnit:' ms'});
+  tips.append(E('p','note','Visible icon labels replace the hover name. The delayed path or URL is separate.'));
   const syncGeneral=()=>{speed.disabled=!anim.checked;delay.disabled=!targets.checked;};
   anim.addEventListener('change',syncGeneral);targets.addEventListener('change',syncGeneral);syncGeneral();
+  const icons=settingsCard(general,'Shortcut icons','behavior');
+  const thumbs=check(icons,'Show image files as thumbnails',prefs.imageThumbnails);
+  thumbs.parentElement.classList.add('card-toggle');
+  icons.append(E('p','note','Uses the image itself for supported image shortcuts. Custom icons take priority.'));
   const configureLaunch=generalLaunchControls(general,state.dock);
-  collectGeneral=()=>({general:{hoverNames:names.checked,hoverTargets:targets.checked,hoverDelay:+delay.value,collapseOnFocusLoss:collapse.checked},
+   if(!creating){
+    const backup=settingsCard(general,'Import and export','backup');
+    backup.parentElement.classList.add('sd-preview-card');
+    if(populateLayoutBackup)populateLayoutBackup(backup);
+    else backup.append(E('p','note','Layout backups are available in the Windows desktop app.'));
+    addResetSection(general);
+   }
+  collectGeneral=()=>({general:{hoverNames:names.checked,hoverTargets:targets.checked,hoverDelay:+delay.value,collapseOnFocusLoss:collapse.checked,imageThumbnails:thumbs.checked,nextFolderColor:creating?(nextFolderColor+1)%FOLDER_KEYS.length:nextFolderColor},
    dock:{motion:anim.checked,motionSpeed:+speed.value,...configureLaunch()}});
   previews.set('dock',previewBox());
   const position=settingsCard(dock,'Screen position','layout');
@@ -1405,7 +1334,23 @@ function editSettings(selected=null,initial='dock',creating=false){
    dockCorner.oninput();
    dockCorner.disabled=!ownCorner.checked;ownCorner.onchange=()=>{dockCorner.disabled=!ownCorner.checked;};
    size.disabled=!useSize.checked;useSize.onchange=()=>{size.disabled=!useSize.checked;if(useSize.checked&&size.value==state.dock.icon){size.value=collectDock().icon;size.dispatchEvent(new Event('input'))}};
-   const icon=iconPicker(folderPane,FOLDER_ICONS,f.icon,f.image,37,true,error,()=>queueMicrotask(draw),null,f);
+   const palette=E('div','sd-folder-colors');
+   const swatches=E('div','sd-color-swatches');
+   swatches.setAttribute('role','group');swatches.setAttribute('aria-label','Built-in folder colors');
+   const swatchButtons=new Map();
+   const syncPalette=({icon,image})=>{
+    for(const [key,button] of swatchButtons)button.setAttribute('aria-pressed',String(!image&&icon===key));
+   };
+   const icon=iconPicker(folderPane,FOLDER_ICONS,f.icon,f.image,37,true,error,pick=>{
+    syncPalette(pick);queueMicrotask(draw);
+   },f);
+   for(const key of FOLDER_KEYS){
+    const label=FOLDER_ICONS[key].label,button=B('','',()=>icon.chooseDefault(key));
+    button.setAttribute('aria-label',label+' folder icon');button.title=label;
+    button.append(art(key,FOLDER_ICONS,26));swatchButtons.set(key,button);swatches.append(button);
+   }
+   syncPalette(f);
+   palette.append(E('strong','','Folder color'),swatches,E('p','note','Choosing a color uses the built-in icon in place of a custom image.'));
 
    const gsPreview=previewBox(gs),layout=settingsCard(gs,'Grid layout','layout');
    layout.classList.add('gs-dimensions');
@@ -1415,7 +1360,7 @@ function editSettings(selected=null,initial='dock',creating=false){
    settingsGear.parentElement.classList.add('card-toggle');
    layout.append(E('p','note','Shortcuts stay in their assigned cells. Move a shortcut before shrinking past its cell.'));
    const style=appearance(gs,{...gsDefaults,...f.style},true);
-   const c={f,folderPane,gs,name,folderHoverLabels,useSize,size,ownCorner,dockCorner,icon,cols,rows,settingsGear,style,folderPreview,gsPreview};cache.set(f.id,c);return c;
+   const c={f,folderPane,gs,name,folderHoverLabels,useSize,size,ownCorner,dockCorner,icon,cols,rows,settingsGear,style,folderPreview,gsPreview,palette};cache.set(f.id,c);return c;
   }
   function show(key){
    tab=key;error.hidden=true;
@@ -1438,7 +1383,7 @@ function editSettings(selected=null,initial='dock',creating=false){
    groupBar.style.visibility=categories.length===1?'hidden':'visible';
    scroll.replaceChildren(node);
    previewSlot.hidden=!sample;
-   previewSlot.replaceChildren(...(sample?[sample,E('p','note','Hover over the preview icons to try effects.')]:[]));
+   previewSlot.replaceChildren(...(sample?[sample,key==='folder'?c.palette:E('p','note','Hover over the preview icons to try effects.')]:[]));
    choose(activeGroups[key]||categories[0][0]);draw();
   }
   activate=(f,key)=>{folder=f;chooser.value=f.id;show(key)};
@@ -1476,34 +1421,31 @@ function guess(target){
  return /\.exe$/i.test(target)?'program':'local';
 }
 function editShortcut(f,where,t){
- const base=t||{id:uid(),type:'item',name:'',target:'',kind:'program',args:'',cwd:'',icon:'web',image:''};
+ const base=t||{id:uid(),type:'item',name:'',target:'',kind:'program',args:'',cwd:'',icon:'program',image:''};
  let name,kind,target,args,cwd,icon;
  dialogBuild(t?'Shortcut properties':'Add shortcut here','Row '+(where.r+1)+', column '+(where.c+1)+'','Save shortcut',(body,error)=>{
   const p=section(body,'Shortcut target');
   name=field(p,'Display name','text',base.name,{required:true,maxLength:65});
-  const savedKind = base.kind || guess(base.target);
-  kind = select(p, 'Target type', [
-  ['program', 'Program'],
-  ['local', 'File or folder'],
-  ['url', 'Web link']
-], savedKind === 'uri' ? 'url' : savedKind);
+  kind=select(p,'Target type',shortcutTypes,shortcutChoice(base));
   kind.classList.add('sd-target-type');
   target=field(p,'Target location','text',base.target,{required:true});
   args=field(p,'Arguments','text',base.args||'');
   cwd=field(p,'Start in','text',base.cwd||'');
-  const update=()=>{args.closest('label').hidden=cwd.closest('label').hidden=kind.value!=='program';target.placeholder=kind.value==='url'?'https://example.com':kind.value==='uri'?'steam://rungameid/…':'C:\\Path\\To\\Shortcut'};
+  icon=iconPicker(body,APP_ICONS,base.icon,customShortcutImage(base),38,false,error,undefined,base,
+   ()=>shortcutIconKey(shortcutFromChoice(kind.value,target.value)));
+  const update=()=>{
+   args.closest('label').hidden=cwd.closest('label').hidden=kind.value!=='program';
+   target.placeholder=kind.value==='url'?'https://example.com':'C:\\Path\\To\\Shortcut';
+   icon.syncTarget();
+  };
   kind.onchange=update;update();
-  icon=iconPicker(body,APP_ICONS,base.icon,base.image,38,false,error);
  },()=>{
-  const n=name.value.trim(),dest=target.value.trim(),pick=icon();if(!n||!dest)throw Error('Enter a name and target.');
-  if (kind.value === 'url') {
-  try {
-    new URL(dest);
-  } catch {
-    throw new Error('Enter a full URL, including its scheme.');
+  const n=name.value.trim(),dest=target.value.trim(),pick=icon();
+  if(!n||!dest)throw Error('Enter a name and target.');
+  if(kind.value==='url'){
+   try{new URL(dest)}catch{throw Error('Enter a full URL, including its scheme.');}
   }
-}
-  Object.assign(base,{name:n,target:dest,kind:kind.value,args:kind.value==='program'?args.value.trim():'',cwd:kind.value==='program'?cwd.value.trim():'',...pick});
+  Object.assign(base,{name:n,...shortcutFromChoice(kind.value,dest),args:kind.value==='program'?args.value.trim():'',cwd:kind.value==='program'?cwd.value.trim():'',...pick});
   if(!t&&!placeEntries(f,where,[base]))throw Error('This grid is full.');
   persist();return refresh;
  });

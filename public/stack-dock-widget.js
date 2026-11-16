@@ -10,7 +10,7 @@
 #dockView .folder-btn:hover,#gsView .tile:hover,.sample-item:hover{background:none;position:relative;z-index:1}
 #dockView .folder-btn>.art,#gsView .tile>.art,.sample-item>.art{position:relative;overflow:visible;z-index:1}
 #dockView .folder-btn>.art>img,#dockView .folder-btn>.art>svg,#gsView .tile>.art>img,#gsView .tile>.art>svg,.sample-item>.art>img,.sample-item>.art>svg{border-radius:inherit}
-.sample-item>.art::after{content:"";position:absolute;inset:calc(-1 * var(--highlight-area,0px));pointer-events:none;border-radius:var(--highlight-round,var(--ir,25%));opacity:0;box-shadow:inset 0 0 0 2px #fff;transition:opacity .12s}
+.sample-item>.art::after{content:"";position:absolute;inset:calc(-1 * var(--highlight-area,0px));pointer-events:none;border-radius:var(--highlight-round,var(--ir,25%));opacity:0;background:var(--sd-highlight-fill,transparent);box-shadow:var(--sd-highlight-inset,inset 0 0 0 2px #fff);transition:opacity .12s}
 .sample-item:hover>.art::after{opacity:calc(var(--sd-hover,.14) * var(--sd-highlight-enabled,1))}
 #gsView .tile{gap:0;justify-content:flex-start}
 #gsView.sd-labels .tile{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:var(--sd-icon-size) var(--sd-reflect) var(--sd-label-space);row-gap:2px;align-content:start;justify-items:center}
@@ -53,7 +53,7 @@
     node.style.setProperty('--launch-text',s.launchText);
     node.style.setProperty('--launch-font',s.launchFont+'px');
     node.style.setProperty('--launch-fill','rgba('+hexRgb(s.launchColor)+','+s.launchOpacity/100+')');
-    const icon=art(item.icon,APP_ICONS,size,item.image,item.radius||'50%');
+    const icon=shortcutArt(item,size,item.radius||'50%');
     const copy=E('div','launch-copy'),title=E('div','launch-title',item.name);
     title.title=item.name;
     copy.append(title);
@@ -95,7 +95,7 @@
       preview.style.width=c.launchWidth+'px';
       preview.style.height=c.launchHeight+'px';
       preview.style.borderRadius=c.launchRadius+'px';
-      launchContent(preview,{icon:'terminal',name:'Example shortcut'},c,Math.min(c.launchIcon,c.launchHeight-10));
+      launchContent(preview,{kind:'program',name:'Example shortcut'},c,Math.min(c.launchIcon,c.launchHeight-10));
     };
     for(const controls of [panel,timing,frame,style]){controls.addEventListener('input',draw);controls.addEventListener('change',draw);}
     draw();
@@ -115,6 +115,8 @@
     highlightEnabled.parentElement.classList.add('card-toggle');
     const hover=slider(panel,'hoverOpacity','Highlight opacity',0,100,'%',14);
     const area=slider(panel,'highlightArea','Highlight reach',0,32,' px',0);
+    const fill=slider(panel,'highlightFill','Inside fill',0,100,'%',0);
+    const fillStyle=select(panel,'Fill style',[[0,'Hard ring'],[1,'Soft airbrush']],s.highlightSoft?'1':'0');
     const hit=settingsCard(body,'Pointer detection','hover');
     const hitExpand=check(hit,'Extend hover and click area',s.hitExpand);
     hitExpand.parentElement.classList.add('card-toggle');
@@ -123,6 +125,7 @@
     hit.append(E('p','note','Makes nearby space over the dock or grid count toward the nearest icon. An icon directly under the pointer takes priority.'));
     const caption=settingsCard(body,'Hover labels','hover');
     const showLabels=check(caption,'Show hover labels',s.hoverLabels!==false);
+    caption.append(E('p','note',isGrid?'If icon labels are visible, hover only shows the delayed path or URL.':'If icon labels are visible, hover does not repeat the folder name.'));
     const background=check(caption,'Show label background',s.hoverLabelBackground!==false);
     const labelSize=slider(caption,'hoverLabelSize','Text size',9,28,' px',12);
     const localDelay=isGrid?check(caption,'Override General details delay',s.customHoverDelay):null;
@@ -164,6 +167,7 @@
     };
     mode.addEventListener('change',syncMotion);syncMotion();
     const effects = () => ({highlightEnabled:highlightEnabled.checked,highlightArea:+area.value,
+      highlightFill:+fill.value,highlightSoft:fillStyle.value==='1',
       hitExpand:hitExpand.checked,hitPadding:+hitPadding.value,hoverLabels:showLabels.checked,
       hoverLabelBackground:background.checked,hoverLabelSize:+labelSize.value,
       ...(isGrid?{customHoverDelay:localDelay.checked,hoverDetailsDelay:+delay.value}:{}),reflections:reflected.checked,
@@ -181,7 +185,7 @@
     };
     const corner=shape(shapePanel,'Icon roundness',initial);
     const highlight=shape(panel,'Highlight roundness',iconCornerValue(s.highlightCorner,initial));
-    const syncHighlight=()=>{hover.disabled=area.disabled=highlight.disabled=!highlightEnabled.checked;};
+    const syncHighlight=()=>{hover.disabled=area.disabled=highlight.disabled=fill.disabled=fillStyle.disabled=!highlightEnabled.checked;};
     highlightEnabled.addEventListener('change',syncHighlight);syncHighlight();
     let separate=Number.isFinite(s.highlightCorner);
     highlight.addEventListener('input',()=>{separate=true;});
@@ -231,7 +235,7 @@
     item.style.setProperty('--sd-hover-transform',matrix(m));
     item.style.setProperty('--sd-hover-duration',m.time+'ms');
     item.style.setProperty('--sd-hover-easing',m.easing);
-    if(name&&s.hoverLabels!==false&&state.general?.hoverNames!==false){
+    if(name&&showHoverName(s,state.general,s.hoverLabels!==false)){
       const label=E('span','sd-hover-label',name);styleHoverLabel(label,s);item.append(label);
     }
   };
@@ -274,7 +278,7 @@
     let highX=Math.max(x2,r.right+xShift+growth),highY=Math.max(y2,r.bottom+m.y+growth);
     if(alpha>0&&w>0&&h>0){
       place(ring,x1,y1,w,h);
-      const svg=svgNode('svg'),mask=svgNode('mask'),outline=svgNode('rect'),background=svgNode('rect');
+      const svg=svgNode('svg'),mask=svgNode('mask'),background=svgNode('rect'),paint=svgNode('g');
       const holes='sd-hover-outline-mask';
       const attrs=(el,values)=>Object.entries(values).forEach(([k,v])=>el.setAttribute(k,v));
       attrs(svg,{width:w,height:h,viewBox:`0 0 ${w} ${h}`});
@@ -291,9 +295,30 @@
         mask.append(cut);
       }
       const pc=parseFloat(source.style.getPropertyValue('--highlight-round'))||0;
-      attrs(outline,{x:1,y:1,width:Math.max(0,w-2),height:Math.max(0,h-2),rx:Math.min(w,h)*pc/100,
-        fill:'none',stroke:'white','stroke-opacity':alpha,'stroke-width':2,mask:'url(#'+holes+')'});
-      const defs=svgNode('defs');defs.append(mask);svg.append(defs,outline);ring.append(svg);hoverLayer.append(ring);
+      const shape={x:1,y:1,width:Math.max(0,w-2),height:Math.max(0,h-2),rx:Math.min(w,h)*pc/100};
+      const fill=clamp((s.highlightFill??0)/100,0,1);
+      const defs=svgNode('defs');defs.append(mask);
+      attrs(paint,{mask:'url(#'+holes+')',opacity:alpha});
+      const outline=svgNode('rect');
+      if(s.highlightSoft){
+        const clip=svgNode('clipPath'),clipShape=svgNode('rect');
+        attrs(clip,{id:'sd-hover-airbrush-clip'});attrs(clipShape,shape);
+        clip.append(clipShape);defs.append(clip);
+        const fog=svgNode('g');attrs(fog,{'clip-path':'url(#sd-hover-airbrush-clip)'});
+        const depth=Math.min(w,h)*(.12+fill*.9);
+        // Wider strokes paint first. Narrower layers build opacity near the rim.
+        for(let i=9;i>=1;i--){
+          const layer=svgNode('rect');
+          attrs(layer,{...shape,fill:'none',stroke:'white','stroke-width':Math.max(1,depth*i/9),
+            'stroke-opacity':(.055+fill*.115)*(1.4-i/10)});
+          fog.append(layer);
+        }
+        paint.append(fog);
+        attrs(outline,{...shape,fill:'none',stroke:'white','stroke-opacity':.3,'stroke-width':1});
+      }else{
+        attrs(outline,{...shape,fill:'white','fill-opacity':fill,stroke:'white','stroke-width':2});
+      }
+      paint.append(outline);svg.append(defs,paint);ring.append(svg);hoverLayer.append(ring);
     }
     let clone;
     if(moved){
@@ -310,7 +335,7 @@
     styleHoverLabel(label,s);
     const labelsEnabled=s.hoverLabels!==false&&(!onDock||entry.folderHoverLabels!==false);
     const showDetails=labelsEnabled&&!onDock&&general.hoverTargets&&!!entry.target;
-    title.hidden=!(labelsEnabled&&general.hoverNames);
+    title.hidden=!showHoverName(s,general,labelsEnabled);
     if(!title.hidden||showDetails)hoverLayer.append(label);
     hoverLayer.hidden=false;
     function layout(){
@@ -319,7 +344,8 @@
         label.style.maxWidth=Math.min(540,d.w-12)+'px';
         const bounds=label.getBoundingClientRect();
         const x=clamp(r.left+(r.width-bounds.width)/2,left+6,Math.max(left+6,right-bounds.width-6));
-        const below=r.bottom+5;
+        const caption=button.querySelector(':scope > .caption');
+        const below=Math.max(r.bottom,caption?.getBoundingClientRect().bottom??r.bottom)+5;
         // If there is no room below the icon, keep the entire caption above it.
         const y=Math.max(top+4,below+bounds.height+4<=bottom?below:Math.min(r.top-5-bounds.height,bottom-bounds.height-4));
         place(label,x,y);

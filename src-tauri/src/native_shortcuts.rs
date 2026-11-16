@@ -278,6 +278,8 @@ pub struct DroppedTarget {
     target: String,
     name: String,
     kind: &'static str,
+    #[serde(rename = "localType")]
+    local_type: &'static str,
 }
 
 #[tauri::command]
@@ -296,6 +298,7 @@ pub async fn inspect_shortcut_drops(paths: Vec<String>) -> Result<Vec<DroppedTar
                 target,
                 name,
                 kind: if is_program { "program" } else { "local" },
+                local_type: if meta.is_dir() { "folder" } else { "file" },
             })
         }).collect()
     })
