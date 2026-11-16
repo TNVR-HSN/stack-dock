@@ -136,15 +136,6 @@
   const style = document.createElement('style');
   style.textContent = `
 #dockView:focus{outline:none}
-dialog.sd-properties{width:min(720px,calc(100% - 24px));--sd-label-width:112px}
-.sd-properties:has(.sd-icon-gallery:not([hidden])) .dialogbody{max-height:calc(100dvh - var(--sd-caption-gutter,0px) - 148px);overflow:auto}
-.sd-properties .sd-properties-hero{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:112px;background:#ffffff07;border:1px solid #ffffff13;border-radius:11px;padding:8px 14px;font-size:20px;font-weight:700;color:#e9b0ff;overflow-wrap:anywhere}
-.sd-properties .sd-hero-icon{flex:0 0 96px}
-.sd-properties .sd-properties-hero .art{border-radius:0;overflow:visible}
-.sd-properties .sd-hero-tools{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:0 0 auto}
-.sd-properties .sd-thumb-switch{display:inline-flex;gap:4px;align-items:center;white-space:nowrap;font-size:11px;color:var(--soft);font-weight:500}
-.sd-properties .sd-thumb-switch input{accent-color:#d78eeb;margin:0}
-.sd-properties .sd-properties-hero>span{min-width:0}
 .fields.sd-property-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
 .sd-property-fields>.field{grid-template-columns:var(--sd-label-width,112px) minmax(0,1fr);gap:8px;align-items:center}
 .sd-property-fields>.sd-icon-rotation-field{grid-template-columns:minmax(0,1fr);gap:5px}
@@ -162,7 +153,6 @@ dialog.sd-properties{width:min(720px,calc(100% - 24px));--sd-label-width:112px}
 .sd-icon-gallery p{margin:0}
 .sd-icon-gallery-actions{display:flex;gap:6px;flex-wrap:wrap}
 .sd-icon-gallery-actions .primary{margin-left:auto}
-@media(max-width:480px){dialog.sd-properties,.sd-property-fields{--sd-label-width:84px}.sd-properties .sd-properties-hero{font-size:17px}.sd-properties .sd-hero-tools{gap:4px}.sd-properties .sd-hero-icon{width:74px;flex-basis:74px}.sd-properties .sd-hero-icon .art{width:74px;height:74px}}
 dialog.sd-panel-region::backdrop{background:transparent}
 dialog.sd-panel-region{box-shadow:none}
 .sd-modal-active #island,.sd-modal-active .folder-flight,.sd-modal-active #toast{visibility:hidden}
@@ -475,22 +465,21 @@ dialog.sd-panel-region{box-shadow:none}
     return read;
   };
 
-  dialog.addEventListener('close',()=>{if(!dialog.open)dialog.classList.remove('sd-properties');});
   editShortcut = function (f, where, t) {
     const base = t || { id: uid(), type: 'item', name: '', target: '', kind: 'program', args: '', cwd: '', icon: 'program', image: '' };
     let name, kind, target, args, cwd, readIcon, getTargetChoice, readThumbnailPreference, readRotation, syncAutoIcon;
     let browsing = false;
     dialogBuild(t ? 'Shortcut properties' : 'Add shortcut here',
       shortcutEditorDesc(f,where), 'Save shortcut', (body, error) => {
-        dialog.classList.add('sd-properties');
         const hero=E('div','sd-properties-hero'),heroName=E('span','',base.name||'New shortcut'),heroArt=E('span','sd-hero-icon');
-        const heroTools=E('div','sd-hero-tools'),thumbLabel=E('label','sd-thumb-switch'),thumb=E('input');
+        const thumbLabel=E('label','sd-thumb-switch'),thumb=E('input');
         thumb.type='checkbox';
         thumb.setAttribute('aria-label','Use image as thumbnail for this shortcut');
         thumbLabel.append(thumb,E('span','','Thumbnail'));thumbLabel.hidden=true;
-        heroTools.append(thumbLabel,heroArt);hero.append(heroName,heroTools);body.append(hero);
+        hero.append(heroArt,heroName);
+        const editor=propertyWorkspace(body,hero,thumbLabel);
         let thumbnailPref=base.imageThumbnail;
-        const p = section(body, 'Shortcut target');
+        const p = section(editor, 'Shortcut target');
         p.classList.add('sd-property-fields');
         name = field(p, 'Display name', 'text', base.name, { required: true, maxLength: 65 });
         name.addEventListener('input',()=>{heroName.textContent=name.value||'New shortcut';});
@@ -543,7 +532,7 @@ dialog.sd-panel-region{box-shadow:none}
             'Use the image as the icon for this shortcut.';
           heroArt.replaceChildren(shortcutArt({...choice,...pick,iconRotation:readRotation(),imageThumbnail:readThumbnailPreference()},96,'0px',surface()));
         };
-        readIcon = iconPicker(body, APP_ICONS, base.icon, customShortcutImage(base), 96, '0px', error,
+        readIcon = iconPicker(editor, APP_ICONS, base.icon, customShortcutImage(base), 96, '0px', error,
           preview, base, () => shortcutIconKey(savedChoice()));
         let iconTarget=base.iconMode==='source'&&base.iconPath?cleanPath(base.target):null;
         let lastIconChoice='',pendingIcon;
@@ -821,7 +810,8 @@ dialog.sd-panel-region{box-shadow:none}
     });
     confirmFields.append(message, cancel, replace);
     confirmPanel.append(E('legend', '', 'Replace current layout?'), confirmFields);
-    panel.append(intro, importButton, exportButton, confirmPanel, status);
+    const actions=E('div','sd-layout-actions');actions.append(importButton,exportButton);
+    panel.append(intro,actions,confirmPanel,status);
     sync();
 
     function report(text, error = false) {
