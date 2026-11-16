@@ -1,6 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod native_shortcuts;
 mod desktop_widget;
+mod file_drop;
 
 #[tauri::command]
 fn set_dock_bounds(
@@ -285,9 +286,21 @@ pub fn run() {
             native_shortcuts::exit_stack_dock,
             native_shortcuts::stack_dock_layout_backup,
             desktop_widget::dock_taskbar_rects,
+            desktop_widget::dock_drag_button_held,
+            file_drop::sync_dock_file_drop,
             desktop_widget::start_desktop_widget
         ])
-        .on_window_event(native_shortcuts::keep_dock_open)
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+                file_drop::unregister_all();
+            }
+            native_shortcuts::keep_dock_open(window, event);
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                file_drop::unregister_all();
+            }
+        });
 }

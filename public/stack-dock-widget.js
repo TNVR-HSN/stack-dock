@@ -40,20 +40,25 @@
   document.head.append(style);
 
   const numeric = (v, lo, hi, fallback) => Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : fallback;
-  Object.assign(dockDefaults, {motionSpeed:100, hoverOpacity:14});
+  Object.assign(dockDefaults, {motionSpeed:100});
   const launchDefaults={launchEnabled:true,launchWidth:300,launchHeight:64,launchHold:1250,
     launchTravel:300,launchReturn:210,launchIcon:42,launchFont:19,launchRadius:32,
-    launchOpacity:94,launchColor:'#111a2c',launchText:'#ffffff',launchLabel:true,launchGap:12,launchPad:16};
+    launchOpacity:65,launchFollowDock:false,launchColor:'#111a2c',launchText:'#ffffff',launchLabel:true,launchGap:12,launchPad:16};
   Object.assign(dockDefaults,launchDefaults);
   const launchView=$('launchView'),launchGlass=$('launchGlass');
   function launchStyle(s){return {...launchDefaults,...s};}
-  function launchContent(node,item,s,size) {
+  function launchSurface(s,dock=state.dock) {
+    return s.launchFollowDock
+      ? {color:dock.color??dockDefaults.color,opacity:dock.opacity??dockDefaults.opacity,border:false}
+      : {color:s.launchColor,opacity:s.launchOpacity,border:false};
+  }
+  function launchContent(node,item,s,size,surface=launchSurface(s)) {
     node.style.setProperty('--launch-gap',s.launchGap+'px');
     node.style.setProperty('--launch-pad',s.launchPad+'px');
     node.style.setProperty('--launch-text',s.launchText);
     node.style.setProperty('--launch-font',s.launchFont+'px');
-    node.style.setProperty('--launch-fill','rgba('+hexRgb(s.launchColor)+','+s.launchOpacity/100+')');
-    const icon=shortcutArt(item,size,item.radius||'50%');
+    node.style.setProperty('--launch-fill','rgba('+hexRgb(surface.color)+','+surface.opacity/100+')');
+    const icon=shortcutArt(item,size,item.radius||'50%',{iconRotation:item.surfaceRotation});
     const copy=E('div','launch-copy'),title=E('div','launch-title',item.name);
     title.title=item.name;
     copy.append(title);
@@ -61,7 +66,7 @@
     node.replaceChildren(icon,copy);
     return {icon,copy};
   }
-  function launchControls(body,s) {
+  function launchControls(body,s,readDock) {
     const panel=settingsCard(body,'Launch indicator preview','launch');
     panel.parentElement.classList.add('sd-preview-card');
     const enabled=check(panel,'Show launch indicator',s.launchEnabled);
@@ -70,7 +75,7 @@
     const timing=settingsCard(body,'Motion and timing','launch');
     const frame=settingsCard(body,'Panel dimensions','launch');
     const style=settingsCard(body,'Typography and color','launch');
-    const number=(card,key,label,min,max,unit)=>field(card,label,'range',s[key],{min,max,datasetUnit:unit});
+    const number=(card,key,label,min,max,unit)=>field(card,label,'range',s[key],{min,max,datasetUnit:unit,defaultValue:launchDefaults[key]});
     const inputs={
       launchWidth:number(frame,'launchWidth','Maximum width',140,680,' px'),
       launchHeight:number(frame,'launchHeight','Height',42,120,' px'),
@@ -85,38 +90,43 @@
       launchGap:number(style,'launchGap','Icon and text spacing',0,28,' px'),
     };
     const background=field(style,'Panel color','color',s.launchColor);
+    const follow=check(style,'Follow dock background',s.launchFollowDock);
+    follow.parentElement.classList.add('card-toggle');
     const text=field(style,'Text color','color',s.launchText);
     const read=()=>({launchEnabled:enabled.checked,launchLabel:label.checked,
-      launchColor:background.value,launchText:text.value,
+      launchColor:background.value,launchText:text.value,launchFollowDock:follow.checked,
       ...Object.fromEntries(Object.entries(inputs).map(([k,v])=>[k,+v.value]))});
     const draw=()=>{
       const c=read();
+      background.disabled=inputs.launchOpacity.disabled=c.launchFollowDock;
       preview.hidden=!c.launchEnabled;
       preview.style.width=c.launchWidth+'px';
       preview.style.height=c.launchHeight+'px';
       preview.style.borderRadius=c.launchRadius+'px';
-      launchContent(preview,{kind:'program',name:'Example shortcut'},c,Math.min(c.launchIcon,c.launchHeight-10));
+      launchContent(preview,{kind:'program',name:'Example shortcut'},c,Math.min(c.launchIcon,c.launchHeight-10),launchSurface(c,readDock()));
     };
     for(const controls of [panel,timing,frame,style]){controls.addEventListener('input',draw);controls.addEventListener('change',draw);}
     draw();
+    read.refresh=draw;
     return read;
   }
-  generalLaunchControls=(body,s)=>launchControls(body,launchStyle(s));
-  Object.assign(gsDefaults, {labelFont:11, labelWidth:76, hoverOpacity:14});
+  generalLaunchControls=(body,s,readDock)=>launchControls(body,launchStyle(s),readDock);
+  Object.assign(gsDefaults, {labelFont:11, labelWidth:76});
   // New appearance keys are preserved by the matching layout backup script.
   const baseAppearance = appearance;
   appearance = function (body, s, isGrid) {
     const read = baseAppearance(body, s, isGrid);
     const shapePanel=settingsCard(body,'Icon shape','layout');
     const panel=settingsCard(body,'Hover highlight','hover');
+    const defaults=isGrid?gsDefaults:dockDefaults;
     const slider = (parent,key,name,min,max,unit,fallback) =>
-      field(parent,name,'range',numeric(s[key],min,max,fallback),{min,max,datasetUnit:unit});
+      field(parent,name,'range',numeric(s[key],min,max,fallback),{min,max,datasetUnit:unit,defaultValue:defaults[key]??fallback});
     const highlightEnabled=check(panel,'Enable hover highlight',s.highlightEnabled!==false);
     highlightEnabled.parentElement.classList.add('card-toggle');
-    const hover=slider(panel,'hoverOpacity','Highlight opacity',0,100,'%',14);
-    const area=slider(panel,'highlightArea','Highlight reach',0,32,' px',0);
-    const fill=slider(panel,'highlightFill','Inside fill',0,100,'%',0);
-    const fillStyle=select(panel,'Fill style',[[0,'Hard ring'],[1,'Soft airbrush']],s.highlightSoft?'1':'0');
+    const hover=slider(panel,'hoverOpacity','Highlight opacity',0,100,'%',40);
+    const area=slider(panel,'highlightArea','Highlight area',0,32,' px',0);
+    const fill=slider(panel,'highlightFill','Inside fill',0,100,'%',30);
+    const fillStyle=select(panel,'Fill style',[[0,'Hard ring'],[1,'Soft Ring']],s.highlightSoft!==false?'1':'0');
     const hit=settingsCard(body,'Pointer detection','hover');
     const hitExpand=check(hit,'Extend hover and click area',s.hitExpand);
     hitExpand.parentElement.classList.add('card-toggle');
@@ -176,21 +186,17 @@
       hoverMode:+mode.value,hoverScale:+scale.value,hoverLift:+lift.value,hoverAngle:+angle.value,
       hoverDuration:+duration.value,hoverCurve:+curve.value});
     const initial = isGrid?gridRoundness(s):dockRoundness(s);
-    const shape = (parent,name,value) => {
-      const input=field(parent,name,'range',value,{min:0,max:50,datasetUnit:'%'});
-      const output=input.parentElement.querySelector('output');
-      input.oninput=()=>output.textContent=input.value*2+'%';
-      input.oninput();
-      return input;
-    };
+    const shape = (parent,name,value) => field(parent,name,'range',value,
+      {min:0,max:50,datasetUnit:'%',defaultValue:isGrid?gridRoundness(gsDefaults):dockRoundness(dockDefaults),displayScale:2});
     const corner=shape(shapePanel,'Icon roundness',initial);
+    const rotation=rotationSlider(shapePanel,'Icon rotation',s.iconRotation);
     const highlight=shape(panel,'Highlight roundness',iconCornerValue(s.highlightCorner,initial));
     const syncHighlight=()=>{hover.disabled=area.disabled=highlight.disabled=fill.disabled=fillStyle.disabled=!highlightEnabled.checked;};
     highlightEnabled.addEventListener('change',syncHighlight);syncHighlight();
     let separate=Number.isFinite(s.highlightCorner);
     highlight.addEventListener('input',()=>{separate=true;});
     corner.addEventListener('input',()=>{if(!separate){highlight.value=corner.value;highlight.oninput();}});
-    const corners=()=>({iconCorner:+corner.value,highlightCorner:separate?+highlight.value:undefined,roundIcons:undefined});
+    const corners=()=>({iconCorner:+corner.value,iconRotation:+rotation.value,highlightCorner:separate?+highlight.value:undefined,roundIcons:undefined});
     if (isGrid) {
       const labels=settingsCard(body,'Label dimensions','layout');
       const font=slider(labels,'labelFont','Label size',9,18,' px',11);
@@ -252,7 +258,7 @@
     const onDock=phase==='closed'&&dockView.contains(button);
     if(!onDock&&!(phase==='open'&&gsView.contains(button)))return;
     if(dialog.open||!menu.hidden||surfaceWanted||drag||nativeBusy||hovered===button)return;
-    const entry=onDock?state.folders.find(f=>f.id===button.dataset.folder):active()?.slots.find(t=>t.id===button.dataset.tile);
+    const entry=onDock?dockEntryAt(button):active()?.slots.find(t=>t.id===button.dataset.tile);
     const s=onDock?state.dock:active()?.style, source=button.querySelector(':scope > .art');
     if(!entry||!s||!source)return;
     const r=source.getBoundingClientRect();
@@ -269,7 +275,7 @@
     const cy=clamp(r.top+r.height/2+m.y,top+extent/2,bottom-extent/2);
     const xShift=cx-r.left-r.width/2;
     m.y=cy-r.top-r.height/2;
-    const area=s.highlightArea??0,alpha=s.highlightEnabled===false?0:(s.hoverOpacity??14)/100;
+    const area=s.highlightArea??0,alpha=s.highlightEnabled===false?0:(s.hoverOpacity??40)/100;
     const ring=E('div','sd-hover-ring');
     const x1=clamp(r.left-area,left,right), y1=clamp(r.top-area,top,bottom);
     const x2=clamp(r.right+area,left,right), y2=clamp(r.bottom+area,top,bottom);
@@ -296,11 +302,11 @@
       }
       const pc=parseFloat(source.style.getPropertyValue('--highlight-round'))||0;
       const shape={x:1,y:1,width:Math.max(0,w-2),height:Math.max(0,h-2),rx:Math.min(w,h)*pc/100};
-      const fill=clamp((s.highlightFill??0)/100,0,1);
+      const fill=clamp((s.highlightFill??30)/100,0,1);
       const defs=svgNode('defs');defs.append(mask);
       attrs(paint,{mask:'url(#'+holes+')',opacity:alpha});
       const outline=svgNode('rect');
-      if(s.highlightSoft){
+      if(s.highlightSoft!==false){
         const clip=svgNode('clipPath'),clipShape=svgNode('rect');
         attrs(clip,{id:'sd-hover-airbrush-clip'});attrs(clipShape,shape);
         clip.append(clipShape);defs.append(clip);
@@ -334,7 +340,7 @@
     trail.hidden=true;label.append(title,trail);
     styleHoverLabel(label,s);
     const labelsEnabled=s.hoverLabels!==false&&(!onDock||entry.folderHoverLabels!==false);
-    const showDetails=labelsEnabled&&!onDock&&general.hoverTargets&&!!entry.target;
+    const showDetails=labelsEnabled&&general.hoverTargets&&!!entry.target;
     title.hidden=!showHoverName(s,general,labelsEnabled);
     if(!title.hidden||showDetails)hoverLayer.append(label);
     hoverLayer.hidden=false;
@@ -344,7 +350,7 @@
         label.style.maxWidth=Math.min(540,d.w-12)+'px';
         const bounds=label.getBoundingClientRect();
         const x=clamp(r.left+(r.width-bounds.width)/2,left+6,Math.max(left+6,right-bounds.width-6));
-        const caption=button.querySelector(':scope > .caption');
+        const caption=button.querySelector(':scope > .caption,:scope > .folder-label');
         const below=Math.max(r.bottom,caption?.getBoundingClientRect().bottom??r.bottom)+5;
         // If there is no room below the icon, keep the entire caption above it.
         const y=Math.max(top+4,below+bounds.height+4<=bottom?below:Math.min(r.top-5-bounds.height,bottom-bounds.height-4));
@@ -460,20 +466,21 @@
     const font = numeric(s.labelFont,9,18,11);
     gsView.style.setProperty('--sd-label-font',font+'px');
     gsView.style.setProperty('--sd-label-space',Math.ceil(font*2.4)+'px');
-    gsView.style.setProperty('--sd-hover',numeric(s.hoverOpacity,0,100,14)/100);
+    gsView.style.setProperty('--sd-hover',numeric(s.hoverOpacity,0,100,40)/100);
     return baseRenderGrid(folder,...args);
   };
   const baseRenderDock = renderDock;
   renderDock = function (...args) {
-    dockView.style.setProperty('--sd-hover',numeric(state.dock.hoverOpacity,0,100,14)/100);
+    dockView.style.setProperty('--sd-hover',numeric(state.dock.hoverOpacity,0,100,40)/100);
     return baseRenderDock(...args);
   };
 
-  showLaunchIndicator = async function(item,start,sourceArt,source) {
+  showLaunchIndicator = async function(item,start,sourceArt,source,fromDock=false) {
     const s=launchStyle(state.dock);
-    if(!s.launchEnabled||phase!=='open'||nativeBusy)return false;
+    if(!s.launchEnabled||phase!==(fromDock?'closed':'open')||nativeBusy)return false;
     closeMenu();clearPointer();
-    const from=readBox(),dock=dockBox(),radius=gridIconRadius(active().style);
+    const from=readBox(),dock=dockBox(),radius=fromDock?dockIconRadius(item):gridIconRadius(active().style);
+    const oldView=fromDock?dockView:gsView,oldGlass=fromDock?dockGlass:gsGlass;
     const target=box(s.launchWidth,s.launchHeight,s.launchRadius);
     const moving=state.dock.motion&&!reduced.matches&&!!island.animate;
     const duration=moving?s.launchTravel:0,returnTime=moving?s.launchReturn:0;
@@ -485,14 +492,15 @@
     let flying,incoming=[],outgoing=[];
     try {
       if(nativeWindow&&!await moveHost(nativeCover(from,target,dock)))return true;
-      styleGlass(launchGlass,{color:s.launchColor,opacity:s.launchOpacity,border:false});
+      styleGlass(launchGlass,launchSurface(s));
       island.style.boxShadow='none';
       launchGlass.hidden=false;launchView.hidden=false;
-      const {icon,copy}=launchContent(launchView,{...item,radius},s,Math.max(12,Math.min(s.launchIcon,target.h-10,target.w-s.launchPad*2-24)));
+      const surfaceRotation=(fromDock?state.dock:active()?.style)?.iconRotation;
+      const {icon,copy}=launchContent(launchView,{...item,radius,surfaceRotation},s,Math.max(12,Math.min(s.launchIcon,target.h-10,target.w-s.launchPad*2-24)));
       applyBox(target);
       if(duration){
         const dest=icon.getBoundingClientRect();
-        incoming=[hull(from,target,duration),fade(gsView,1,0,duration*.65),fade(gsGlass,1,0,duration),
+        incoming=[hull(from,target,duration),fade(oldView,1,0,duration*.65),fade(oldGlass,1,0,duration),
           fade(launchGlass,0,1,duration),fade(copy,0,1,duration)];
         if(start?.width&&dest.width&&sourceArt){
           icon.style.visibility='hidden';
@@ -507,7 +515,7 @@
         }
         await play(incoming);
       }
-      gsView.style.opacity=gsGlass.style.opacity='0';
+      oldView.style.opacity=oldGlass.style.opacity='0';
       icon.style.visibility='';flying?.remove();release(incoming);incoming=[];
       setPhase('launched');
       if(nativeWindow)await moveHost(nativeCover(target));
@@ -668,7 +676,7 @@
 
   const sameArea = (a,b) => a && b &&
     ['px','py','w','h','scale'].every(k => a[k] === b[k]);
-  const busy = () => nativeBusy || surfaceWanted || phase !== 'closed' || dialog.open || !menu.hidden;
+  const busy = () => nativeBusy || surfaceWanted || !!drag || externalDropActive || phase !== 'closed' || dialog.open || !menu.hidden;
 
   function usable(monitor, taskbars) {
     const wa=monitor.workArea,p=monitor.position || wa.position,z=monitor.size || wa.size;
@@ -746,6 +754,7 @@
     if(!fixedHost) console.warn('Stack Dock: using the existing non-fixed window fallback.');
     try {await updateArea(true);} catch(error) {console.warn('Could not adjust for the taskbar:',error);}
     await invoke('start_desktop_widget',{});
+    scheduleDropZone();
     setInterval(()=>void updateArea().catch(error=>console.warn('Dock work area:',error)),1000);
   }
   void bootWidget().catch(error=>console.error('Stack Dock desktop widget:',error));

@@ -23,6 +23,8 @@
 .icon-effects .reflect{position:absolute;inset:0 0 auto;height:var(--reflection-h);overflow:hidden;mask-image:linear-gradient(#000,transparent);opacity:var(--reflection-alpha)}
 .icon-effects .reflect .art{transform:scaleY(-1);transform-origin:50% 50%}
 .icon-effects .ground-shadow{position:absolute;top:var(--shadow-y,0px);left:5%;width:90%;height:var(--shadow-h,8px);background:radial-gradient(ellipse at center,#000 0%,#0008 42%,transparent 73%);opacity:var(--shadow-alpha)}
+.sd-dock-insert{position:fixed;z-index:49;pointer-events:none;border-radius:4px;background:#efbbff;box-shadow:0 0 8px #db8ff4aa}
+#dockView .dragging{opacity:.34}
 .drag-ghost{position:fixed;z-index:50;pointer-events:none;transform:translate(-50%,-50%);opacity:.83}
 .menu{position:fixed;z-index:15;min-width:218px;max-width:calc(100vw - 14px);max-height:calc(100dvh - 14px);overflow:auto;padding:5px;border:1px solid #e5b4ef40;border-radius:11px;background:#211726f7;box-shadow:0 16px 48px #08030ccf}.menu-title{padding:6px 9px;color:#d4acde;font-size:11px;font-weight:650;letter-spacing:.02em;overflow-wrap:anywhere}.menu button{width:100%;border:0;background:none;border-radius:7px;text-align:left;min-height:34px;padding:6px 9px;display:flex;justify-content:space-between;align-items:center;gap:8px}.menu button:not(:disabled):hover,.menu button:focus-visible{background:#ebaeff22}.menu small{font-size:10px;color:#c5abc9}.menu hr{border:0;border-top:1px solid var(--line);margin:4px}.menu .danger{color:#ffb4c8}.menu.position{min-width:min(278px,calc(100vw - 14px))}.posrow{display:grid;grid-template-columns:45px repeat(3,1fr);align-items:center;gap:4px;margin:4px}.posrow span{font-size:11px;color:#d8c6dd}.posrow button{justify-content:center;padding:4px;font-size:11px;border:1px solid #ffffff16}.posrow button[aria-pressed=true]{background:#ebaeff38;border-color:#edb7fc6f}
 dialog{width:min(524px,calc(100% - 20px));max-height:calc(100dvh - 20px);padding:0;border-radius:17px;border:1px solid #d9a5e350;background:var(--panel);box-shadow:0 20px 80px #07020bd5;color:#f2eaf6}dialog.settings-dialog{width:min(664px,calc(100% - 20px));overflow:hidden}
@@ -80,6 +82,15 @@ dialog.settings-dialog{width:min(950px,calc(100% - 24px))}
 .settings-monitor{padding:15px 12px;border-left:1px solid var(--line);overflow:auto;text-align:center}
 .settings-monitor .settings-preview{position:relative;min-height:160px;max-height:380px;padding-inline:9px}
 .settings-monitor .note{margin:8px 0 0}
+.sd-slider-default{font-size:10px;color:var(--soft);opacity:.82;justify-self:end}
+.settings-dialog.sd-hide-slider-defaults .sd-slider-default{display:none}
+.sd-folder-arrow{--arrow-size:clamp(7px,calc(var(--size) * .27),13px);position:absolute;left:var(--folder-arrow-x);top:var(--folder-arrow-y);width:var(--arrow-size);height:var(--arrow-size);transform:translate(-50%,-50%);pointer-events:none;z-index:2;color:#fff;filter:drop-shadow(0 1px 1px #000d)}
+.sd-arrow-actions{grid-column:1/-1;justify-self:start}
+.art>img,.art>svg{rotate:var(--icon-angle,0deg)}
+.sd-folder-arrow>svg{rotate:var(--folder-arrow-angle,0deg)}
+.folder-flight .art:has(.sd-folder-arrow){overflow:visible}
+.folder-flight .art>img,.folder-flight .art>svg{border-radius:inherit}
+
 .sd-folder-colors{margin-top:12px;padding:8px 5px 2px}
 .sd-folder-colors .note{margin:7px 0 0}
 .sd-color-swatches{display:flex;justify-content:center;gap:7px;margin-top:7px}
@@ -202,10 +213,10 @@ const $=id=>document.getElementById(id), E=(tag,cls='',text='')=>{const x=docume
 const B=(label,cls='',fn)=>{const b=E('button',cls,label);b.type='button';if(fn)b.onclick=fn;return b};
 const cap=s=>s[0].toUpperCase()+s.slice(1), clamp=(x,a,b)=>Math.max(a,Math.min(x,b));
 const uid=()=>Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
-const generalDefaults={hoverNames:true,hoverTargets:true,hoverDelay:1500,collapseOnFocusLoss:true,imageThumbnails:false};
+const generalDefaults={hoverNames:true,hoverTargets:true,hoverDelay:1500,collapseOnFocusLoss:true,imageThumbnails:false,sliderDefaults:true};
 const showHoverName=(style,prefs,enabled)=>enabled&&!style.labels&&prefs?.hoverNames!==false;
-const iconEffectDefaults={highlightEnabled:true,highlightFill:0,highlightSoft:false,hitExpand:false,hitPadding:8,hoverLabels:true,hoverLabelBackground:true,hoverLabelSize:12,customHoverDelay:false,hoverDetailsDelay:1500,hoverMode:0,hoverScale:125,hoverLift:10,hoverAngle:10,hoverDuration:160,hoverCurve:1,groundShadowOffset:0,gapSplit:false,padSplit:false,highlightArea:0,reflectionIntensity:55,reflectionArea:10,groundShadow:false,groundShadowIntensity:65};
-const dockDefaults={...iconEffectDefaults,gapX:6,gapY:6,padX:8,padY:8,reflections:false,opacity:76,border:true,shadow:true,radius:26,icon:40,gap:6,pad:8,labels:false,color:'#101019',motion:true,borderColor:'#ffffff',borderOpacity:23,borderWidth:1,roundIcons:true};
+const iconEffectDefaults={highlightEnabled:true,iconRotation:0,hoverOpacity:40,highlightFill:30,highlightSoft:true,hitExpand:false,hitPadding:8,hoverLabels:true,hoverLabelBackground:true,hoverLabelSize:12,customHoverDelay:false,hoverDetailsDelay:1500,hoverMode:0,hoverScale:125,hoverLift:10,hoverAngle:10,hoverDuration:160,hoverCurve:1,groundShadowOffset:0,gapSplit:false,padSplit:false,highlightArea:0,reflectionIntensity:55,reflectionArea:10,groundShadow:false,groundShadowIntensity:65};
+const dockDefaults={...iconEffectDefaults,folderArrow:false,folderArrowX:84,folderArrowY:16,folderArrowRotation:0,gapX:6,gapY:6,padX:8,padY:8,reflections:false,opacity:76,border:true,shadow:true,radius:26,icon:40,gap:6,pad:8,labels:false,color:'#101019',motion:true,borderColor:'#ffffff',borderOpacity:23,borderWidth:1,roundIcons:true};
 const gsDefaults={...iconEffectDefaults,gapX:7,gapY:7,padX:15,padY:15,opacity:84,border:true,shadow:true,radius:22,icon:52,gap:7,pad:15,labels:true,reflections:true,color:'#0e0e16',borderColor:'#ffffff',borderOpacity:23,borderWidth:1,titleIcon:25,roundIcons:true,settingsGear:false};
 const storageKey='dynamic-island-stack-dock-custom-v1';
 const headingHeight=42,headingIconSize=25;
@@ -213,7 +224,7 @@ const triggerSize=(f,d=state.dock)=>f.triggerSize||d.icon;
 const headingSize=s=>s.titleIcon||headingIconSize;
 const headingSpace=s=>Math.max(headingHeight,headingSize(s)+15);
 function fresh(){
- return {edge:'bottom',align:'center',general:{...generalDefaults},dock:{...dockDefaults},folders:[{
+ return {edge:'bottom',align:'center',general:{...generalDefaults},dock:{...dockDefaults},dockShortcuts:[],dockOrder:[],folders:[{
   id:uid(),name:'Shortcuts',icon:'folder-emerald',image:'',cols:5,rows:3,slots:[],style:{...gsDefaults}
  }]};
 }
@@ -222,6 +233,8 @@ try {
  const saved=JSON.parse(localStorage.getItem(storageKey));
  if(saved?.folders?.length&&saved.dock&&['top','bottom','left','right'].includes(saved.edge)){
   state=saved;
+  if(!Array.isArray(state.dockShortcuts))state.dockShortcuts=[];
+  if(!Array.isArray(state.dockOrder))state.dockOrder=[];
   // Drop the old background effect from saved layouts without resetting them.
   let migrated=false;
   for(const appearance of [state.dock,...state.folders.map(folder=>folder?.style)]){
@@ -257,7 +270,7 @@ const nativeCore=window.__TAURI__?.core;
 let nativeWindow=null,nativeArea=null,nativeHost={x:0,y:0},nativeQueue=Promise.resolve(),nativeBusy=false;
 let fixedHost=false,nativeRegion=null;
 let surfaceWanted=false,surfaceRequest=0;
-let focusLossPending=false,focusLossTimer=0;
+let focusLossPending=false,focusLossTimer=0,focusLossTicket=0,externalDropActive=false;
 const nativeMargin=5;
 function nativeFailure(error){
  console.error('Stack Dock window:',error);
@@ -343,15 +356,28 @@ function settleViewport(target){
 function queueFocusLoss(){
  if(launch.pending)return;
  focusLossPending=true;clearTimeout(focusLossTimer);
- focusLossTimer=setTimeout(async()=>{
-  if(!focusLossPending||nativeBusy||surfaceWanted||dialog.open||phase==='opening'||launch.pending)return;
+ const ticket=++focusLossTicket;
+ let lifted=false;
+ const blocked=()=>ticket!==focusLossTicket||!focusLossPending||nativeBusy||surfaceWanted||dialog.open||phase==='opening'||launch.pending;
+ const check=async()=>{
+  if(blocked())return;
   const focused=await nativeWindow?.isFocused?.().catch(()=>undefined);
-  if(!focusLossPending||nativeBusy||surfaceWanted||dialog.open||phase==='opening'||launch.pending)return;
+  if(blocked())return;
+  if(focused===true){focusLossPending=false;return;}
+  if(phase==='open'&&state.general?.collapseOnFocusLoss!==false&&nativeCore?.invoke){
+   // Explorer receives focus before the file reaches our WebView. Keep the
+   // grid alive while the mouse button is held or a native drop is processing.
+   if(externalDropActive){focusLossTimer=setTimeout(check,100);return;}
+   const held=await nativeCore.invoke('dock_drag_button_held',{raise:!lifted}).catch(()=>false);
+   if(held)lifted=true;
+   if(blocked())return;
+   if(held||externalDropActive){focusLossTimer=setTimeout(check,100);return;}
+  }
   focusLossPending=false;
-  if(focused===true)return;
   if(!menu.hidden)closeMenu();
   if(phase==='open'&&state.general?.collapseOnFocusLoss!==false)closeStack(false);
- },65);
+ };
+ focusLossTimer=setTimeout(check,85);
 }
 function fitNative(grid){
  if(!nativeWindow||nativeBusy||surfaceWanted||!menu.hidden||dialog.open||!['closed','open'].includes(phase))return;
@@ -368,22 +394,66 @@ function expandForControls(callback){
  });
 }
 let clearHover=()=>{}, expandedIconAt=()=>null;
+let scheduleDropZone=()=>{};
 let phase='closed', activeId=null, lastId=null, serial=0, tracks=[], currentMetrics=null, menuFocus=null, savedFocus=null, toastTimer=0;
-let drag=null, dropCell=null, suppressClick=0, press=null, ignoreNativeMenuUntil=0, flight=null;
+let drag=null, dropCell=null, dockInsert=null, suppressClick=0, press=null, ignoreNativeMenuUntil=0, flight=null;
 const active=()=>state.folders.find(f=>f.id===activeId);
+const MAX_DOCK_SHORTCUTS=160;
+const isDockShortcut=entry=>entry?.type==='item';
+function dockEntries(layout=state){
+ const remaining=new Map([...layout.folders,...(layout.dockShortcuts||[])].map(entry=>[entry.id,entry]));
+ const order=[];
+ for(const id of layout.dockOrder||[]){
+  if(remaining.has(id)){order.push(remaining.get(id));remaining.delete(id);}
+ }
+ return [...order,...remaining.values()];
+}
+function saveDockOrder(entries){
+ state.dockOrder=entries.map(item=>item.id);
+ state.folders=entries.filter(item=>!isDockShortcut(item));
+ state.dockShortcuts=entries.filter(isDockShortcut);
+}
+function insertDockShortcuts(entries,slot=dockEntries().length){
+ const items=dockEntries(), added=entries.slice(0,Math.max(0,MAX_DOCK_SHORTCUTS-(state.dockShortcuts?.length||0)));
+ if(added.length){items.splice(clamp(slot,0,items.length),0,...added);saveDockOrder(items);}
+ return added.length;
+}
+function reorderDock(entry,slot){
+ const items=dockEntries(),from=items.indexOf(entry);
+ if(from<0)return false;
+ const to=clamp(slot-(from<slot?1:0),0,items.length-1);
+ if(from===to)return false;
+ items.splice(to,0,items.splice(from,1)[0]);saveDockOrder(items);persist();refresh();return true;
+}
+const dockEntryAt=node=>dockEntries().find(item=>item.id===node?.closest?.('.folder-btn')?.dataset.dockEntry);
+function removeDockEntry(entry){
+ saveDockOrder(dockEntries().filter(item=>item!==entry));persist();refresh();
+}
+function addShortcut(destination,entry){
+ return destination.dock?insertDockShortcuts([entry]):placeEntries(destination.folder,destination.where,[entry]);
+}
+function shortcutEditorDesc(f,where){
+ return f?'Row '+(where.r+1)+', column '+(where.c+1):'Direct shortcut on the dock';
+}
 function persist(){try{localStorage.setItem(storageKey,JSON.stringify(state));return true}catch{notify('Saved for this session only. Browser storage is unavailable or full.');return false}}
 function notify(message){const t=$('toast');t.textContent=message;t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.hidden=true,3100)}
-function art(key,source,size,image='',round=false){
+const iconAngle=value=>Number.isFinite(value)?clamp(value,0,360):0;
+const iconRotationOf=(entry,appearance)=>iconAngle(entry?.iconRotation??appearance?.iconRotation);
+function rotationSlider(parent,label,value){
+ return field(parent,label,'range',iconAngle(value),{min:0,max:360,datasetUnit:'°',defaultValue:0});
+}
+function art(key,source,size,image='',round=false,angle=0){
  const n=E('span','art');n.style.setProperty('--size',size+'px');if(round)n.style.setProperty('--ir',round===true?'50%':round);n.setAttribute('aria-hidden','true');
+ n.style.setProperty('--icon-angle',iconAngle(angle)+'deg');
  if(/^data:image\/(png|jpeg|gif|webp);base64,/i.test(image)){const img=E('img');img.src=image;img.alt='';img.draggable=false;n.append(img)}
  else{const {svg}=Object.hasOwn(source,key)?source[key]:Object.values(source)[0];n.innerHTML=typeof svg==='function'?svg():svg}
  return n;
 }
 // The desktop bridge resolves old local paths and optional thumbnails as icons come into view.
 let resolveShortcutVisual=null;
-function shortcutArt(t,size,radius){
+function shortcutArt(t,size,radius,appearance){
  const image=customShortcutImage(t);
- const node=art(shortcutIconKey(t),APP_ICONS,size,image,radius);
+ const node=art(shortcutIconKey(t),APP_ICONS,size,image,radius,iconRotationOf(t,appearance));
  if(!image&&resolveShortcutVisual)resolveShortcutVisual(node,t,size,radius);
  return node;
 }
@@ -396,15 +466,33 @@ function dockIconRadius(f,s=state.dock,override=f.dockIconCorner){
  return roundnessCSS(iconCornerValue(override,fallback));
 }
 function gridIconRadius(s){return roundnessCSS(gridRoundness(s))}
+function folderArrowStyle(folder,dock){
+ const arrow=folder?.arrowOverride;
+ return {folderArrow:arrow?.enabled??dock.folderArrow??dockDefaults.folderArrow,
+  folderArrowX:arrow?.x??dock.folderArrowX??dockDefaults.folderArrowX,
+  folderArrowY:arrow?.y??dock.folderArrowY??dockDefaults.folderArrowY,
+  folderArrowRotation:iconAngle(arrow?.rotation??dock.folderArrowRotation)};
+}
+function addFolderArrow(node,folder,dock){
+ const {folderArrow,folderArrowX,folderArrowY,folderArrowRotation}=folderArrowStyle(folder,dock);
+ if(!folderArrow)return node;
+ const mark=E('span','sd-folder-arrow');
+ mark.setAttribute('aria-hidden','true');
+ mark.style.setProperty('--folder-arrow-x',clamp(folderArrowX,0,100)+'%');
+ mark.style.setProperty('--folder-arrow-y',clamp(folderArrowY,0,100)+'%');
+ mark.style.setProperty('--folder-arrow-angle',folderArrowRotation+'deg');
+ mark.innerHTML='<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="m3 10 5-5 5 5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+ node.append(mark);return node;
+}
 function highlightArt(node,s,iconRadius,scale=1){
  const value=iconCornerValue(s.highlightCorner,Number.parseFloat(iconRadius)||0);
  node.style.setProperty('--highlight-round',roundnessCSS(value));
  node.style.setProperty('--sd-highlight-enabled',s.highlightEnabled===false?0:1);
  node.style.setProperty('--highlight-area',Math.round((s.highlightArea??0)*scale)+'px');
- const fill=clamp((s.highlightFill??0)/100,0,1);
+ const fill=clamp((s.highlightFill??30)/100,0,1),soft=s.highlightSoft!==false;
  const softWidth=(parseFloat(node.style.getPropertyValue('--size'))||30)*(.12+fill*.9);
- node.style.setProperty('--sd-highlight-fill',s.highlightSoft?'transparent':'rgb(255 255 255 / '+fill+')');
- node.style.setProperty('--sd-highlight-inset',s.highlightSoft?'inset 0 0 '+softWidth+'px '+(softWidth*.14)+'px rgb(255 255 255 / '+(.32+fill*.66)+')':'inset 0 0 0 2px #fff');
+ node.style.setProperty('--sd-highlight-fill',soft?'transparent':'rgb(255 255 255 / '+fill+')');
+ node.style.setProperty('--sd-highlight-inset',soft?'inset 0 0 '+softWidth+'px '+(softWidth*.14)+'px rgb(255 255 255 / '+(.32+fill*.66)+')':'inset 0 0 0 2px #fff');
  return node;
 }
 function dims(){
@@ -441,7 +529,7 @@ function iconEffects(btn,key,source,size,image,radius,s,scale=1,entry){
  if(hasShadow)fx.append(E('div','ground-shadow'));
  if(reflectionHeight(s,size,scale)){
   const reflection=E('div','reflect');
-  reflection.append(entry?shortcutArt(entry,size,radius):art(key,source,size,image,radius));fx.append(reflection);
+  reflection.append(entry?shortcutArt(entry,size,radius,s):art(key,source,size,image,radius,s.iconRotation));fx.append(reflection);
  }
  btn.append(fx);
 }
@@ -457,7 +545,7 @@ function box(w,h,r){
  return {x,y,w,h,r:Math.min(r,w/2,h/2)};
 }
 function dockBox(){
- const s=state.dock,sizes=state.folders.map(f=>triggerSize(f)),n=sizes.length,p=spacingValues(s);
+ const s=state.dock,sizes=dockEntries().map(f=>triggerSize(f)),n=sizes.length,p=spacingValues(s);
  const heights=sizes.map(size=>size+effectsHeight(s,size)+(s.labels?17:0));
  const sum=arr=>arr.reduce((a,b)=>a+b,0);
  return box((vertical()?Math.max(...sizes):sum(sizes)+(n-1)*p.gapX)+2*p.padX,
@@ -492,15 +580,31 @@ function stopMotion(){++serial;tracks.forEach(x=>x.cancel());tracks=[];clearFlig
 function dockIcon(id){
  return [...dockView.querySelectorAll('.folder-btn')].find(b=>b.dataset.folder===id)?.querySelector('.art');
 }
-function startFlight(f,from,destination,source,duration,easing){
+function startFlight(f,from,destination,source,duration,easing,opening,interrupted){
  const to=destination?.getBoundingClientRect();
  if(!f||!from?.width||!to?.width)return null;
  const node=E('div','folder-flight');
  node.setAttribute('aria-hidden','true');node.style.left=from.left+'px';node.style.top=from.top+'px';
  const startRadius=source?.style.getPropertyValue('--ir')||'50%';
  const endRadius=destination.style.getPropertyValue('--ir')||'50%';
- const traveling=art(f.icon,FOLDER_ICONS,from.width,f.image,startRadius);
+ const fromAngle=((interrupted?.angle??(parseFloat(source?.style.getPropertyValue('--icon-angle'))||0))%360+360)%360;
+ const toAngle=parseFloat(destination.style.getPropertyValue('--icon-angle'))||0;
+ const angleDelta=((toAngle-fromAngle+540)%360)-180;
+ const traveling=art(f.icon,FOLDER_ICONS,from.width,f.image,startRadius,fromAngle);
+ const dockSide=opening?source:destination;
+ const arrow=dockSide?.querySelector('.sd-folder-arrow')?.cloneNode(true);
+ if(arrow)traveling.append(arrow);
  node.append(traveling);desktop.append(node);
+ const artwork=traveling.querySelector(':scope > img,:scope > svg');
+ if(artwork?.animate&&angleDelta)artwork.animate(
+  [{rotate:fromAngle+'deg'},{rotate:(fromAngle+angleDelta)+'deg'}],{duration,easing,fill:'both'});
+ if(arrow){
+  const alpha=interrupted?.arrow??(opening?1:0);
+  arrow.animate(opening
+   ? [{opacity:alpha,offset:0},{opacity:alpha,offset:.18},{opacity:0,offset:1}]
+   : [{opacity:alpha,offset:0},{opacity:1,offset:.82},{opacity:1,offset:1}],
+   {duration,easing:'ease-in-out',fill:'both'});
+ }
  // Shape follows the source and destination, including raw icons.
  if(startRadius!==endRadius&&traveling.animate)traveling.animate(
   [{borderRadius:startRadius},{borderRadius:endRadius}],{duration,easing,fill:'forwards'});
@@ -522,19 +626,32 @@ function setPhase(next){
  const closed=next==='closed',open=next==='open';
  dockView.inert=!closed;dockView.setAttribute('aria-hidden',String(!closed));
  gsView.inert=!open;gsView.setAttribute('aria-hidden',String(!open));
+ scheduleDropZone();
 }
 function renderDock(){
  const previous=dockView.querySelector('.folders');
  const sx=previous?.scrollLeft||0,sy=previous?.scrollTop||0;
  const s=state.dock, fs=E('div','folders'+(vertical()?' vertical':''));
  for(const [key,val] of Object.entries(spacingValues(s)))fs.style.setProperty('--'+key.replace(/[XY]$/,axis=>'-'+axis.toLowerCase()),val+'px');
- for(const f of state.folders){
-  const b=B('','folder-btn',ev=>{if(performance.now()<suppressClick)return;openStack(f.id,ev.detail===0)});
+ for(const f of dockEntries()){
+  const shortcut=isDockShortcut(f);
+  const b=B('','folder-btn',ev=>{
+   if(performance.now()<suppressClick)return;
+   if(shortcut)void launch(f);else openStack(f.id,ev.detail===0);
+  });
+  b.dataset.dockEntry=f.id;
   const size=triggerSize(f);
   b.style.setProperty('--bw',size+'px');b.style.setProperty('--bh',(size+effectsHeight(s,size)+(s.labels?17:0))+'px');
   const radius=dockIconRadius(f,s);
-  b.dataset.folder=f.id;b.setAttribute('aria-label',f.name);b.setAttribute('aria-controls','gsView');b.append(highlightArt(art(f.icon,FOLDER_ICONS,size,f.image,radius),s,radius));
-  iconEffects(b,f.icon,FOLDER_ICONS,size,f.image,radius,s);
+  b.setAttribute('aria-label',f.name);
+  if(shortcut){
+   b.append(highlightArt(shortcutArt(f,size,radius,s),s,radius));
+   iconEffects(b,shortcutIconKey(f),APP_ICONS,size,customShortcutImage(f),radius,s,1,f);
+  }else{
+   b.dataset.folder=f.id;b.setAttribute('aria-controls','gsView');
+   b.append(addFolderArrow(highlightArt(art(f.icon,FOLDER_ICONS,size,f.image,radius,iconRotationOf(f,s)),s,radius),f,s));
+   iconEffects(b,f.icon,FOLDER_ICONS,size,f.image,radius,{...s,iconRotation:iconRotationOf(f,s)});
+  }
   if(s.labels)b.append(E('span','folder-label',f.name));fs.append(b)
  }
  dockView.replaceChildren(fs);fs.scrollLeft=sx;fs.scrollTop=sy;
@@ -546,7 +663,7 @@ function renderGrid(f,retain=true){
  gsView.style.setProperty('--pad-x',m.padX+'px');gsView.style.setProperty('--pad-y',m.padY+'px');gsView.style.setProperty('--heading-h',headingSpace(s)+'px');
  const heading=E('header','gs-heading'),badge=E('div','gs-heading-inner'),name=E('h2','',f.name);
  name.title=f.name;badge.style.height=(headingSize(s)+3)+'px';
- badge.append(art(f.icon,FOLDER_ICONS,headingSize(s),f.image,gridIconRadius(s)),name);
+ badge.append(art(f.icon,FOLDER_ICONS,headingSize(s),f.image,gridIconRadius(s),s.iconRotation),name);
  heading.append(badge);
  if(s.settingsGear){
   heading.classList.add('has-settings');
@@ -564,7 +681,7 @@ function renderGrid(f,retain=true){
    const b=B('','tile',ev=>{if(phase==='open'&&performance.now()>=suppressClick)launch(t)});
    b.dataset.tile=t.id;b.setAttribute('aria-label',t.name);
    const radius=gridIconRadius(s);
-   b.append(highlightArt(shortcutArt(t,s.icon,radius),s,radius));
+   b.append(highlightArt(shortcutArt(t,s.icon,radius,s),s,radius));
    iconEffects(b,shortcutIconKey(t),APP_ICONS,s.icon,customShortcutImage(t),radius,s,1,t);
    if(s.labels)b.append(E('span','caption',t.name));cell.append(b);
   }
@@ -583,7 +700,14 @@ function morph(target,opening,finish){
   stopMotion();applyBox(target);views(opening);finish();return;
  }
  const f=active(),source=opening?dockIcon(f?.id):gsView.querySelector('.gs-heading .art');
- const fromIcon=(flight?.node||source)?.getBoundingClientRect();
+ const flyingArt=flight?.node.querySelector('.art');
+ const flyingAngle=flyingArt?.querySelector(':scope > img,:scope > svg');
+ const flyingArrow=flyingArt?.querySelector('.sd-folder-arrow');
+ const interrupted=flight?{
+  angle:flyingAngle?parseFloat(getComputedStyle(flyingAngle).rotate)||0:undefined,
+  arrow:flyingArrow?Number(getComputedStyle(flyingArrow).opacity):0,
+ }:null;
+ const fromIcon=(flyingArt||source)?.getBoundingClientRect();
  const from=readBox(), previousShadow=getComputedStyle(island).boxShadow, gg=Number(getComputedStyle(gsGlass).opacity),dg=Number(getComputedStyle(dockGlass).opacity),
        gv=Number(getComputedStyle(gsView).opacity),dv=Number(getComputedStyle(dockView).opacity);
  const ticket=stopMotion();
@@ -591,7 +715,7 @@ function morph(target,opening,finish){
  const speed=100/clamp(Number.isFinite(state.dock.motionSpeed)?state.dock.motionSpeed:100,25,250);
  const duration=(opening?420:325)*speed, easing=opening?'cubic-bezier(.19,.84,.26,1)':'cubic-bezier(.38,.03,.32,1)';
  const destination=opening?gsView.querySelector('.gs-heading .art'):dockIcon(f?.id);
- const iconMotion=startFlight(f,fromIcon,destination,source,duration,opening?'cubic-bezier(.24,.74,.2,1)':easing);
+ const iconMotion=startFlight(f,fromIcon,destination,source,duration,opening?'cubic-bezier(.24,.74,.2,1)':easing,opening,interrupted);
  const hull=island.animate([{...boxFrame(from),boxShadow:previousShadow},{...boxFrame(target),boxShadow:island.style.boxShadow}],{duration,easing});
  const a=(node,start,end,{duration,delay})=>node.animate([{opacity:start},{opacity:end}],{fill:'backwards',easing:'ease-out',duration:duration*speed,delay:delay*speed});
  // Surface and content crossfade independently. The GS fill never uses dock opacity.
@@ -609,7 +733,7 @@ function finishClose(refocus){
  fitNative();
 }
 function openStack(id,keyboard=false){
- if(phase!=='closed'||nativeBusy||dialog.open)return;
+ if(phase!=='closed'||nativeBusy||dialog.open||launch.pending)return;
  const f=state.folders.find(x=>x.id===id);if(!f)return;
  closeMenu();lastId=activeId=id;gsView.style.opacity='0';gsGlass.style.opacity='0';renderGrid(f,false);
  const goal=gridBox(f,currentMetrics);
@@ -656,7 +780,8 @@ function refresh(){
  fitNative(grid);
 }
 async function launch(t) {
-  if (phase !== 'open' || launch.pending) return;
+  const fromDock=phase==='closed'&&state.dockShortcuts?.includes(t);
+  if ((!fromDock&&phase !== 'open') || launch.pending || nativeBusy) return;
 
   const core = window.__TAURI__?.core;
   const kind = t.kind || guess(t.target);
@@ -668,7 +793,8 @@ async function launch(t) {
     return;
   }
 
-  const source=[...gsView.querySelectorAll('.tile')].find(b=>b.dataset.tile===t.id)?.querySelector('.art');
+  const source=fromDock?[...dockView.querySelectorAll('.folder-btn')].find(b=>b.dataset.dockEntry===t.id)?.querySelector('.art'):
+    [...gsView.querySelectorAll('.tile')].find(b=>b.dataset.tile===t.id)?.querySelector('.art');
   const start=source?.getBoundingClientRect();
   const sourceArt=source?.cloneNode(true);
   launch.pending = true;
@@ -693,7 +819,7 @@ async function launch(t) {
 
     launch.pending=false;
     focusLossPending=false;
-    if(!await showLaunchIndicator(t,start,sourceArt,source))closeStack(false);
+    if(!await showLaunchIndicator(t,start,sourceArt,source,fromDock)&&!fromDock)closeStack(false);
   } catch (error) {
     dialogBuild('Could not open ' + t.name, String(error), 'OK', () => {}, () => {});
   } finally {
@@ -793,17 +919,30 @@ function showPositions(x,y){
   }
  },true)
 }
-function dockMenu(x,y,f){
+function dockMenu(x,y,entry){
  if(phase!=='closed')return;
+ const items=dockEntries(),i=items.indexOf(entry),shortcut=isDockShortcut(entry);
  showMenu(x,y,()=>{
-  mt(f?f.name:'Dock');
-  mi('Settings…',()=>editSettings(f,f?'folder':'dock'));
-  if(f){mi('Move folder earlier',()=>moveFolder(f,-1),{disabled:state.folders.indexOf(f)===0});mi('Move folder later',()=>moveFolder(f,1),{disabled:state.folders.indexOf(f)===state.folders.length-1});sep()}
-  mi('Position',({x,y})=>showPositions(x,y),{hint:'›'});mi('New folder…',()=>editSettings(null,'folder',true));
-  if(f&&state.folders.length>1){sep();mi('Remove folder…',()=>confirm('Remove '+f.name+'?','This removes the folder and its shortcuts from Stack Dock.',()=>{state.folders=state.folders.filter(a=>a!==f);persist();refresh()}),{danger:true})}
+  mt(entry?entry.name:'Dock');
+  if(shortcut){
+   mi('Shortcut properties…',()=>editShortcut(null,null,entry));
+   const link=['url','uri'].includes(entry.kind||guess(entry.target));
+   mi(link?'Open Link':'Open Destination',()=>link?void launch(entry):void openDestination(entry));
+   sep();
+  }
+  mi('Settings…',()=>editSettings(shortcut?null:entry,entry&&!shortcut?'folder':'dock'));
+  if(entry){
+   mi(shortcut?'Move shortcut earlier':'Move folder earlier',()=>reorderDock(entry,i-1),{disabled:i===0});
+   mi(shortcut?'Move shortcut later':'Move folder later',()=>reorderDock(entry,i+2),{disabled:i===items.length-1});
+   sep();
+  }
+  mi('Position',({x,y})=>showPositions(x,y),{hint:'›'});
+  mi('New folder…',()=>editSettings(null,'folder',true));
+  mi('Add shortcut to dock…',()=>editShortcut(null,null),{disabled:(state.dockShortcuts?.length||0)>=MAX_DOCK_SHORTCUTS});
+  if(shortcut){sep();mi('Remove shortcut',()=>removeDockEntry(entry),{danger:true});}
+  else if(entry&&state.folders.length>1){sep();mi('Remove folder…',()=>confirm('Remove '+entry.name+'?','This removes the folder and its shortcuts from Stack Dock.',()=>removeDockEntry(entry)),{danger:true})}
  });
 }
-function moveFolder(f,n){const i=state.folders.indexOf(f);state.folders.splice(i+n,0,state.folders.splice(i,1)[0]);persist();refresh()}
 function gridMenu(x,y,target,explicit=null){
  if(phase!=='open'||!active())return;
  const f=active(),where=explicit||locate(x,y),tile=target?.closest('.tile');
@@ -833,7 +972,7 @@ function context(e){
  if(e.button===2&&!insideIsland(e.clientX,e.clientY))return;
  clearPointer();
  if(phase==='open')gridMenu(e.clientX,e.clientY,e.target);
- else if(phase==='closed'){const id=e.target.closest('.folder-btn')?.dataset.folder;dockMenu(e.clientX,e.clientY,state.folders.find(f=>f.id===id))}
+ else if(phase==='closed')dockMenu(e.clientX,e.clientY,dockEntryAt(e.target));
 }
 document.addEventListener('contextmenu',context);
 document.addEventListener('keydown',e=>{
@@ -841,7 +980,7 @@ document.addEventListener('keydown',e=>{
  if(e.key==='Escape'){if(!menu.hidden){e.preventDefault();closeMenu(true)}else if(['open','opening'].includes(phase)){e.preventDefault();closeStack()}return}
  if((e.key==='ContextMenu'||e.shiftKey&&e.key==='F10')&&island.contains(document.activeElement)){
   e.preventDefault();const node=document.activeElement,r=node.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;
-  if(phase==='open')gridMenu(x,y,node);else if(phase==='closed')dockMenu(x,y,state.folders.find(f=>f.id===node.dataset.folder));
+  if(phase==='open')gridMenu(x,y,node);else if(phase==='closed')dockMenu(x,y,dockEntryAt(node));
  }
  if(!menu.hidden&&menu.contains(document.activeElement)&&['ArrowUp','ArrowDown','Home','End'].includes(e.key)){
   e.preventDefault();const all=[...menu.querySelectorAll('button:not(:disabled)')],i=all.indexOf(document.activeElement);
@@ -858,10 +997,48 @@ function mark(p){
  dropCell?.classList.remove('drop-target');dropCell=null;
  if(p){dropCell=gsView.querySelector('.cell[data-r="'+p.r+'"][data-c="'+p.c+'"]');dropCell?.classList.add('drop-target')}
 }
+function dockDropSlot(x,y){
+ if(!insideIsland(x,y))return null;
+ const list=dockView.querySelector('.folders');
+ if(!list)return null;
+ const position=vertical()?y:x;
+ const buttons=[...list.querySelectorAll('.folder-btn')];
+ for(const [index,button] of buttons.entries()){
+  const r=button.getBoundingClientRect();
+  if(position<(vertical()?r.top+r.height/2:r.left+r.width/2))return index;
+ }
+ return buttons.length;
+}
+function markDockInsertion(slot){
+ if(slot===null){dockInsert?.remove();dockInsert=null;return;}
+ const list=dockView.querySelector('.folders');
+ if(!list)return;
+ const buttons=list.querySelectorAll('.folder-btn'),panel=island.getBoundingClientRect();
+ const before=buttons[slot-1]?.getBoundingClientRect(),after=buttons[slot]?.getBoundingClientRect();
+ const v=vertical(),start=v?panel.top:panel.left,end=v?panel.bottom:panel.right;
+ const low=before?(v?before.bottom:before.right):start;
+ const high=after?(v?after.top:after.left):end;
+ const at=clamp((low+high)/2,start+2,end-2);
+ if(!dockInsert){dockInsert=E('div','sd-dock-insert');dockInsert.setAttribute('aria-hidden','true');desktop.append(dockInsert);}
+ Object.assign(dockInsert.style,{left:(v?panel.left+4:at-1)+'px',top:(v?at-1:panel.top+4)+'px',
+  width:(v?Math.max(1,panel.width-8):2)+'px',height:(v?2:Math.max(1,panel.height-8))+'px'});
+}
+function scrollDropEdges(node,x,y){
+ if(!node)return;
+ const r=node.getBoundingClientRect();
+ if(y>=r.top&&y<=r.bottom){
+  if(x>r.right-22&&x<r.right)node.scrollLeft+=11;
+  else if(x<r.left+22&&x>r.left)node.scrollLeft-=11;
+ }
+ if(x>=r.left&&x<=r.right){
+  if(y>r.bottom-22&&y<r.bottom)node.scrollTop+=11;
+  else if(y<r.top+22&&y>r.top)node.scrollTop-=11;
+ }
+}
 function clearPointer(){
  if(press)clearTimeout(press.timer);press=null;
  if(drag){drag.tile?.classList.remove('dragging');drag.ghost?.remove();drag=null}
- mark(null);
+ mark(null);markDockInsertion(null);
 }
 function insideIsland(x,y){
  const r=island.getBoundingClientRect();
@@ -875,38 +1052,52 @@ island.addEventListener('pointerdown',e=>{
  if(e.target.closest('.gs-settings'))return;
  const tile=e.target.closest('.tile')||expandedIconAt(e)?.closest('.tile'),f=active();
  const item=tile&&f?.slots.find(x=>x.id===tile.dataset.tile);
- press={id:e.pointerId,x:e.clientX,y:e.clientY,target:e.target,tile,item,timer:null};
+ const dockButton=phase==='closed'&&(e.target.closest('.folder-btn')||expandedIconAt(e));
+ const dockEntry=dockButton&&dockEntryAt(dockButton);
+ press={id:e.pointerId,x:e.clientX,y:e.clientY,target:e.target,tile,item,dockButton,dockEntry,timer:null};
  if(e.pointerType!=='mouse')press.timer=setTimeout(()=>{
    if(!press)return;const p=press;clearPointer();p.target=document.elementFromPoint(p.x,p.y)||p.target;suppressClick=performance.now()+550;ignoreNativeMenuUntil=performance.now()+750;
    if(phase==='open')gridMenu(p.x,p.y,p.target);
-   else if(phase==='closed')dockMenu(p.x,p.y,state.folders.find(f=>f.id===p.target.closest('.folder-btn')?.dataset.folder));
+   else if(phase==='closed')dockMenu(p.x,p.y,dockEntryAt(p.target));
  },520);
 });
 document.addEventListener('pointermove',e=>{
  if(!press||e.pointerId!==press.id)return;
  if(!drag&&Math.hypot(e.clientX-press.x,e.clientY-press.y)>7){
    clearTimeout(press.timer);
-   if(phase==='open'&&press.item){const s=active().style,ghost=E('div','drag-ghost');ghost.append(shortcutArt(press.item,s.icon,gridIconRadius(s)));document.body.append(ghost);press.tile.classList.add('dragging');drag={ghost,tile:press.tile,item:press.item}}
-   else{press=null;return}
+   if(phase==='open'&&press.item){const s=active().style,ghost=E('div','drag-ghost');ghost.append(shortcutArt(press.item,s.icon,gridIconRadius(s),s));document.body.append(ghost);press.tile.classList.add('dragging');drag={ghost,tile:press.tile,item:press.item}}
+   else if(phase==='closed'&&press.dockEntry){
+    const entry=press.dockEntry,s=state.dock,size=triggerSize(entry),radius=dockIconRadius(entry,s),ghost=E('div','drag-ghost');
+    ghost.append(isDockShortcut(entry)?shortcutArt(entry,size,radius,s):addFolderArrow(art(entry.icon,FOLDER_ICONS,size,entry.image,radius,iconRotationOf(entry,s)),entry,s));
+    document.body.append(ghost);press.dockButton.classList.add('dragging');drag={ghost,tile:press.dockButton,dockEntry:entry};
+    try{island.setPointerCapture(e.pointerId);}catch{}
+   }else{press=null;return}
  }
  if(drag){
    e.preventDefault();drag.ghost.style.left=e.clientX+'px';drag.ghost.style.top=e.clientY+'px';
-   const sc=gsView.querySelector('.scroll'),r=sc.getBoundingClientRect();
-   if(e.clientX>r.right-22&&e.clientX<r.right)sc.scrollLeft+=11;
-   else if(e.clientX<r.left+22&&e.clientX>r.left)sc.scrollLeft-=11;
-   if(e.clientY>r.bottom-22&&e.clientY<r.bottom)sc.scrollTop+=11;
-   else if(e.clientY<r.top+22&&e.clientY>r.top)sc.scrollTop-=11;
-   mark(insideIsland(e.clientX,e.clientY)?locate(e.clientX,e.clientY):null);
+   if(drag.dockEntry){
+    scrollDropEdges(dockView.querySelector('.folders'),e.clientX,e.clientY);
+    markDockInsertion(dockDropSlot(e.clientX,e.clientY));
+   }else{
+    scrollDropEdges(gsView.querySelector('.scroll'),e.clientX,e.clientY);
+    mark(insideIsland(e.clientX,e.clientY)?locate(e.clientX,e.clientY):null);
+   }
  }
 },{passive:false});
 document.addEventListener('pointerup',e=>{
  if(!press||e.pointerId!==press.id)return;
- if(drag){const item=drag.item,where=insideIsland(e.clientX,e.clientY)?locate(e.clientX,e.clientY):null;clearPointer();suppressClick=performance.now()+450;if(where&&active())reposition(active(),item,where)}
+ if(drag?.dockEntry){
+  const entry=drag.dockEntry,slot=dockDropSlot(e.clientX,e.clientY);
+  clearPointer();suppressClick=performance.now()+450;
+  if(slot!==null)reorderDock(entry,slot);
+ }else if(drag){const item=drag.item,where=insideIsland(e.clientX,e.clientY)?locate(e.clientX,e.clientY):null;clearPointer();suppressClick=performance.now()+450;if(where&&active())reposition(active(),item,where)}
  else clearPointer();
 });
-document.addEventListener('pointercancel',clearPointer);
+document.addEventListener('pointercancel',()=>{if(drag?.dockEntry)suppressClick=performance.now()+450;clearPointer();});
+island.addEventListener('lostpointercapture',()=>{if(drag?.dockEntry){clearPointer();suppressClick=performance.now()+450;}});
 window.addEventListener('blur',clearPointer);
 function dropEntries(dt){
+ if(!dt)return [];
  const files=[...dt.files];
  if(files.length)return files.map(file=>({id:uid(),type:'item',name:file.name.replace(/\.[^.]+$/,''),target:file.name,kind:'local',localType:'file',args:'',cwd:'',icon:'file',image:''}));
  const uri=dt.getData('text/uri-list').split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith('#'));
@@ -915,14 +1106,32 @@ function dropEntries(dt){
 }
 desktop.addEventListener('dragover',e=>{e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect='none'});
 gsView.addEventListener('dragover',e=>{
- if(phase!=='open')return;e.preventDefault();e.stopPropagation();if(e.dataTransfer)e.dataTransfer.dropEffect='copy';mark(locate(e.clientX,e.clientY));
+ if(phase!=='open'||dialog.open)return;e.preventDefault();e.stopPropagation();if(e.dataTransfer)e.dataTransfer.dropEffect='copy';mark(locate(e.clientX,e.clientY));
 });
 gsView.addEventListener('dragleave',e=>{if(!gsView.contains(e.relatedTarget))mark(null)});
-desktop.addEventListener('drop',e=>{e.preventDefault();mark(null)});
+desktop.addEventListener('drop',e=>{e.preventDefault();mark(null);markDockInsertion(null)});
+dockView.addEventListener('dragover',e=>{
+ if(phase!=='closed'||dialog.open)return;
+ e.preventDefault();e.stopPropagation();
+ scrollDropEdges(dockView.querySelector('.folders'),e.clientX,e.clientY);
+ const slot=dockDropSlot(e.clientX,e.clientY);
+ if(e.dataTransfer)e.dataTransfer.dropEffect=slot===null?'none':'copy';
+ markDockInsertion(slot);
+});
+dockView.addEventListener('dragleave',e=>{if(!dockView.contains(e.relatedTarget))markDockInsertion(null);});
+dockView.addEventListener('drop',e=>{
+ if(phase!=='closed'||dialog.open)return;
+ e.preventDefault();e.stopPropagation();markDockInsertion(null);
+ const slot=dockDropSlot(e.clientX,e.clientY);
+ if(slot===null)return;
+ const n=insertDockShortcuts(dropEntries(e.dataTransfer),slot);
+ if(n){persist();refresh();}
+});
 gsView.addEventListener('drop',e=>{
- e.preventDefault();e.stopPropagation();if(phase!=='open')return;
+ e.preventDefault();e.stopPropagation();if(phase!=='open'||dialog.open)return;
  const f=active(),where=locate(e.clientX,e.clientY),entries=dropEntries(e.dataTransfer);
  mark(null);if(!entries.length){notify('Drop a file or an HTTP(S) link.');return}
+ if(!f||!where)return;
  const n=placeEntries(f,where,entries);persist();refresh();
  if(!n){notify('This grid is full.');return}
  notify(n+' shortcut'+(n===1?'':'s')+' added'+(e.dataTransfer.files.length?' · browser stores file names, not full Windows paths':''));
@@ -957,6 +1166,7 @@ function dialogBuildHere(title,desc,submit,build,save,settings=false){
  clearHover(false);
  savedFocus=document.activeElement;dialog.classList.toggle('settings-dialog',settings);form.noValidate=settings;
  form.replaceChildren();
+ dialog.classList.remove('sd-hide-slider-defaults');
  dialog.classList.remove('sd-dialog-placed');
  const movable=settings||/^(Shortcut properties|Add shortcut here)$/.test(title);
  dialog.classList.toggle('sd-movable',movable);
@@ -991,11 +1201,15 @@ function section(body,title){
 }
 function field(parent,label,type,value,opts={}){
  const l=E('label','field'),title=E('span','',label),n=E('input');n.setAttribute('aria-label',label);n.type=type;
- for(const [k,v] of Object.entries(opts))if(k!=='datasetUnit')n[k]=v;
+ for(const [k,v] of Object.entries(opts))if(!['datasetUnit','defaultValue','displayScale'].includes(k))n[k]=v;
  n.value=value??'';
  if(type==='range'){
-  const bar=E('span','rangeLabel'),out=E('output','',n.value+('%'===opts.datasetUnit?'%':opts.datasetUnit||''));
-  bar.append(title,out);l.append(bar);n.oninput=()=>out.textContent=n.value+(opts.datasetUnit||'');
+  const format=v=>String(Number(v)*(opts.displayScale??1))+(opts.datasetUnit||'');
+  const bar=E('span','rangeLabel'),out=E('output','',format(n.value));
+  bar.append(title,out);l.append(bar);n.oninput=()=>out.textContent=format(n.value);
+  if(Number.isFinite(opts.defaultValue)){
+   l.append(n,E('small','sd-slider-default','Default: '+format(opts.defaultValue)));parent.append(l);return n;
+  }
  }else l.append(title);
  l.append(n);parent.append(l);return n;
 }
@@ -1113,28 +1327,56 @@ function addResetSection(general){
  // A click by itself, including a synthetic click, never resets the layout.
  hold.addEventListener('click',event=>event.preventDefault());
 }
+function folderArrowControls(parent,initial,inherit=null){
+ const override=inherit?check(parent,'Override dock folder arrow',!!initial):null;
+ const start=inherit?{...inherit(),...initial}:initial||dockDefaults;
+ const enabled=check(parent,'Show folder arrow',inherit?start.enabled:start.folderArrow);
+ enabled.parentElement.classList.add('card-toggle');
+ if(override)override.parentElement.classList.add('card-toggle');
+ const range=(label,value,def)=>field(parent,label,'range',value,{min:0,max:100,datasetUnit:'%',defaultValue:def});
+ const x=range('Horizontal position',inherit?start.x:start.folderArrowX,dockDefaults.folderArrowX);
+ const y=range('Vertical position',inherit?start.y:start.folderArrowY,dockDefaults.folderArrowY);
+ const rotation=rotationSlider(parent,'Arrow rotation',inherit?start.rotation:start.folderArrowRotation);
+ const reset=B('Reset position','quiet sd-arrow-actions',()=>{
+  x.value=dockDefaults.folderArrowX;y.value=dockDefaults.folderArrowY;
+  x.dispatchEvent(new Event('input',{bubbles:true}));y.dispatchEvent(new Event('input',{bubbles:true}));
+ });
+ parent.append(reset);
+ const set=(value)=>{enabled.checked=value.enabled;x.value=value.x;y.value=value.y;rotation.value=value.rotation??0;x.oninput();y.oninput();rotation.oninput();};
+ const refresh=()=>{
+  if(override&&!override.checked)set(inherit());
+  enabled.disabled=!!override&&!override.checked;
+  x.disabled=y.disabled=rotation.disabled=reset.disabled=enabled.disabled;
+ };
+ override?.addEventListener('change',refresh);
+ enabled.addEventListener('change',refresh);refresh();
+ const read=()=>inherit?override.checked?{enabled:enabled.checked,x:+x.value,y:+y.value,rotation:+rotation.value}:undefined:
+  {folderArrow:enabled.checked,folderArrowX:+x.value,folderArrowY:+y.value,folderArrowRotation:+rotation.value};
+ read.refresh=refresh;return read;
+}
 function appearance(body,s,isGrid){
- const px=(p,n,v,min,max)=>field(p,n,'range',v,{min,max,datasetUnit:' px'});
+ const defaults=isGrid?gsDefaults:dockDefaults;
+ const px=(p,n,v,min,max,key)=>field(p,n,'range',v,{min,max,datasetUnit:' px',defaultValue:defaults[key]});
  const background=settingsCard(body,'Panel background','surface');
  const color=field(background,'Background color','color',s.color);
- const opacity=field(background,'Background opacity','range',s.opacity,{min:0,max:100,datasetUnit:'%'});
- const radius=px(background,'Corner radius',s.radius,0,56);
+ const opacity=field(background,'Background opacity','range',s.opacity,{min:0,max:100,datasetUnit:'%',defaultValue:defaults.opacity});
+ const radius=px(background,'Corner radius',s.radius,0,56,'radius');
  const frame=settingsCard(body,'Panel border and shadow','surface');
  const border=check(frame,'Show border',s.border),shadow=check(frame,'Show shadow',s.shadow);
  const borderColor=field(frame,'Border color','color',s.borderColor||'#ffffff');
- const borderOpacity=field(frame,'Border opacity','range',s.borderOpacity??23,{min:0,max:100,datasetUnit:'%'});
- const borderWidth=px(frame,'Border thickness',s.borderWidth??1,1,5);
+ const borderOpacity=field(frame,'Border opacity','range',s.borderOpacity??23,{min:0,max:100,datasetUnit:'%',defaultValue:defaults.borderOpacity});
+ const borderWidth=px(frame,'Border thickness',s.borderWidth??1,1,5,'borderWidth');
  const borderUI=()=>{for(const n of [borderColor,borderOpacity,borderWidth])n.disabled=!border.checked};
  border.onchange=borderUI;borderUI();
  const spacing=settingsCard(body,'Icons and labels','layout');
- const icon=px(spacing,isGrid?'Shortcut icon size':'Folder icon size',s.icon,isGrid?26:24,isGrid?88:74);
+ const icon=px(spacing,isGrid?'Shortcut icon size':'Folder icon size',s.icon,isGrid?26:24,isGrid?88:74,'icon');
  function axisControls(key,label,maximum){
   const axis=settingsCard(body,label,'layout');
   const independent=check(axis,'Independent '+label.toLowerCase(),s[key+'Split']);
   independent.parentElement.classList.add('card-toggle');
-  const linked=px(axis,label,s[key],0,maximum);
-  const x=px(axis,label+' · Horizontal',s[key+'X']??s[key],0,maximum);
-  const y=px(axis,label+' · Vertical',s[key+'Y']??s[key],0,maximum);
+  const linked=px(axis,label,s[key],0,maximum,key);
+  const x=px(axis,label+' · Horizontal',s[key+'X']??s[key],0,maximum,key+'X');
+  const y=px(axis,label+' · Vertical',s[key+'Y']??s[key],0,maximum,key+'Y');
   const show=()=>{
    linked.parentElement.hidden=independent.checked;linked.parentElement.style.gridColumn='1/-1';
    x.parentElement.hidden=y.parentElement.hidden=!independent.checked;
@@ -1149,9 +1391,10 @@ function appearance(body,s,isGrid){
  }
  const gap=axisControls('gap','Icon spacing',120);
  const pad=axisControls('pad','Inner padding',160);
+ const arrow=isGrid?null:folderArrowControls(settingsCard(body,'Folder arrow','layout'),s);
  const labels=check(spacing,'Show labels',s.labels);
- const titleIcon=isGrid?px(spacing,'Title icon size',headingSize(s),16,44):null;
- return ()=>({...s,color:color.value,opacity:+opacity.value,radius:+radius.value,icon:+icon.value,...gap(),...pad(),border:border.checked,shadow:shadow.checked,labels:labels.checked,borderColor:borderColor.value,borderOpacity:+borderOpacity.value,borderWidth:+borderWidth.value,...(isGrid?{titleIcon:+titleIcon.value}:{})});
+ const titleIcon=isGrid?px(spacing,'Title icon size',headingSize(s),16,44,'titleIcon'):null;
+ return ()=>({...s,color:color.value,opacity:+opacity.value,radius:+radius.value,icon:+icon.value,...gap(),...pad(),...(arrow?.()||{}),border:border.checked,shadow:shadow.checked,labels:labels.checked,borderColor:borderColor.value,borderOpacity:+borderOpacity.value,borderWidth:+borderWidth.value,...(isGrid?{titleIcon:+titleIcon.value}:{})});
 }
 // The browser version uses a local file chooser. The desktop bridge adds path and EXE support.
 function iconPicker(body,source,initial,image,size,round,error,onChange=()=>{},prior={},readDefault=null){
@@ -1209,28 +1452,34 @@ function editSettings(selected=null,initial='dock',creating=false){
   const k=Math.min(standard,(draw.clientWidth||255)/(2*p.padX+3*s.icon+2*p.gapX+28),
    260/(2*p.padY+3*s.icon+2*p.gapY+28));
   hull.style.borderRadius=Math.round(s.radius*k)+'px';hull.style.padding=Math.round(p.padY*k)+'px '+Math.round(p.padX*k)+'px';
-  hull.style.setProperty('--sd-hover',(s.hoverOpacity??14)/100);
+  hull.style.setProperty('--sd-hover',(s.hoverOpacity??40)/100);
   hull.style.boxShadow=shadow(s);styleGlass(glass,s);hull.append(glass);
   row.style.gap=Math.round(p.gapY*k)+'px '+Math.round(p.gapX*k)+'px';
   const readIcon=entry=>{try{return cache.get(entry.id)?.icon()||entry}catch{return entry}};
   if(type==='gs'){
    const title=E('div','sample-row sample-name');
    const ico=readIcon(f);
-   title.style.gap='5px';title.append(art(ico.icon,FOLDER_ICONS,Math.round(headingSize(s)*.66),ico.image,gridIconRadius(s)),E('span','',cache.get(f.id)?.name.value||f.name||'New folder'));hull.append(title);
+   title.style.gap='5px';title.append(art(ico.icon,FOLDER_ICONS,Math.round(headingSize(s)*.66),ico.image,gridIconRadius(s),s.iconRotation),E('span','',cache.get(f.id)?.name.value||f.name||'New folder'));hull.append(title);
    const sample=f.slots.filter(t=>t.type==='item').slice(0,3);
    (sample.length?sample:[{name:'Shortcut',kind:'program',image:''}]).forEach(t=>{
-    const item=E('div','sample-item'),radius=gridIconRadius(s);item.append(highlightArt(shortcutArt(t,Math.round(s.icon*k),radius),s,radius,k));
+    const item=E('div','sample-item'),radius=gridIconRadius(s);item.append(highlightArt(shortcutArt(t,Math.round(s.icon*k),radius,s),s,radius,k));
     iconEffects(item,shortcutIconKey(t),APP_ICONS,Math.round(s.icon*k),customShortcutImage(t),radius,s,k,t);
     stylePreviewIcon(item,s,k,t.name);if(s.labels)item.append(E('small','',t.name));row.append(item);
    });
   }else{
-   (type==='folder'?[f]:state.folders.slice(0,3)).forEach(entry=>{
+   (type==='folder'?[f]:dockEntries().slice(0,3)).forEach(entry=>{
     const controls=cache.get(entry.id),ico=readIcon(entry);
     const size=controls?(controls.useSize.checked?+controls.size.value:s.icon):triggerSize(entry,s);
     const override=controls?.ownCorner.checked?+controls.dockCorner.value:controls?dockRoundness(s):undefined;
     const item=E('div','sample-item'),radius=dockIconRadius(entry,s,override);
-    item.append(highlightArt(art(ico.icon,FOLDER_ICONS,Math.round(size*k),ico.image,radius),s,radius,k));
-    iconEffects(item,ico.icon,FOLDER_ICONS,Math.round(size*k),ico.image,radius,s,k);
+    const drawSize=Math.round(size*k),angle=controls?controls.rotation():iconRotationOf(entry,s);
+    if(isDockShortcut(entry)){
+     item.append(highlightArt(shortcutArt(entry,drawSize,radius,s),s,radius,k));
+     iconEffects(item,shortcutIconKey(entry),APP_ICONS,drawSize,customShortcutImage(entry),radius,s,k,entry);
+    }else{
+     item.append(addFolderArrow(highlightArt(art(ico.icon,FOLDER_ICONS,drawSize,ico.image,radius,angle),s,radius,k),controls?{arrowOverride:controls.arrow()}:entry,s));
+     iconEffects(item,ico.icon,FOLDER_ICONS,drawSize,ico.image,radius,{...s,iconRotation:angle},k);
+    }
     const label=controls?.name.value||entry.name||'New folder';
     stylePreviewIcon(item,{...s,hoverLabels:s.hoverLabels!==false&&(controls?.folderHoverLabels.checked??entry.folderHoverLabels!==false)},k,label);if(s.labels)item.append(E('small','',label));row.append(item);
    });
@@ -1240,6 +1489,8 @@ function editSettings(selected=null,initial='dock',creating=false){
  function draw(){
   if(!dialog.open||!collectDock)return;
   const controls=cache.get(folder.id),d=collectDock();
+  controls?.arrow.refresh();
+  controls?.rotation.refresh();
   if(controls&&!controls.ownCorner.checked){
    controls.dockCorner.value=dockRoundness(d);
    controls.dockCorner.parentElement.querySelector('output').textContent=controls.dockCorner.value*2+'%';
@@ -1271,6 +1522,9 @@ function editSettings(selected=null,initial='dock',creating=false){
   function pane(){const n=E('section','settings-pane');n.setAttribute('role','tabpanel');return n}
   const dock=pane(),general=pane();
   const prefs={...generalDefaults,...state.general};
+  const applySliderLabels=visible=>dialog.classList.toggle('sd-hide-slider-defaults',!visible);
+  const sliderLabels=check(settingsCard(general,'Settings display','behavior'),'Show default values on sliders',prefs.sliderDefaults);
+  sliderLabels.onchange=()=>applySliderLabels(sliderLabels.checked);applySliderLabels(sliderLabels.checked);
   const startup=settingsCard(general,'Windows startup','behavior');
   const startupInput=check(startup,'Start Stack Dock when I sign in',false);
   const startupInfo=E('p','note','Checking Windows startup status…');
@@ -1288,11 +1542,11 @@ function editSettings(selected=null,initial='dock',creating=false){
   const behavior=settingsCard(general,'Interaction','behavior');
   const collapse=check(behavior,'Close the grid when I switch apps',prefs.collapseOnFocusLoss);
   const anim=check(behavior,'Animate opening and closing',state.dock.motion);
-  const speed=field(behavior,'Window animation speed','range',state.dock.motionSpeed??100,{min:25,max:250,datasetUnit:'%'});
+  const speed=field(behavior,'Window animation speed','range',state.dock.motionSpeed??100,{min:25,max:250,datasetUnit:'%',defaultValue:dockDefaults.motionSpeed??100});
   const tips=settingsCard(general,'Hover labels','behavior');
   const names=check(tips,'Show full icon name on hover',prefs.hoverNames);
   const targets=check(tips,'Show shortcut path or URL after a pause',prefs.hoverTargets);
-  const delay=field(tips,'Default details delay','range',prefs.hoverDelay,{min:0,max:5000,step:100,datasetUnit:' ms'});
+  const delay=field(tips,'Default details delay','range',prefs.hoverDelay,{min:0,max:5000,step:100,datasetUnit:' ms',defaultValue:generalDefaults.hoverDelay});
   tips.append(E('p','note','Visible icon labels replace the hover name. The delayed path or URL is separate.'));
   const syncGeneral=()=>{speed.disabled=!anim.checked;delay.disabled=!targets.checked;};
   anim.addEventListener('change',syncGeneral);targets.addEventListener('change',syncGeneral);syncGeneral();
@@ -1300,7 +1554,7 @@ function editSettings(selected=null,initial='dock',creating=false){
   const thumbs=check(icons,'Show image files as thumbnails',prefs.imageThumbnails);
   thumbs.parentElement.classList.add('card-toggle');
   icons.append(E('p','note','Uses the image itself for supported image shortcuts. Custom icons take priority.'));
-  const configureLaunch=generalLaunchControls(general,state.dock);
+  const configureLaunch=generalLaunchControls(general,state.dock,()=>collectDock?.()||state.dock);
    if(!creating){
     const backup=settingsCard(general,'Import and export','backup');
     backup.parentElement.classList.add('sd-preview-card');
@@ -1308,7 +1562,7 @@ function editSettings(selected=null,initial='dock',creating=false){
     else backup.append(E('p','note','Layout backups are available in the Windows desktop app.'));
     addResetSection(general);
    }
-  collectGeneral=()=>({general:{hoverNames:names.checked,hoverTargets:targets.checked,hoverDelay:+delay.value,collapseOnFocusLoss:collapse.checked,imageThumbnails:thumbs.checked,nextFolderColor:creating?(nextFolderColor+1)%FOLDER_KEYS.length:nextFolderColor},
+  collectGeneral=()=>({general:{hoverNames:names.checked,hoverTargets:targets.checked,hoverDelay:+delay.value,collapseOnFocusLoss:collapse.checked,imageThumbnails:thumbs.checked,sliderDefaults:sliderLabels.checked,nextFolderColor:creating?(nextFolderColor+1)%FOLDER_KEYS.length:nextFolderColor},
    dock:{motion:anim.checked,motionSpeed:+speed.value,...configureLaunch()}});
   previews.set('dock',previewBox());
   const position=settingsCard(dock,'Screen position','layout');
@@ -1326,14 +1580,23 @@ function editSettings(selected=null,initial='dock',creating=false){
    const name=field(identity,'Folder name','text',f.name,{maxLength:40});
    const folderHoverLabels=check(identity,'Show hover label for this folder',f.folderHoverLabels!==false);
    const useSize=check(identity,'Override dock icon size',f.triggerSize);
-   const size=field(identity,'Custom folder icon size','range',f.triggerSize||state.dock.icon,{min:24,max:74,datasetUnit:' px'});
+   const size=field(identity,'Custom folder icon size','range',f.triggerSize||state.dock.icon,{min:24,max:74,datasetUnit:' px',defaultValue:dockDefaults.icon});
    const ownCorner=check(identity,'Override dock icon roundness',Number.isFinite(f.dockIconCorner)||['raw','rounded'].includes(f.dockIconShape));
-   const dockCorner=field(identity,'Dock icon roundness','range',Number.parseFloat(dockIconRadius(f,collectDock())),{min:0,max:50,datasetUnit:'%'});
-   const cornerOutput=dockCorner.parentElement.querySelector('output');
-   dockCorner.oninput=()=>cornerOutput.textContent=dockCorner.value*2+'%';
-   dockCorner.oninput();
+   const dockCorner=field(identity,'Dock icon roundness','range',Number.parseFloat(dockIconRadius(f,collectDock())),{min:0,max:50,datasetUnit:'%',defaultValue:dockRoundness(dockDefaults),displayScale:2});
    dockCorner.disabled=!ownCorner.checked;ownCorner.onchange=()=>{dockCorner.disabled=!ownCorner.checked;};
    size.disabled=!useSize.checked;useSize.onchange=()=>{size.disabled=!useSize.checked;if(useSize.checked&&size.value==state.dock.icon){size.value=collectDock().icon;size.dispatchEvent(new Event('input'))}};
+   const rotate=check(identity,'Override dock icon rotation',Number.isFinite(f.iconRotation));
+   const rotationInput=rotationSlider(identity,'Folder icon rotation',iconRotationOf(f,collectDock()));
+   const rotation=()=>rotate.checked?+rotationInput.value:iconAngle(collectDock().iconRotation);
+   rotation.refresh=()=>{
+    rotationInput.disabled=!rotate.checked;
+    if(!rotate.checked){rotationInput.value=rotation();rotationInput.oninput();}
+   };
+   rotate.addEventListener('change',rotation.refresh);rotation.refresh();
+   const arrow=folderArrowControls(settingsCard(folderPane,'Folder arrow','identity'),f.arrowOverride,()=>{
+    const global=folderArrowStyle(null,collectDock());
+    return {enabled:global.folderArrow,x:global.folderArrowX,y:global.folderArrowY,rotation:global.folderArrowRotation};
+   });
    const palette=E('div','sd-folder-colors');
    const swatches=E('div','sd-color-swatches');
    swatches.setAttribute('role','group');swatches.setAttribute('aria-label','Built-in folder colors');
@@ -1360,7 +1623,7 @@ function editSettings(selected=null,initial='dock',creating=false){
    settingsGear.parentElement.classList.add('card-toggle');
    layout.append(E('p','note','Shortcuts stay in their assigned cells. Move a shortcut before shrinking past its cell.'));
    const style=appearance(gs,{...gsDefaults,...f.style},true);
-   const c={f,folderPane,gs,name,folderHoverLabels,useSize,size,ownCorner,dockCorner,icon,cols,rows,settingsGear,style,folderPreview,gsPreview,palette};cache.set(f.id,c);return c;
+   const c={f,folderPane,gs,name,folderHoverLabels,useSize,size,ownCorner,dockCorner,icon,arrow,rotation,rotate,cols,rows,settingsGear,style,folderPreview,gsPreview,palette};cache.set(f.id,c);return c;
   }
   function show(key){
    tab=key;error.hidden=true;
@@ -1384,7 +1647,9 @@ function editSettings(selected=null,initial='dock',creating=false){
    scroll.replaceChildren(node);
    previewSlot.hidden=!sample;
    previewSlot.replaceChildren(...(sample?[sample,key==='folder'?c.palette:E('p','note','Hover over the preview icons to try effects.')]:[]));
-   choose(activeGroups[key]||categories[0][0]);draw();
+   choose(activeGroups[key]||categories[0][0]);
+   if(key==='general')configureLaunch.refresh?.();
+   draw();
   }
   activate=(f,key)=>{folder=f;chooser.value=f.id;show(key)};
   body.append(tablist,groupBar,targetWrap,workspace);
@@ -1402,12 +1667,12 @@ function editSettings(selected=null,initial='dock',creating=false){
    if(!Number.isInteger(rows)||rows<1||rows>MAX_ROWS)invalid(c,'gs',c.rows,'Enter a row count between 1 and '+MAX_ROWS+'.');
    if(c.f.slots.some(t=>t.c>=cols))invalid(c,'gs',c.cols,'Move shortcuts out of the columns you want to remove first.');
    if(c.f.slots.some(t=>t.r>=rows))invalid(c,'gs',c.rows,'Move shortcuts out of the rows you want to remove first.');
-   changes.push([c.f,{name,...icon,folderHoverLabels:c.folderHoverLabels.checked,dockIconShape:undefined,dockIconCorner:c.ownCorner.checked?+c.dockCorner.value:undefined,triggerSize:c.useSize.checked?+c.size.value:0,cols,rows,style:{...c.style(),settingsGear:c.settingsGear.checked}}]);
+   changes.push([c.f,{name,...icon,folderHoverLabels:c.folderHoverLabels.checked,dockIconShape:undefined,dockIconCorner:c.ownCorner.checked?+c.dockCorner.value:undefined,triggerSize:c.useSize.checked?+c.size.value:0,arrowOverride:c.arrow(),iconRotation:c.rotate.checked?c.rotation():undefined,cols,rows,style:{...c.style(),settingsGear:c.settingsGear.checked}}]);
   }
   const personal=collectGeneral(),dock={...collectDock(),...personal.dock},nextEdge=edge.value,nextAlign=alignment.value;
   const commit=()=>{
    for(const [f,v] of changes)Object.assign(f,v);
-   if(creating)state.folders.push(newFolder);
+   if(creating)saveDockOrder([...dockEntries(),newFolder]);
    state.dock=dock;state.general=personal.general;state.edge=nextEdge;state.align=nextAlign;
    persist();return ()=>{if(phase==='open')renderDock();refresh()};
   };
@@ -1423,7 +1688,7 @@ function guess(target){
 function editShortcut(f,where,t){
  const base=t||{id:uid(),type:'item',name:'',target:'',kind:'program',args:'',cwd:'',icon:'program',image:''};
  let name,kind,target,args,cwd,icon;
- dialogBuild(t?'Shortcut properties':'Add shortcut here','Row '+(where.r+1)+', column '+(where.c+1)+'','Save shortcut',(body,error)=>{
+ dialogBuild(t?'Shortcut properties':'Add shortcut here',shortcutEditorDesc(f,where),'Save shortcut',(body,error)=>{
   const p=section(body,'Shortcut target');
   name=field(p,'Display name','text',base.name,{required:true,maxLength:65});
   kind=select(p,'Target type',shortcutTypes,shortcutChoice(base));
@@ -1446,7 +1711,7 @@ function editShortcut(f,where,t){
    try{new URL(dest)}catch{throw Error('Enter a full URL, including its scheme.');}
   }
   Object.assign(base,{name:n,...shortcutFromChoice(kind.value,dest),args:kind.value==='program'?args.value.trim():'',cwd:kind.value==='program'?cwd.value.trim():'',...pick});
-  if(!t&&!placeEntries(f,where,[base]))throw Error('This grid is full.');
+  if(!t&&!addShortcut({dock:!f,folder:f,where},base))throw Error(f?'This grid is full.':'The dock is full.');
   persist();return refresh;
  });
 }

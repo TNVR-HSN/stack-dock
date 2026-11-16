@@ -426,10 +426,10 @@ dialog.sd-panel-region{box-shadow:none}
   dialog.addEventListener('close',()=>{if(!dialog.open)dialog.classList.remove('sd-properties');});
   editShortcut = function (f, where, t) {
     const base = t || { id: uid(), type: 'item', name: '', target: '', kind: 'program', args: '', cwd: '', icon: 'program', image: '' };
-    let name, kind, target, args, cwd, readIcon, getTargetChoice, readThumbnailPreference;
+    let name, kind, target, args, cwd, readIcon, getTargetChoice, readThumbnailPreference, readRotation;
     let browsing = false;
     dialogBuild(t ? 'Shortcut properties' : 'Add shortcut here',
-      'Row ' + (where.r + 1) + ', column ' + (where.c + 1), 'Save shortcut', (body, error) => {
+      shortcutEditorDesc(f,where), 'Save shortcut', (body, error) => {
         dialog.classList.add('sd-properties');
         const hero=E('div','sd-properties-hero'),heroName=E('span','',base.name||'New shortcut'),heroArt=E('span','sd-hero-icon');
         const heroTools=E('div','sd-hero-tools'),thumbLabel=E('label','sd-thumb-switch'),thumb=E('input');
@@ -479,6 +479,10 @@ dialog.sd-panel-region{box-shadow:none}
         const cwdRow=pathRow(cwd,[iconButton('Browse start-in folder','folder',()=>void browse('folder',cwd))]);
         const eligibleForThumbnail=choice=>choice.kind==='local'&&localShortcutType(choice)!=='folder'&&imagePath(cleanPath(choice.target));
         readThumbnailPreference=()=>eligibleForThumbnail(savedChoice())?thumbnailPref:undefined;
+        const surface=()=>f?f.style:state.dock;
+        const rotate=check(p,'Override icon rotation',Number.isFinite(base.iconRotation));
+        const rotation=rotationSlider(p,'Shortcut icon rotation',iconRotationOf(base,surface()));
+        readRotation=()=>rotate.checked?+rotation.value:undefined;
         const preview = pick => {
           const choice=savedChoice(), eligible=eligibleForThumbnail(choice), hasCustom=!!pick.image;
           thumbLabel.hidden=!eligible;
@@ -486,10 +490,18 @@ dialog.sd-panel-region{box-shadow:none}
           thumb.checked=thumbnailEnabled({imageThumbnail:thumbnailPref});
           thumbLabel.title=hasCustom?'Reset the custom icon to show an image thumbnail.':
             'Use the image as the icon for this shortcut.';
-          heroArt.replaceChildren(shortcutArt({...choice,...pick,imageThumbnail:readThumbnailPreference()},96,'0px'));
+          heroArt.replaceChildren(shortcutArt({...choice,...pick,iconRotation:readRotation(),imageThumbnail:readThumbnailPreference()},96,'0px',surface()));
         };
         readIcon = iconPicker(body, APP_ICONS, base.icon, customShortcutImage(base), 96, '0px', error,
           preview, base, () => shortcutIconKey(savedChoice()));
+        const syncRotation=()=>{
+          rotation.disabled=!rotate.checked;
+          if(!rotate.checked){rotation.value=iconAngle(surface().iconRotation);rotation.oninput();}
+          readIcon.syncTarget();
+        };
+        rotate.addEventListener('change',syncRotation);
+        rotation.addEventListener('input',()=>readIcon.syncTarget());
+        syncRotation();
         thumb.addEventListener('change',()=>{
           thumbnailPref=thumb.checked;
           readIcon.syncTarget();
@@ -529,8 +541,8 @@ dialog.sd-panel-region{box-shadow:none}
         const pick = readIcon(), program = kind.value === 'program';
         Object.assign(base, { name: n, ...getTargetChoice(), target: dest,
           args: program ? args.value.trim() : '', cwd: program ? cleanPath(cwd.value) : '',
-          imageThumbnail:readThumbnailPreference(), ...pick });
-        if (!t && !placeEntries(f, where, [base])) throw Error('This grid is full.');
+          imageThumbnail:readThumbnailPreference(),iconRotation:readRotation(), ...pick });
+        if (!t && !addShortcut({dock:!f,folder:f,where},base)) throw Error(f?'This grid is full.':'The dock is full.');
         persist();
         return refresh;
       });
@@ -567,6 +579,7 @@ dialog.sd-panel-region{box-shadow:none}
         hitPadding:[0,48], hoverLabelSize:[9,28], hoverDetailsDelay:[0,5000],
         hoverMode:[0,5], hoverScale:[100,200], hoverLift:[0,48], hoverAngle:[-30,30], hoverDuration:[0,900], hoverCurve:[0,3],
         groundShadowOffset:[-24,48], highlightArea:[0,32], reflectionArea:[0,64], reflectionIntensity:[0,100], groundShadowIntensity:[0,100], borderOpacity:[0,100], borderWidth:[1,5], titleIcon:[16,44],
+        folderArrowX:[0,100],folderArrowY:[0,100],folderArrowRotation:[0,360],iconRotation:[0,360],
         motionSpeed:[25,250], hoverOpacity:[0,100], labelFont:[9,18], labelWidth:[64,200],
         launchWidth:[140,680],launchHeight:[42,120],launchHold:[0,8000],launchTravel:[0,1000],
         launchReturn:[0,700],launchIcon:[16,84],launchFont:[11,34],launchRadius:[0,60],launchGap:[0,28],launchPad:[4,28]
@@ -598,6 +611,18 @@ dialog.sd-panel-region{box-shadow:none}
     const s = data.layout;
     if (!edge.includes(s.edge) || !align.includes(s.align) ||
         !Array.isArray(s.folders) || !int(s.folders.length, 1, 100)) fail('bad dock position or folder list.');
+    function readShortcut(t,slot) {
+      if (t.type !== 'item' || !string(t.name,1024) || !t.name.trim() || !string(t.target,32768) ||
+          !t.target.trim() || !string(t.args ?? '',32768) || !string(t.cwd ?? '',32768) ||
+          ![undefined,'program','local','url','uri'].includes(t.kind) || !picture(t.image)) fail('bad shortcut.');
+      const localType = ['file','folder'].includes(t.localType) ? t.localType : undefined;
+      const imageThumbnail = typeof t.imageThumbnail==='boolean' ? t.imageThumbnail : undefined;
+      const custom = customShortcutImage(t);
+      return { ...slot, name:t.name, target:t.target, kind:t.kind, localType, imageThumbnail,
+        iconRotation:int(t.iconRotation,0,360)?t.iconRotation:undefined,args:t.args ?? '', cwd:t.cwd ?? '',
+        icon:shortcutIconKey({...t,localType}), image:custom,
+        ...(custom?iconSource(t):{iconMode:'default'}) };
+    }
     const folders = s.folders.map((f,folderIndex) => {
       if (!object(f) || !keys(f.id) || seenIds.has(f.id) || !string(f.name, 100) || !f.name.trim() ||
           !int(f.cols, 1, 12) || !int(f.rows, 1, MAX_ROWS) ||
@@ -612,21 +637,18 @@ dialog.sd-panel-region{box-shadow:none}
         cells.add(t.r + ':' + t.c);
         ids.add(t.id);
         const slot = { id:t.id, r:t.r, c:t.c, type:t.type };
-        if (t.type !== 'item' || !string(t.name,1024) || !t.name.trim() || !string(t.target,32768) ||
-            !t.target.trim() || !string(t.args ?? '',32768) || !string(t.cwd ?? '',32768) ||
-            ![undefined,'program','local','url','uri'].includes(t.kind) || !picture(t.image)) fail('bad shortcut.');
-        const localType = ['file','folder'].includes(t.localType) ? t.localType : undefined;
-        const imageThumbnail = typeof t.imageThumbnail==='boolean' ? t.imageThumbnail : undefined;
-        const custom = customShortcutImage(t);
-        return { ...slot, name:t.name, target:t.target, kind:t.kind, localType, imageThumbnail, args:t.args ?? '', cwd:t.cwd ?? '',
-          icon:shortcutIconKey({...t,localType}), image:custom,
-          ...(custom?iconSource(t):{iconMode:'default'}) };
+        return readShortcut(t,slot);
       });
       return { id:f.id, name:f.name, cols:f.cols, rows:f.rows, slots,
         folderHoverLabels:f.folderHoverLabels!==false,
         style:appearanceCopy(f.style, gsDefaults),
         dockIconShape:['default','rounded','raw'].includes(f.dockIconShape) ? f.dockIconShape : 'default',
         dockIconCorner:int(f.dockIconCorner,0,50) ? f.dockIconCorner : undefined,
+        iconRotation:int(f.iconRotation,0,360)?f.iconRotation:undefined,
+        arrowOverride:object(f.arrowOverride)&&typeof f.arrowOverride.enabled==='boolean'
+          ? {enabled:f.arrowOverride.enabled,x:int(f.arrowOverride.x,0,100)?f.arrowOverride.x:dockDefaults.folderArrowX,
+            y:int(f.arrowOverride.y,0,100)?f.arrowOverride.y:dockDefaults.folderArrowY,
+            rotation:int(f.arrowOverride.rotation,0,360)?f.arrowOverride.rotation:undefined} : undefined,
         triggerSize:int(f.triggerSize,24,74) ? f.triggerSize : 0,
         icon:Object.hasOwn(FOLDER_ICONS,f.icon) ? f.icon : folderIconKey(folderIndex),
         image:f.image || '', ...iconSource(f) };
@@ -639,7 +661,22 @@ dialog.sd-panel-region{box-shadow:none}
       general[key]=value;
     }
     general.nextFolderColor=int(s.general?.nextFolderColor,0,FOLDER_KEYS.length-1)?s.general.nextFolderColor:folders.length%FOLDER_KEYS.length;
-    return { edge:s.edge, align:s.align, general, dock:appearanceCopy(s.dock, dockDefaults), folders };
+    const dockShortcuts=s.dockShortcuts===undefined?[]:s.dockShortcuts;
+    if(!Array.isArray(dockShortcuts)||dockShortcuts.length>MAX_DOCK_SHORTCUTS)fail('invalid direct dock shortcuts.');
+    const restoredShortcuts=dockShortcuts.map(t=>{
+      if(!object(t)||!keys(t.id)||seenIds.has(t.id))fail('duplicate or invalid dock shortcut.');
+      seenIds.add(t.id);
+      return readShortcut(t,{id:t.id,type:'item'});
+    });
+    const dockOrder=[];
+    if(s.dockOrder!==undefined){
+      if(!Array.isArray(s.dockOrder)||s.dockOrder.length>100+MAX_DOCK_SHORTCUTS)fail('invalid dock order.');
+      for(const id of s.dockOrder){
+        if(seenIds.delete(id))dockOrder.push(id);
+      }
+    }
+    return { edge:s.edge, align:s.align, general, dock:appearanceCopy(s.dock, dockDefaults), folders,
+      dockShortcuts:restoredShortcuts,dockOrder };
   }
 
   const notice = message => {
@@ -777,6 +814,11 @@ dialog.sd-panel-region{box-shadow:none}
         closeStack(false);
         if (!await waitForPhase('closed')) throw Error('Could not close the current grid.');
       }
+      if (!folder) {
+        if (phase!=='closed'||!state.dockShortcuts?.includes(item)) throw Error('Could not open the dock shortcut.');
+        await launch(item);
+        return;
+      }
       if (phase === 'closed') openStack(folder.id);
       if (!await waitForPhase('open') || active() !== folder || !folder.slots.includes(item)) {
         throw Error('Could not open the shortcut’s folder.');
@@ -793,10 +835,12 @@ dialog.sd-panel-region{box-shadow:none}
   function showShortcutSearch() {
     if (dialog.open || searchLaunchPending || !['closed','open'].includes(phase)) return;
     let field, results, summary, matches = [], selected = 0;
-    const records = state.folders.flatMap(folder => folder.slots
-      .filter(item => item.type === 'item')
-      .map(item => ({ folder, item, name:item.name.toLowerCase(),
-        searchable:(item.name + ' ' + folder.name + ' ' + item.target).toLowerCase() })));
+    const record=(folder,item)=>({folder,item,name:item.name.toLowerCase(),location:folder?.name||'Dock',
+      searchable:(item.name+' '+(folder?.name||'Dock')+' '+item.target).toLowerCase()});
+    const records=[
+      ...(state.dockShortcuts||[]).map(item=>record(null,item)),
+      ...state.folders.flatMap(folder=>folder.slots.filter(item=>item.type==='item').map(item=>record(folder,item)))
+    ];
     const choose = entry => {
       if (!entry) return;
       dialog.close();
@@ -820,9 +864,9 @@ dialog.sd-panel-region{box-shadow:none}
         const button = B('', 'quiet sd-search-result', () => choose(entry));
         button.id = 'sd-shortcut-result-' + index;
         button.tabIndex = index === selected ? 0 : -1;
-        button.setAttribute('aria-label', entry.item.name + ' · ' + entry.folder.name);
-        button.append(shortcutArt(entry.item,32),
-          E('span','sd-search-name',entry.item.name), E('span','sd-search-folder',entry.folder.name));
+        button.setAttribute('aria-label', entry.item.name + ' · ' + entry.location);
+        button.append(shortcutArt(entry.item,32,undefined,entry.folder?.style||state.dock),
+          E('span','sd-search-name',entry.item.name), E('span','sd-search-folder',entry.location));
         results.append(button);
       });
       if (reset) results.scrollTop = 0;
@@ -914,64 +958,109 @@ dialog.sd-panel-region{box-shadow:none}
     finally { showMenu = baseShow; }
   };
 
-  // Explorer supplies full Windows paths through Tauri, not the HTML file name.
-  const view = bridge.webview?.getCurrentWebview?.();
+  // The Windows host forwards actual Explorer paths, never browser file names.
+  const listenForDrops=bridge.event?.listen;
+  let dropZoneFrame=0,lastDropZone='';
+  scheduleDropZone=()=>{
+    if(dropZoneFrame)return;
+    dropZoneFrame=requestAnimationFrame(()=>{
+      dropZoneFrame=0;
+      const accepting=(phase==='open'||phase==='closed')&&menu.hidden&&!dialog.open&&!surfaceWanted;
+      const rect=accepting?island.getBoundingClientRect():null;
+      const scale=window.devicePixelRatio||nativeArea?.scale||1;
+      const zone=rect?{x:Math.round(rect.left*scale),y:Math.round(rect.top*scale),
+        width:Math.round(rect.width*scale),height:Math.round(rect.height*scale)}:{x:0,y:0,width:0,height:0};
+      const key=JSON.stringify(zone);
+      if(key===lastDropZone)return;
+      lastDropZone=key;
+      void call('sync_dock_file_drop',zone).catch(error=>{
+        if(lastDropZone===key)lastDropZone='';
+        console.warn('StackDock Windows file drop:',error);
+      });
+    });
+  };
+  new MutationObserver(scheduleDropZone).observe(island,{attributes:true,attributeFilter:['style','data-phase']});
+  new MutationObserver(scheduleDropZone).observe(menu,{attributes:true,attributeFilter:['hidden']});
+  new MutationObserver(scheduleDropZone).observe(dialog,{attributes:true,attributeFilter:['open']});
+  window.addEventListener('resize',scheduleDropZone);
   const footerNotice = text => {
     if (dialog.open) return;
     dialogBuild('Stack Dock', text, 'OK', () => {}, () => {});
   };
-  const nextCell = f => {
-    const map = occupiedMap(f);
-    const limit = MAX_ROWS * f.cols;
-    for (let i = 0; i < limit; i++) {
-      if (!map.has(i)) return { r: Math.floor(i / f.cols), c: i % f.cols };
-    }
-    return null;
-  };
-
-  if (view?.onDragDropEvent) {
-    // Prevent the browser's filename-only drop from also adding a duplicate.
+  let activeDropCount=0;
+  let dropInvalidation=0;
+  function clearDropTarget() {
+    mark(null);
+    markDockInsertion(null);
+  }
+  // Native Explorer drops use absolute paths. Ignore duplicate browser drops.
+  if (listenForDrops) {
     document.addEventListener('drop', event => {
       if (!event.dataTransfer?.files.length) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      mark(null);
+      clearDropTarget();
     }, true);
-
-    view.onDragDropEvent(async ({ payload }) => {
-      if (payload.type === 'leave' || !payload.position || dialog.open) {
-        mark(null);
+    listenForDrops('stackdock-file-drop',async ({ payload }) => {
+      if (payload.type==='leave') {
+        externalDropActive=activeDropCount>0;
+        clearDropTarget();
         return;
       }
-      const scale = window.devicePixelRatio || nativeArea?.scale || 1;
-      const x = payload.position.x / scale, y = payload.position.y / scale;
-      const hit = document.elementFromPoint(x, y);
-      const grid = phase === 'open' && gsView.contains(hit) ? active() : null;
-      const folderId = phase === 'closed' ? hit?.closest('.folder-btn')?.dataset.folder : null;
-      const f = grid || state.folders.find(folder => folder.id === folderId);
-      const where = f && (grid ? locate(x, y) : nextCell(f));
-      if (payload.type !== 'drop') {
-        mark(grid ? where : null);
+      if (!payload.position||dialog.open||!menu.hidden||!['closed','open'].includes(phase)) {
+        externalDropActive=activeDropCount>0;
+        clearDropTarget();
         return;
       }
-      mark(null);
-      if (!f || !payload.paths?.length) return;
-      if (!where) { footerNotice('This folder has no empty slots.'); return; }
+      const scale=window.devicePixelRatio||nativeArea?.scale||1;
+      const x=payload.position.x/scale, y=payload.position.y/scale;
+      const f=phase==='open'&&insideIsland(x,y)?active():null;
+      const dockSlot=phase==='closed'?dockDropSlot(x,y):null;
+      if(f&&payload.type!=='drop')scrollDropEdges(gsView.querySelector('.scroll'),x,y);
+      if(dockSlot!==null&&payload.type!=='drop')scrollDropEdges(dockView.querySelector('.folders'),x,y);
+      const where=f&&locate(x,y);
+      if(payload.type!=='drop'){
+        externalDropActive=!!where||dockSlot!==null||activeDropCount>0;
+        mark(where||null);markDockInsertion(dockSlot===null?null:dockDropSlot(x,y));
+        return;
+      }
+      clearDropTarget();
+      if((!where&&dockSlot===null)||!payload.paths?.length){
+        externalDropActive=activeDropCount>0;
+        return;
+      }
+      const layout=state, sequence=++dropInvalidation;
+      const order=dockSlot===null?null:dockEntries();
+      const at=order?.[dockSlot]?.id;
+      activeDropCount++;externalDropActive=true;
+      // A successful drop is intentional. Don't close the grid on the old
+      // focus-loss event when Explorer is still foreground after the drop.
+      if(f){focusLossPending=false;clearTimeout(focusLossTimer);focusLossTicket++;}
       try {
-        const paths = await call('inspect_shortcut_drops', { paths: payload.paths });
-        if (!state.folders.includes(f)) return;
-        const entries = paths.map(item => ({
-          ...item, id: uid(), type: 'item', args: '', cwd: '',
-          icon: shortcutIconKey(item), image: ''
+        const paths=await call('inspect_shortcut_drops',{paths:payload.paths});
+        if(state!==layout)return;
+        const entries=paths.map(item=>({
+          ...item,id:uid(),type:'item',args:'',cwd:'',icon:shortcutIconKey(item),image:''
         }));
-        if (!entries.length) { footerNotice('No accessible files or folders were found.'); return; }
-        const n = placeEntries(f, where, entries);
-        if (!n) { footerNotice('This folder is full.'); return; }
-        persist();
-        refresh();
-      } catch (message) {
-        footerNotice(String(message));
+        if(!entries.length){if(sequence===dropInvalidation)footerNotice('No accessible files or folders were found.');return;}
+        if(f&&!state.folders.includes(f))return;
+        const current=order?dockEntries():[];
+        const index=at===undefined?current.length:current.findIndex(entry=>entry.id===at);
+        const n=f?placeEntries(f,where,entries):insertDockShortcuts(entries,index<0?current.length:index);
+        if(!n){if(sequence===dropInvalidation)footerNotice(f?'This grid is full.':'The dock is full.');return;}
+        persist();refresh();
+        // Restore the open grid's focus after a successful Explorer drop so a
+        // later, ordinary app switch still follows the collapse preference.
+        if(f&&phase==='open'&&active()===f&&!dialog.open){
+          void nativeWindow?.setFocus().catch(()=>{});
+        }
+        if(n<entries.length&&sequence===dropInvalidation)footerNotice((entries.length-n)+' shortcuts did not fit.');
+      } catch(message) {
+        if(sequence===dropInvalidation&&state===layout)footerNotice(String(message));
+      } finally {
+        activeDropCount--;
+        externalDropActive=activeDropCount>0;
       }
-    }).catch(error => console.warn('Native drag-and-drop not available:', error));
+    }).catch(error=>console.warn('Native drag-and-drop not available:',error));
   }
 })();

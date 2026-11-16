@@ -13,6 +13,25 @@ unsafe extern "system" {
     fn IsWindowVisible(hwnd: Hwnd) -> i32;
     fn ShowWindow(hwnd: Hwnd, command: i32) -> i32;
     fn SetWindowPos(hwnd: Hwnd, insert_after: Hwnd, x: i32, y: i32, w: i32, h: i32, flags: u32) -> i32;
+    fn GetAsyncKeyState(virtual_key: i32) -> i16;
+}
+
+#[tauri::command]
+pub fn dock_drag_button_held(window: tauri::WebviewWindow, raise: bool) -> bool {
+    // Explorer can take focus before the pointer reaches the drop target.
+    // Only query the physical mouse buttons, and only while the grid loses focus.
+    const VK_LBUTTON: i32 = 0x01;
+    const VK_RBUTTON: i32 = 0x02;
+    let held = unsafe { GetAsyncKeyState(VK_LBUTTON) < 0 || GetAsyncKeyState(VK_RBUTTON) < 0 };
+    if held && raise {
+        if let Ok(handle) = window.hwnd() {
+            // Lift the clipped dock above Explorer without activating it or
+            // entering the always-on-top band.
+            const FLAGS: u32 = 0x0001 | 0x0002 | 0x0010;
+            unsafe { SetWindowPos(handle.0 as Hwnd, ptr::null_mut(), 0, 0, 0, 0, FLAGS); }
+        }
+    }
+    held
 }
 
 #[tauri::command]
