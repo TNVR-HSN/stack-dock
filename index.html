@@ -642,6 +642,9 @@ function queueFocusLoss(){
 }
 function fitNative(grid){
  if(!nativeWindow||nativeBusy||surfaceWanted||!menu.hidden||dialog.open||!['closed','open'].includes(phase))return;
+ // Clipping to the newly saved dock size too soon can cut off the departing
+ // item when its context menu or confirmation releases the native window.
+ if(removalTracks.size){moveHost(nativeCover(readBox()));return}
  if(!grid||!Number.isFinite(grid.w))grid=undefined;
  moveHost(phase==='open'&&active()?(fixedHost?nativeCover(grid||gridBox(active())):nativeCover(dockBox(),grid||gridBox(active()))):nativeCover(dockBox()));
 }
@@ -687,8 +690,44 @@ function reorderDock(entry,slot){
  items.splice(to,0,items.splice(from,1)[0]);saveDockOrder(items);persist();refresh();return true;
 }
 const dockEntryAt=node=>dockEntries().find(item=>item.id===node?.closest?.('.folder-btn')?.dataset.dockEntry);
+const removalTracks=new Set();
+// Keep the item at its current position while it shrinks away. The model
+// changes first so a second render or an immediate exit cannot restore it.
+function animateRemoval(node,finish){
+ const style=state.dock;
+ if(!node?.isConnected||!style.motion||reduced.matches||!node.animate){finish();return}
+ clearHover(false);
+ node.inert=true;node.tabIndex=-1;
+ node.setAttribute('aria-hidden','true');
+ const speed=100/clamp(Number.isFinite(style.motionSpeed)?style.motionSpeed:100,25,250);
+ let animation;
+ try{
+  animation=node.animate([
+   {transform:'translateY(0) scale(1)',opacity:1},
+   {transform:'translateY(2px) scale(.77)',opacity:.75,offset:.42},
+   {transform:'translateY(6px) scale(.28)',opacity:0},
+  ],{duration:clamp(205*speed,80,650),easing:'cubic-bezier(.32,.04,.64,1)',fill:'forwards'});
+ }catch{finish();return}
+ removalTracks.add(animation);
+ const complete=()=>{removalTracks.delete(animation);finish();};
+ animation.finished.then(complete,complete);
+}
+function finishItemRemoval(node,hadFocus,view,visible,selector,index){
+ const focus=document.activeElement;
+ const restore=hadFocus&&visible()&&!dialog.open&&(!focus||focus===document.body||focus===node);
+ if(removalTracks.size)return;
+ refresh();
+ if(!restore)return;
+ const buttons=[...view.querySelectorAll(selector)].filter(button=>!button.inert);
+ (buttons[Math.min(Math.max(0,index),buttons.length-1)]||view).focus({preventScroll:true});
+}
 function removeDockEntry(entry){
- saveDockOrder(dockEntries().filter(item=>item!==entry));persist();refresh();
+ const items=dockEntries(),index=items.indexOf(entry);
+ if(index<0||!isDockShortcut(entry)&&state.folders.length<=1)return;
+ const node=[...dockView.querySelectorAll('.folder-btn')].find(button=>button.dataset.dockEntry===entry.id);
+ const hadFocus=!!node&&(document.activeElement===node||savedFocus===node);
+ saveDockOrder(items.filter(item=>item!==entry));persist();
+ animateRemoval(node,()=>finishItemRemoval(node,hadFocus,dockView,()=>phase==='closed','.folder-btn',index));
 }
 function addShortcut(destination,entry){
  return destination.dock?insertDockShortcuts([entry]):placeEntries(destination.folder,destination.where,[entry]);
@@ -1134,7 +1173,13 @@ function reposition(f,t,where){
  if(swap){swap.r=t.r;swap.c=t.c}
  t.r=where.r;t.c=where.c;persist();refresh();
 }
-function erase(f,t){f.slots=f.slots.filter(x=>x!==t);persist();refresh()}
+function erase(f,t){
+ if(!state.folders.includes(f)||!f.slots.includes(t))return;
+ const buttons=[...gsView.querySelectorAll('.tile')],index=buttons.findIndex(button=>button.dataset.tile===t.id);
+ const node=buttons[index],hadFocus=!!node&&(document.activeElement===node||savedFocus===node);
+ f.slots=f.slots.filter(item=>item!==t);persist();
+ animateRemoval(node,()=>finishItemRemoval(node,hadFocus,gsView,()=>phase==='open'&&active()===f,'.tile',index));
+}
 function addRow(f,where){
  const next=Math.min(f.rows,where.r+1);
  if(f.rows>=MAX_ROWS){notify('This stack already has '+MAX_ROWS+' rows.');return}

@@ -18,7 +18,8 @@
  color:var(--sd-ui-rail-muted)
 }
 #dialog .sd-panel-mark,#dialog .primary:not(.sd-reset-hold){
- background:var(--sd-ui-button);color:var(--sd-ui-button-text);border-color:var(--sd-ui-button)
+ background:linear-gradient(150deg,var(--sd-ui-button-sheen),var(--sd-ui-button));
+ color:var(--sd-ui-button-text);border-color:var(--sd-ui-button-sheen)
 }
 #dialog .settings-tabs button{color:var(--sd-ui-rail-text)}
 #dialog .settings-tabs button[aria-selected=true]::before{background:var(--sd-ui-rail-focus)}
@@ -30,8 +31,11 @@
 #dialog :is(.settings-tabs button:hover,.settings-tabs button[aria-selected=true],
  .settings-groups button:hover,.settings-groups button[aria-pressed=true],.dialogtop .close:hover,
  .sd-theme-option[aria-pressed=true],.sd-icon-thumbs button[aria-pressed=true],.sd-search-result.sd-search-selected){
- background:var(--sd-ui-selected);color:var(--sd-ui-selected-text);border-color:var(--sd-ui-selected-focus)
+ background:var(--sd-ui-selected);color:var(--sd-ui-selected-text);border-color:var(--sd-ui-selected-border)
 }
+#dialog .settings-tabs button:is(:hover,[aria-selected=true]){border-color:var(--sd-ui-selected-rail-border)}
+#dialog :is(button,input,select):focus-visible{outline-color:var(--accent,var(--sd-ui-accent))}
+#dialog .sd-panel-search:focus-within{border-color:var(--sd-ui-input-focus)}
 #dialog .sd-ui-card{color:var(--sd-ui-card-text);--soft:var(--sd-ui-card-muted);--ui-muted:var(--sd-ui-card-muted)}
 #dialog :is(.sd-ui-card h4,.section legend){color:var(--sd-ui-heading)}
 #dialog .sd-slider-default{opacity:1}
@@ -44,14 +48,14 @@
 #dialog :is(.field input[type=range],.sd-thumb-switch input){accent-color:var(--sd-ui-accent)}
 #dialog .sd-ui-card input[type=checkbox]{background:var(--sd-ui-switch-off);border-color:var(--sd-ui-switch-off)}
 #dialog .sd-ui-card input[type=checkbox]::after{background:var(--sd-ui-switch-thumb)}
-#dialog .sd-ui-card input[type=checkbox]:checked{background:var(--sd-ui-accent);border-color:var(--sd-ui-accent)}
-#dialog .sd-ui-card input[type=checkbox]:checked::after{background:var(--sd-ui-accent-thumb)}
+#dialog .sd-ui-card input[type=checkbox]:checked{background:var(--sd-ui-switch-on);border-color:var(--sd-ui-switch-on-border)}
+#dialog .sd-ui-card input[type=checkbox]:checked::after{background:var(--sd-ui-switch-on-thumb)}
 #dialog .quiet:not(.sd-reset-danger){background:var(--sd-ui-input);color:var(--sd-ui-input-text);border-color:var(--sd-ui-line)}
 #dialog .quiet:not(.sd-reset-danger):not(:disabled):hover{
- background:var(--sd-ui-selected);color:var(--sd-ui-selected-text);border-color:var(--sd-ui-selected-focus)
+ background:var(--sd-ui-selected);color:var(--sd-ui-selected-text);border-color:var(--sd-ui-selected-border)
 }
 #dialog .sd-icon-gallery{background:var(--sd-ui-card);border-color:var(--sd-ui-line)}
-#dialog :is(.settings-body,.sd-property-editor){scrollbar-color:var(--sd-ui-accent) transparent}
+#dialog :is(.settings-body,.sd-property-editor){scrollbar-color:var(--sd-ui-scrollbar) transparent}
 #dialog :is(.sd-ui-card.sd-reset-card,.sd-reset-actions,.sd-reset-danger,.err){
  background:var(--sd-ui-warning);color:var(--sd-ui-warning-text);border-color:var(--sd-ui-warning-border);
  --ui-muted:var(--sd-ui-warning-text);--soft:var(--sd-ui-warning-text)
@@ -64,7 +68,10 @@
 }
 #dialog :is(.settings-monitor,.sd-property-preview) h3{color:var(--sd-ui-preview-heading)}
 #dialog :is(.settings-monitor .settings-preview,.sd-properties-hero){
- background:var(--sd-ui-stage);color:var(--sd-ui-stage-text);border-color:var(--sd-ui-line)
+ background:radial-gradient(ellipse at 62% 57%,var(--sd-ui-stage),transparent 69%),
+  radial-gradient(ellipse at 12% 14%,var(--sd-ui-stage-halo),transparent 66%),
+  linear-gradient(150deg,var(--sd-ui-stage-base),var(--sd-ui-preview) 87%);
+ color:var(--sd-ui-stage-text);border-color:var(--sd-ui-line)
 }
 #dialog .settings-monitor .settings-preview>.note{color:var(--sd-ui-stage-muted)}
 #dialog .sd-thumb-switch{color:var(--sd-ui-preview-muted)}
@@ -77,18 +84,34 @@
 }
 #menu :is(.menu-title,small,.posrow span){color:var(--sd-ui-rail-muted)}
 #menu button:is(:not(:disabled):hover,:focus-visible,[aria-pressed=true]){
- background:var(--sd-ui-selected);color:var(--sd-ui-selected-text);border-color:var(--sd-ui-selected-focus)
+ background:var(--sd-ui-selected);color:var(--sd-ui-selected-text);border-color:var(--sd-ui-selected-border)
 }
 #menu button:is(:not(:disabled):hover,:focus-visible,[aria-pressed=true]) small{color:inherit}
 #menu button.danger{background:var(--sd-ui-warning);color:var(--sd-ui-warning-text)}
 
+#dialog .sd-theme-modes{
+ display:flex;align-items:center;gap:12px;padding:10px 15px 0;
+ color:var(--sd-ui-card-muted);font-size:12px
+}
+#dialog .sd-theme-mode-control{
+ display:inline-flex;gap:3px;padding:3px;border:1px solid var(--sd-ui-line);
+ background:var(--sd-ui-input);border-radius:9px
+}
+#dialog .sd-theme-mode-control button{
+ min-height:28px;padding:4px 12px;color:var(--sd-ui-input-text);
+ border:1px solid transparent;background:transparent;border-radius:6px
+}
+#dialog .sd-theme-mode-control button:not(:disabled):hover,
+#dialog .sd-theme-mode-control button[aria-pressed=true]{
+ color:var(--sd-ui-selected-text);background:var(--sd-ui-selected);border-color:var(--sd-ui-selected-border)
+}
 .sd-theme-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(120px,100%),1fr));gap:8px;padding:12px 15px}
 #dialog .sd-theme-option{
  display:flex;flex-direction:column;gap:7px;min-width:0;padding:8px;text-align:left;font-size:12px;
  color:var(--sd-ui-input-text);background:var(--sd-ui-input);border:1px solid var(--sd-ui-line);border-radius:9px
 }
 #dialog .sd-theme-option[aria-pressed=true]{
- background:var(--sd-ui-selected);color:var(--sd-ui-selected-text);border-color:var(--sd-ui-selected-focus)
+ background:var(--sd-ui-selected);color:var(--sd-ui-selected-text);border-color:var(--sd-ui-selected-border)
 }
 .sd-theme-swatches{display:flex;height:14px;overflow:hidden;border-radius:4px}
 .sd-theme-swatches span{flex:1}
