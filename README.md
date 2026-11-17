@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/TNVR-HSN/stack-dock/releases">Download for Windows</a> ·
+   · <a href="https://github.com/TNVR-HSN/stack-dock/releases">Download for Windows</a> ·
 </p>
 
 Keep your favorite shortcuts directly on the dock, or group them into folders that open as expandable grids called **Grid Stacks**.
