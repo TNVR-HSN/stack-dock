@@ -397,6 +397,7 @@ dialog.sd-properties{width:min(860px,calc(100% - 24px))}
  .settings-dialog .settings-body{padding-block:8px}
 }
 </style>
+<link rel="stylesheet" href="/stack-dock-panels.css">
 </head>
 <body>
 <main class="desktop" id="desktop" aria-label="Stack Dock desktop">
@@ -1461,7 +1462,7 @@ function dialogBuildHere(title,desc,submit,build,save,settings=false){
  dialog.classList.toggle('sd-properties',properties);form.noValidate=settings;
  form.replaceChildren();
  dialog.classList.remove('sd-hide-slider-defaults');
- dialog.classList.remove('sd-dialog-placed');
+ dialog.classList.remove('sd-dialog-placed','sd-dialog-resized');
  const movable=settings||properties;
  dialog.classList.toggle('sd-movable',movable);
  const head=E('div','dialogtop'),text=E('div'),h=E('h2','',title);h.id='dialogTitle';
@@ -1480,6 +1481,7 @@ function dialogBuildHere(title,desc,submit,build,save,settings=false){
  const foot=E('div','dialogfoot'),cancel=B('Cancel','quiet',()=>dialog.close()),ok=B(submit,'primary');ok.type='submit';
  if(settings||properties)foot.append(E('span','sd-panel-footnote',properties?'Changes apply to this shortcut only.':'Save to apply your changes.'));
  foot.append(cancel,ok);form.append(head,body,foot);
+ if(movable)installDialogResize(settings?'settings':'properties');
  const submitError=err=>{error.textContent=err.message||String(err);error.hidden=false;};
  function complete(after){dialog.close();if(typeof after==='function')after();}
  form.onsubmit=e=>{
@@ -1582,7 +1584,7 @@ function addResetSection(general){
    }
    }
    localStorage.setItem(storageKey,JSON.stringify(next));
-   state=next;lastId=null;
+   state=next;lastId=null;applyUiTheme(next.uiTheme);
    dialog.close();
    if(phase==='open')finishClose(false);else refresh();
   }catch(error){
@@ -1751,11 +1753,11 @@ function editSettings(selected=null,initial='dock',creating=false){
  const folders=creating?[newFolder]:state.folders;
  let folder=selected||active()||folders[0],tab=initial,collectDock,collectGeneral,applyStartup,edge,alignment,activate,targetWrap,tablist,scroll;
  const cache=new Map(),previews=new Map(),labels={general:'General',dock:'Dock',folder:'Folder',gs:'Grid Stack'};
- const groups={general:[['behavior','Behavior'],['launch','Launch indicator'],['backup','Layout Backup']],dock:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects']],
+ const groups={general:[['behavior','Behavior'],['launch','Launch indicator'],['themes','Themes'],['backup','Layout Backup']],dock:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects']],
   folder:[['identity','Folder icon']],gs:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects']]};
  const activeGroups={};
  const pageCopy={
-  general:'Startup, motion, hover behavior and backups for StackDock.',
+  general:'Startup, motion, hover behavior, themes and backups for StackDock.',
   dock:'Set the dock’s screen position, appearance and icon behavior.',
   folder:'Customize the icon that opens this folder from the dock.',
   gs:'Set the grid layout, panel appearance and effects for this folder.'
@@ -1765,7 +1767,7 @@ function editSettings(selected=null,initial='dock',creating=false){
  const byTab=new Map();
  function previewBox(){const node=E('div','settings-preview');node.setAttribute('aria-label','Live appearance preview');return node}
  function preview(draw,s,f,type,controls=null){
-  if(!draw?.isConnected||draw.closest('[hidden]'))return;
+  if(!draw?.isConnected||!draw.clientWidth||draw.closest('[hidden]'))return;
   const hull=E('div','sample-shell'),glass=E('div','glass'),row=E('div','sample-row');
   const vertical=type==='dock'&&verticalEdge(edge.value);
   if(type==='dock'){draw.dataset.edge=edge.value;draw.dataset.align=alignment.value;if(vertical)row.style.flexDirection='column'}
@@ -1787,6 +1789,12 @@ function editSettings(selected=null,initial='dock',creating=false){
   const k=Math.min(type==='folder'?.82:.59,
    Math.max(30,(draw.clientWidth||255)-24)/(2*p.padX+across*cellWidth+(across-1)*p.gapX+10),
    (small?52:167)/(2*p.padY+down*cellHeight+(down-1)*p.gapY+(type==='gs'?43:5)));
+  // The dock/grid fill is independent of the interface theme. Contrast
+  // preview captions against that simulated surface, not the theme alone.
+  const stageStyle=getComputedStyle(draw);
+  const base=stageStyle.getPropertyValue('--sd-ui-stage').trim();
+  const ink=stageStyle.getPropertyValue('--sd-ui-stage-text').trim();
+  if(base&&ink)hull.style.color=uiLegible(ink,uiMix(base,s.color,clamp(s.opacity/100,0,1)));
   hull.style.borderRadius=Math.round(s.radius*k)+'px';hull.style.padding=Math.round(p.padY*k)+'px '+Math.round(p.padX*k)+'px';
   hull.style.setProperty('--sd-hover',(s.hoverOpacity??40)/100);
   hull.style.boxShadow=shadow(s);styleGlass(glass,s);hull.append(glass);
@@ -1859,10 +1867,9 @@ function editSettings(selected=null,initial='dock',creating=false){
   query.setAttribute('aria-label','Filter settings on this page');
   panelGlyph(search,'search').append(query);
   tablist=E('nav','settings-tabs');tablist.setAttribute('role','tablist');tablist.setAttribute('aria-label','Settings pages');
-  const narrowRail=matchMedia('(max-width:630px)');
-  const orientTabs=()=>tablist.setAttribute('aria-orientation',narrowRail.matches?'horizontal':'vertical');
-  orientTabs();narrowRail.addEventListener('change',orientTabs);
-  dialog.addEventListener('close',()=>narrowRail.removeEventListener('change',orientTabs),{once:true});
+  const orientTabs=()=>tablist.setAttribute('aria-orientation',
+   getComputedStyle(tablist).flexDirection==='row'?'horizontal':'vertical');
+  if(typeof ResizeObserver!=='function')queueMicrotask(orientTabs);
   rail.append(search,tablist,E('div','sd-rail-caption','STACKDOCK  /  SETTINGS'));
   const head=E('header','settings-page-head'),pageTitle=E('h3'),pageDescription=E('p');
   head.append(pageTitle,pageDescription);
@@ -1932,6 +1939,8 @@ function editSettings(selected=null,initial='dock',creating=false){
    configureLaunch.refresh?.();
    launchDisabled.hidden=!launchSample?.hidden;
   };
+   const themeBar=creating?null:buildUiThemeSettings(general,draw);
+   if(themeBar)center.insertBefore(themeBar,scroll);
    if(!creating){
     const backup=settingsCard(general,'Import and export','backup');
     backup.parentElement.classList.add('sd-preview-card');
@@ -1987,7 +1996,8 @@ function editSettings(selected=null,initial='dock',creating=false){
     button.append(art(key,FOLDER_ICONS,26));swatchButtons.set(key,button);swatches.append(button);
    }
    syncPalette(f);
-   palette.append(E('strong','','Folder color'),swatches,E('p','note','Choosing a color uses the built-in icon in place of a custom image.'));
+   palette.append(swatches,E('p','note','Choosing a color uses the built-in icon in place of a custom image.'));
+   settingsCard(folderPane,'Folder color','identity').append(palette);
 
    const gsPreview=previewBox(gs),layout=settingsCard(gs,'Grid layout','layout');
    layout.classList.add('gs-dimensions');
@@ -1997,7 +2007,7 @@ function editSettings(selected=null,initial='dock',creating=false){
    settingsGear.parentElement.classList.add('card-toggle');
    layout.append(E('p','note','Shortcuts stay in their assigned cells. Move a shortcut before shrinking past its cell.'));
    const style=appearance(gs,{...gsDefaults,...f.style},true);
-   const c={f,folderPane,gs,name,folderHoverLabels,useSize,size,ownCorner,dockCorner,icon,arrow,rotation,rotate,cols,rows,settingsGear,style,folderPreview,gsPreview,palette};cache.set(f.id,c);return c;
+   const c={f,folderPane,gs,name,folderHoverLabels,useSize,size,ownCorner,dockCorner,icon,arrow,rotation,rotate,cols,rows,settingsGear,style,folderPreview,gsPreview};cache.set(f.id,c);return c;
   }
   let currentPane=null;
   function renderPreview(key,c,group){
@@ -2005,7 +2015,7 @@ function editSettings(selected=null,initial='dock',creating=false){
    const sample=launch?launchStage:key==='dock'||key==='general'?previews.get(key):key==='folder'?c.folderPreview:c.gsPreview;
    previewHint.textContent=launch?'This shows the appearance of the launch indicator.':
     key==='folder'?'Preview of this folder on the dock.':'Hover over the preview icons to try effects.';
-   previewSlot.replaceChildren(previewTitle,sample,previewHint,...(key==='folder'?[c.palette]:key==='gs'?[layoutInfo]:[]));
+   previewSlot.replaceChildren(previewTitle,sample,previewHint,...(key==='gs'?[layoutInfo]:[]));
   }
   function filter(){
    if(!currentPane)return;
@@ -2025,6 +2035,7 @@ function editSettings(selected=null,initial='dock',creating=false){
     for(const row of controls)row.classList.toggle('sd-filter-out',!!words.length&&!titleMatch&&!!matchedRows.length&&!matchedRows.includes(row));
     if(!card.hidden)shown++;
    }
+   if(themeBar)themeBar.hidden=tab!=='general'||!Array.from(currentPane.children).some(card=>card.dataset.group==='themes'&&!card.hidden);
    empty.hidden=shown>0;
    empty.textContent=shown?'':'No settings on this page match your search.';
   }
@@ -2067,8 +2078,8 @@ function editSettings(selected=null,initial='dock',creating=false){
   const update=()=>{if(query.value.trim())filter();draw();};
   scroll.addEventListener('input',update);scroll.addEventListener('change',update);
   if(typeof ResizeObserver==='function'){
-   const resize=new ResizeObserver(()=>draw());
-   resize.observe(previewSlot);
+   const resize=new ResizeObserver(()=>{orientTabs();draw();});
+   resize.observe(shell);resize.observe(previewSlot);
    dialog.addEventListener('close',()=>resize.disconnect(),{once:true});
   }
   if(creating)ensure(newFolder);
@@ -2212,6 +2223,7 @@ async function startNative(){
 }
 const nativeReady=startNative();
 </script>
+<script src="/stack-dock-panels.js"></script>
 <script src="/stack-dock-native.js"></script>
 <script src="/stack-dock-widget.js"></script>
 </body>

@@ -133,10 +133,11 @@ impl IDropTarget_Impl for DockTarget_Impl {
         let accepted = data.as_ref().is_some_and(|source| {
             (unsafe { source.QueryGetData(&file_format()).is_ok() }) || !paths_from(source).is_empty()
         });
-        self.entered.set(accepted);
-        self.accepts_files.set(accepted);
         self.last_over.set(None);
         let allowed = if accepted { safe_effect(*effect) } else { DROPEFFECT_NONE };
+        let registered_drag = allowed.0 != 0;
+        self.entered.set(registered_drag);
+        self.accepts_files.set(registered_drag);
         self.source_effect.set(allowed);
         *effect = allowed;
         if effect.0 != 0 { self.emit_drop("enter", Some(point), Vec::new()); }
@@ -225,11 +226,10 @@ fn set_surface_visibility(surface: &mut Surface) {
         hide(surface);
         return;
     }
-    // Arm before the pointer reaches the edge, but do not put anything over
-    // a different window if StackDock is obscured.
-    let near = cursor.x >= top_left.x - 90 && cursor.y >= top_left.y - 90 &&
-        cursor.x < top_left.x + zone.width + 90 && cursor.y < top_left.y + zone.height + 90;
-    if !near && !surface.entered.get() { hide(surface); return; }
+    // Arm on the held external mouse button even when the cursor is far
+    // away. Waiting for proximity can send OLE into the WebView before the
+    // registered target is visible. The surface remains confined to the
+    // current dock/grid rectangle and the visibility checks below still apply.
     let cursor_inside = cursor.x >= top_left.x && cursor.y >= top_left.y &&
         cursor.x < top_left.x + zone.width && cursor.y < top_left.y + zone.height;
     let hit = |point| {
@@ -297,7 +297,7 @@ fn create_surface(window: &WebviewWindow) -> std::result::Result<Surface, String
         unsafe { let _ = DestroyWindow(hwnd); OleUninitialize(); }
         return Err(error.to_string());
     }
-    let timer = unsafe { SetTimer(Some(hwnd), 1, 35, Some(surface_tick)) };
+    let timer = unsafe { SetTimer(Some(hwnd), 1, 16, Some(surface_tick)) };
     if timer == 0 {
         unsafe { let _ = RevokeDragDrop(hwnd); let _ = DestroyWindow(hwnd); OleUninitialize(); }
         return Err("Windows could not start the file drop surface.".into());

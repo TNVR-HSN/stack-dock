@@ -734,7 +734,7 @@ dialog.sd-panel-region{box-shadow:none}
         if(seenIds.delete(id))dockOrder.push(id);
       }
     }
-    return { edge:s.edge, align:s.align, general, dock:appearanceCopy(s.dock, dockDefaults), folders,
+    return { edge:s.edge, align:s.align, general, uiTheme:normalizeUiTheme(s.uiTheme), dock:appearanceCopy(s.dock, dockDefaults), folders,
       dockShortcuts:restoredShortcuts,dockOrder };
   }
 
@@ -746,6 +746,7 @@ dialog.sd-panel-region{box-shadow:none}
     try { localStorage.setItem(storageKey, JSON.stringify(next)); }
     catch { throw Error('This layout does not fit in local storage. Your current layout was not changed.'); }
     state = next;
+    applyUiTheme(next.uiTheme);
     void fillExistingIconSources(next);
   }
 
@@ -1029,8 +1030,11 @@ dialog.sd-panel-region{box-shadow:none}
       const accepting=(phase==='open'||phase==='closed')&&menu.hidden&&!dialog.open&&!surfaceWanted;
       const rect=accepting?island.getBoundingClientRect():null;
       const scale=window.devicePixelRatio||nativeArea?.scale||1;
-      const zone=rect?{x:Math.round(rect.left*scale),y:Math.round(rect.top*scale),
-        width:Math.round(rect.width*scale),height:Math.round(rect.height*scale)}:{x:0,y:0,width:0,height:0};
+      // Round the physical edges outwards instead of rounding the size
+      // separately. Fractional display scaling must not leave a dead strip.
+      const x=rect?Math.floor(rect.left*scale):0,y=rect?Math.floor(rect.top*scale):0;
+      const zone=rect?{x,y,width:Math.ceil(rect.right*scale)-x,height:Math.ceil(rect.bottom*scale)-y}
+        :{x:0,y:0,width:0,height:0};
       const key=JSON.stringify(zone);
       if(key===lastDropZone)return;
       lastDropZone=key;

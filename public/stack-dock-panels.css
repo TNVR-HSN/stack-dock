@@ -1,0 +1,147 @@
+/* Interface palette. Dock and Grid Stack appearance settings are independent. */
+:root{--panel:var(--sd-ui-win,#211725)}
+#dialog{
+ color-scheme:var(--sd-ui-scheme,dark);color:var(--sd-ui-text);
+ --soft:var(--sd-ui-muted);--accent:var(--sd-ui-accent);--line:var(--sd-ui-line)
+}
+#dialog:is(.settings-dialog,.sd-properties){
+ --ui-win:var(--sd-ui-win);--ui-rail:var(--sd-ui-rail);--ui-card:var(--sd-ui-card);
+ --ui-preview:var(--sd-ui-preview);--ui-text:var(--sd-ui-text);--ui-muted:var(--sd-ui-muted);
+ --ui-line:var(--sd-ui-line);--ui-rule:var(--sd-ui-rule);
+ --ui-accent:var(--sd-ui-accent);--ui-selected:var(--sd-ui-selected);border-color:var(--sd-ui-line)
+}
+#dialog :is(.dialogtop,.dialogfoot,.settings-rail){
+ color:var(--sd-ui-rail-text);background:var(--sd-ui-rail);
+ --soft:var(--sd-ui-rail-muted);--accent:var(--sd-ui-rail-focus)
+}
+#dialog :is(.dialogtop .close,.dialogfoot .sd-panel-footnote,.sd-panel-brand h2,.sd-rail-caption){
+ color:var(--sd-ui-rail-muted)
+}
+#dialog .sd-panel-mark,#dialog .primary:not(.sd-reset-hold){
+ background:var(--sd-ui-button);color:var(--sd-ui-button-text);border-color:var(--sd-ui-button)
+}
+#dialog .settings-tabs button{color:var(--sd-ui-rail-text)}
+#dialog .settings-tabs button[aria-selected=true]::before{background:var(--sd-ui-rail-focus)}
+#dialog .settings-groups{background:var(--sd-ui-card);border-color:var(--sd-ui-line)}
+#dialog :is(.settings-groups button,.sd-ui-card .check,.sd-ui-card .field span,.sd-ui-card .field label,.sd-ui-card .field output){
+ color:var(--sd-ui-card-text)
+}
+#dialog .settings-target .field{color:var(--sd-ui-text)}
+#dialog :is(.settings-tabs button:hover,.settings-tabs button[aria-selected=true],
+ .settings-groups button:hover,.settings-groups button[aria-pressed=true],.dialogtop .close:hover,
+ .sd-theme-option[aria-pressed=true],.sd-icon-thumbs button[aria-pressed=true],.sd-search-result.sd-search-selected){
+ background:var(--sd-ui-selected);color:var(--sd-ui-selected-text);border-color:var(--sd-ui-selected-focus)
+}
+#dialog .sd-ui-card{color:var(--sd-ui-card-text);--soft:var(--sd-ui-card-muted);--ui-muted:var(--sd-ui-card-muted)}
+#dialog :is(.sd-ui-card h4,.section legend){color:var(--sd-ui-heading)}
+#dialog .sd-slider-default{opacity:1}
+#dialog :is(.sd-panel-search,.field input:not([type=range]),.field select,.sd-search-input){
+ background:var(--sd-ui-input);color:var(--sd-ui-input-text);border-color:var(--sd-ui-input-border);
+ --accent:var(--sd-ui-input-focus);color-scheme:var(--sd-ui-input-scheme,dark)
+}
+#dialog :is(.sd-panel-search input,.field input,.sd-search-input)::placeholder{color:var(--sd-ui-input-muted)}
+#dialog .sd-panel-search input{background:transparent;border:0;color:var(--sd-ui-input-text)}
+#dialog :is(.field input[type=range],.sd-thumb-switch input){accent-color:var(--sd-ui-accent)}
+#dialog .sd-ui-card input[type=checkbox]{background:var(--sd-ui-switch-off);border-color:var(--sd-ui-switch-off)}
+#dialog .sd-ui-card input[type=checkbox]::after{background:var(--sd-ui-switch-thumb)}
+#dialog .sd-ui-card input[type=checkbox]:checked{background:var(--sd-ui-accent);border-color:var(--sd-ui-accent)}
+#dialog .sd-ui-card input[type=checkbox]:checked::after{background:var(--sd-ui-accent-thumb)}
+#dialog .quiet:not(.sd-reset-danger){background:var(--sd-ui-input);color:var(--sd-ui-input-text);border-color:var(--sd-ui-line)}
+#dialog .quiet:not(.sd-reset-danger):not(:disabled):hover{
+ background:var(--sd-ui-selected);color:var(--sd-ui-selected-text);border-color:var(--sd-ui-selected-focus)
+}
+#dialog .sd-icon-gallery{background:var(--sd-ui-card);border-color:var(--sd-ui-line)}
+#dialog :is(.settings-body,.sd-property-editor){scrollbar-color:var(--sd-ui-accent) transparent}
+#dialog :is(.sd-ui-card.sd-reset-card,.sd-reset-actions,.sd-reset-danger,.err){
+ background:var(--sd-ui-warning);color:var(--sd-ui-warning-text);border-color:var(--sd-ui-warning-border);
+ --ui-muted:var(--sd-ui-warning-text);--soft:var(--sd-ui-warning-text)
+}
+#dialog :is(.sd-ui-card.sd-reset-card h4,.sd-reset-actions legend,.sd-reset-warning){color:var(--sd-ui-warning-text)}
+#dialog .sd-reset-hold::before{background:var(--sd-ui-warning-border);opacity:.32}
+#dialog :is(.settings-monitor,.sd-property-preview){
+ background:var(--sd-ui-preview);color:var(--sd-ui-preview-text);
+ --soft:var(--sd-ui-preview-muted);--ui-muted:var(--sd-ui-preview-muted)
+}
+#dialog :is(.settings-monitor,.sd-property-preview) h3{color:var(--sd-ui-preview-heading)}
+#dialog :is(.settings-monitor .settings-preview,.sd-properties-hero){
+ background:var(--sd-ui-stage);color:var(--sd-ui-stage-text);border-color:var(--sd-ui-line)
+}
+#dialog .settings-monitor .settings-preview>.note{color:var(--sd-ui-stage-muted)}
+#dialog .sd-thumb-switch{color:var(--sd-ui-preview-muted)}
+#dialog .sd-folder-colors{margin:0;padding:10px 15px 13px}
+#dialog .sd-color-swatches{justify-content:flex-start}
+#dialog .sd-color-swatches button{background:var(--sd-ui-input);border-color:var(--sd-ui-line)}
+#dialog .sd-color-swatches button[aria-pressed=true]{border-color:var(--sd-ui-accent)}
+#menu,#toast{
+ background:var(--sd-ui-rail);color:var(--sd-ui-rail-text);border-color:var(--sd-ui-line);--accent:var(--sd-ui-rail-focus)
+}
+#menu :is(.menu-title,small,.posrow span){color:var(--sd-ui-rail-muted)}
+#menu button:is(:not(:disabled):hover,:focus-visible,[aria-pressed=true]){
+ background:var(--sd-ui-selected);color:var(--sd-ui-selected-text);border-color:var(--sd-ui-selected-focus)
+}
+#menu button:is(:not(:disabled):hover,:focus-visible,[aria-pressed=true]) small{color:inherit}
+#menu button.danger{background:var(--sd-ui-warning);color:var(--sd-ui-warning-text)}
+
+.sd-theme-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(120px,100%),1fr));gap:8px;padding:12px 15px}
+#dialog .sd-theme-option{
+ display:flex;flex-direction:column;gap:7px;min-width:0;padding:8px;text-align:left;font-size:12px;
+ color:var(--sd-ui-input-text);background:var(--sd-ui-input);border:1px solid var(--sd-ui-line);border-radius:9px
+}
+#dialog .sd-theme-option[aria-pressed=true]{
+ background:var(--sd-ui-selected);color:var(--sd-ui-selected-text);border-color:var(--sd-ui-selected-focus)
+}
+.sd-theme-swatches{display:flex;height:14px;overflow:hidden;border-radius:4px}
+.sd-theme-swatches span{flex:1}
+.sd-theme-bar{
+ display:flex;flex-wrap:wrap;align-items:center;gap:7px;padding:8px 18px;
+ border-bottom:1px solid var(--sd-ui-line);background:var(--sd-ui-win);flex:none
+}
+.sd-theme-bar .note{flex:1;min-width:70px;margin:0}
+.sd-theme-bar button{min-height:30px;padding-block:4px}
+
+/* Dragging the grip changes the DOM dialog. The existing native observer
+   follows its new bounds without resizing the full host window. */
+#dialog:is(.settings-dialog,.sd-properties) form{position:relative}
+#dialog.settings-dialog form{container:sd-settings / inline-size}
+#dialog.sd-properties form{container:sd-properties / inline-size}
+#dialog.sd-dialog-resized{width:min(var(--sd-dialog-w),calc(100% - 8px));height:var(--sd-dialog-h)}
+#dialog.sd-dialog-resized form{height:100%;max-height:100%}
+#dialog.sd-dialog-resized .dialogbody{flex:1;min-height:0}
+#dialog.sd-dialog-resized.sd-properties .sd-property-shell{flex:1;min-height:0}
+#dialog:is(.settings-dialog,.sd-properties) .dialogfoot{padding-inline-end:42px}
+#dialog .sd-dialog-resize{
+ position:absolute;right:6px;bottom:5px;width:26px;height:26px;padding:4px;display:grid;place-items:center;
+ border:0;border-radius:6px;background:transparent;color:var(--sd-ui-rail-muted);
+ cursor:nwse-resize;touch-action:none;user-select:none
+}
+#dialog .sd-dialog-resize:is(:hover,:focus-visible){
+ background:var(--sd-ui-selected);color:var(--sd-ui-selected-text)
+}
+#dialog .sd-dialog-resize svg{width:17px;height:17px}
+
+@container sd-settings (width < 980px){
+ #dialog .settings-shell{grid-template-columns:150px minmax(0,1fr) 218px}
+}
+/* SETTINGS PREVIEW CUTOFF — change 820px here.
+   Measured against the dialog content width, not the display width. */
+@container sd-settings (width < 820px){
+ #dialog .settings-shell{grid-template-columns:145px minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+ #dialog .settings-monitor{display:none}
+}
+@container sd-settings (width < 630px){
+ #dialog .settings-shell{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+ #dialog .settings-rail{padding:7px 11px;border-right:0;border-bottom:1px solid var(--sd-ui-line)}
+ #dialog .settings-tabs{flex-direction:row;flex-wrap:wrap}
+ #dialog .settings-tabs button{flex:1;min-height:29px;justify-content:center}
+ #dialog .settings-tabs button::before,#dialog .sd-rail-caption{display:none}
+}
+@container sd-properties (width < 760px){
+ #dialog .sd-property-shell{grid-template-columns:minmax(0,1fr) minmax(125px,25%);grid-template-rows:minmax(0,1fr)}
+ #dialog .sd-property-preview{grid-row:auto}
+}
+/* An unusually small display can be narrower than the minimum window width.
+   The preview stays visible above the form in that case. */
+@container sd-properties (width < 465px){
+ #dialog .sd-property-shell{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+ #dialog .sd-property-preview{grid-row:1}
+}
