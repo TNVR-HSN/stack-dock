@@ -1,10 +1,23 @@
-# StackDock
+<p align="center">
+  <img src="public/stackdock-app-icon.png" width="112" alt="StackDock SD icon">
+</p>
 
-**A customizable Windows dock for apps, games, files, folders, and links.**
+<h1 align="center">StackDock</h1>
 
-Keep your favorite shortcuts directly on the dock, or group them into folders that open as expandable grids called **Grid Stacks**. StackDock is in beta.
+<p align="center"><strong>A customizable Windows dock for apps, games, files, folders, and links.</strong></p>
 
-[Download for Windows](https://github.com/TNVR-HSN/stack-dock/releases) · [Report a bug or suggest a feature](https://github.com/TNVR-HSN/stack-dock/issues)
+<p align="center">
+  <a href="#get-started"><img src="https://img.shields.io/badge/platform-Windows-0078D4" alt="Platform: Windows"></a>
+  <a href="#build-from-source"><img src="https://img.shields.io/badge/built%20with-Tauri%202-24C8DB?logo=tauri" alt="Built with Tauri 2"></a>
+  <a href="https://github.com/TNVR-HSN/stack-dock/releases"><img src="https://img.shields.io/badge/status-0.1.0--beta-F2A900" alt="Status: 0.1.0-beta"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/TNVR-HSN/stack-dock/releases">Download for Windows</a> ·
+  <a href="https://github.com/TNVR-HSN/stack-dock/issues">Report a bug or suggest a feature</a>
+</p>
+
+Keep your favorite shortcuts directly on the dock, or group them into folders that open as expandable grids called **Grid Stacks**.
 
 ## Features
 
