@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark">
-<title>Stack Dock</title>
+<title>StackDock</title>
 <style>
 :root{color-scheme:dark;font:14px/1.45 "Segoe UI",system-ui,sans-serif;color:#f2eaf6;background:#100a14;--soft:#bdb0c5;--line:#ffffff23;--accent:#efb7ff;--panel:#211725}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{margin:0;overflow:hidden}button,input,select{font:inherit}button{cursor:pointer;color:inherit}button:disabled{cursor:default;opacity:.38}:focus-visible{outline:2px solid var(--accent);outline-offset:2px}[hidden]{display:none!important}[inert]{pointer-events:none!important}svg{display:block}button svg{pointer-events:none}
 .desktop{position:fixed;inset:0;overflow:hidden;background:radial-gradient(ellipse at 50% 38%,#7a2b4355,transparent 62%),radial-gradient(ellipse at 16% 78%,#551e7347,transparent 52%),radial-gradient(ellipse at 85% 77%,#6d23435c,transparent 52%),linear-gradient(160deg,#160d19,#0c0912 67%,#100913);isolation:isolate}
@@ -13,6 +13,8 @@
 .island{position:absolute;z-index:4;isolation:isolate;overflow:hidden;touch-action:auto}.glass{position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:var(--fill);border:var(--border-w,1px) solid var(--edge);box-shadow:inset 0 1px 0 var(--shine)}.dock-view,.gs-view{position:absolute;inset:0;min-width:0;min-height:0}.dock-view{display:flex;align-items:center;justify-content:center}.gs-view{padding:var(--pad-y) var(--pad-x);display:flex;flex-direction:column;align-items:stretch}
 .gs-heading{display:flex;align-items:flex-start;justify-content:center;flex:0 0 var(--heading-h);min-width:0;position:relative}
 .gs-heading.has-settings{padding-inline:25px}
+.gs-settings.sd-grid-back{left:0;right:auto;font-size:23px}
+.sd-outgoing-grid{pointer-events:none!important}
 .gs-settings{position:absolute;right:0;top:0;width:25px;height:25px;border:0;border-radius:6px;background:transparent;padding:0;display:grid;place-items:center;font-size:17px;line-height:1}.gs-settings:hover{background:#ffffff22}
 .gs-heading-inner{height:28px;max-width:100%;display:flex;align-items:center;gap:8px}
 .gs-heading h2{min-width:0;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.25;font-weight:650;letter-spacing:.015em;text-shadow:0 1px 6px #000a}
@@ -66,6 +68,9 @@ html.native-dock,html.native-dock body,html.native-dock #desktop{background:tran
 .native-dock dialog:modal{top:var(--sd-caption-gutter,0px);bottom:0;max-height:calc(100dvh - var(--sd-caption-gutter,0px) - 20px)}
 .native-dock .menu{max-height:calc(100dvh - var(--sd-caption-gutter,0px) - 14px)}
 #island[data-phase="opening"] .scroll,#island[data-phase="closing"] .scroll{overflow:hidden}
+.gs-view .scroll {
+  scrollbar-width: none;
+}
 /* Settings keep the tab, category and preview outside the scrolling controls. */
 dialog.settings-dialog{width:min(950px,calc(100% - 24px))}
 .settings-dialog form{height:min(760px,calc(100dvh - var(--sd-caption-gutter,0px) - 30px));max-height:none}
@@ -400,8 +405,8 @@ dialog.sd-properties{width:min(860px,calc(100% - 24px))}
 <link rel="stylesheet" href="/stack-dock-panels.css">
 </head>
 <body>
-<main class="desktop" id="desktop" aria-label="Stack Dock desktop">
-<section id="island" class="island" data-phase="closed" aria-label="Stack dock">
+<main class="desktop" id="desktop" aria-label="StackDock desktop">
+<section id="island" class="island" data-phase="closed" aria-label="StackDock">
   <div id="dockGlass" class="glass"></div><div id="gsGlass" class="glass" style="opacity:0"></div>
   <div id="dockView" class="dock-view"></div><div id="gsView" class="gs-view" inert aria-hidden="true"></div>
   <div id="launchGlass" class="glass" hidden></div><div id="launchView" class="launch-view" role="status" hidden></div>
@@ -428,12 +433,38 @@ const dockFolderIcon=(label,light,dark,folder,accent)=>({label,svg:()=>{
  </svg>`;
 }});
 const FOLDER_ICONS={
- 'folder-emerald':dockFolderIcon('Emerald','#16c792','#047857','#05271e','#68e7ad'),
  'folder-azure':dockFolderIcon('Blue','#39bdf7','#145599','#092440','#86ddff'),
+ 'folder-emerald':dockFolderIcon('Emerald','#16c792','#047857','#05271e','#68e7ad'),
  'folder-violet':dockFolderIcon('Violet','#af83ff','#6236aa','#281540','#d9bcff')
 };
 const FOLDER_KEYS=Object.keys(FOLDER_ICONS);
 const folderIconKey=index=>FOLDER_KEYS[index % FOLDER_KEYS.length];
+const isSubfolder=entry=>entry?.type==='folder';
+const MAX_FOLDER_DEPTH=12, FOLDER_PALETTE=2;
+const childrenOf=f=>Array.isArray(f?.slots)?f.slots.filter(isSubfolder):[];
+function folderTree(roots){
+ const result=[],queue=roots.map(folder=>({folder,path:[folder]})).reverse(),seen=new Set();
+ while(queue.length){
+  const entry=queue.pop(),{folder,path}=entry;
+  if(!folder||seen.has(folder))continue;
+  seen.add(folder);result.push(entry);
+  for(const child of childrenOf(folder).reverse())queue.push({folder:child,path:[...path,child]});
+ }
+ return result;
+}
+function folderPath(id){return id?folderTree(state.folders).find(item=>item.folder.id===id)?.path||[]:[]}
+const folderParent=f=>folderPath(f?.id).at(-2);
+function nextFolderColorIndex(layout=state){
+ const n=layout.general?.nextFolderColor;
+ return layout.general?.folderPalette===FOLDER_PALETTE&&Number.isInteger(n)&&n>=0&&n<FOLDER_KEYS.length?n:0;
+}
+function advanceFolderColor(layout=state){
+ layout.general={...layout.general,folderPalette:FOLDER_PALETTE,nextFolderColor:(nextFolderColorIndex(layout)+1)%FOLDER_KEYS.length};
+}
+function folderDraft(parent=null){
+ return {id:uid(),name:'',icon:folderIconKey(nextFolderColorIndex()),image:'',
+  cols:parent?4:5,rows:3,slots:[],style:{...gsDefaults,...parent?.style},...(parent?{type:'folder'}:{})};
+}
 const APP_ICONS={
  file:{svg:`<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
  <path d="M17 8h20l12 12v31a5 5 0 0 1-5 5H17a5 5 0 0 1-5-5V13a5 5 0 0 1 5-5z" fill="#cbd5e1"/>
@@ -485,8 +516,8 @@ const triggerSize=(f,d=state.dock)=>f.triggerSize||d.icon;
 const headingSize=s=>s.titleIcon||headingIconSize;
 const headingSpace=s=>Math.max(headingHeight,headingSize(s)+15);
 function fresh(){
- return {edge:'bottom',align:'center',general:{...generalDefaults},dock:{...dockDefaults},dockShortcuts:[],dockOrder:[],folders:[{
-  id:uid(),name:'Shortcuts',icon:'folder-emerald',image:'',cols:5,rows:3,slots:[],style:{...gsDefaults}
+ return {edge:'bottom',align:'center',orientation:'auto',general:{...generalDefaults,folderPalette:FOLDER_PALETTE,nextFolderColor:0},dock:{...dockDefaults},dockShortcuts:[],dockOrder:[],folders:[{
+  id:uid(),name:'Shortcuts',icon:'folder-azure',image:'',cols:5,rows:3,slots:[],style:{...gsDefaults}
  }]};
 }
 let state=fresh();
@@ -496,18 +527,21 @@ try {
   state=saved;
   if(!Array.isArray(state.dockShortcuts))state.dockShortcuts=[];
   if(!Array.isArray(state.dockOrder))state.dockOrder=[];
+  const restoredFolders=folderTree(state.folders).map(entry=>entry.folder);
   // Drop the old background effect from saved layouts without resetting them.
   let migrated=false;
-  for(const appearance of [state.dock,...state.folders.map(folder=>folder?.style)]){
+  for(const appearance of [state.dock,...restoredFolders.map(folder=>folder?.style)]){
    if(appearance&&Object.hasOwn(appearance,'blur')){
     delete appearance.blur;
     migrated=true;
    }
   }
    // Keep each shortcut at its saved coordinates. Old gaps become ordinary empty cells.
-  for(const [index,folder] of state.folders.entries()){
+  for(const [index,folder] of restoredFolders.entries()){
    if(!Object.hasOwn(FOLDER_ICONS,folder.icon)){folder.icon=folderIconKey(index);migrated=true;}
+   if(!Array.isArray(folder.slots)){folder.slots=[];migrated=true;}
    for(const item of folder.slots){
+    if(item?.type!=='item')continue;
     const key=shortcutIconKey(item);
     if(item.icon!==key){item.icon=key;migrated=true;}
     if(item.iconMode==='target'){
@@ -517,8 +551,8 @@ try {
    }
    if(Object.hasOwn(folder,'mode')){delete folder.mode;migrated=true;}
    if(folder.style&&Object.hasOwn(folder.style,'guides')){delete folder.style.guides;migrated=true;}
-   if(folder.slots.some(slot=>slot.type!=='item')){
-    folder.slots=folder.slots.filter(slot=>slot.type==='item');migrated=true;
+   if(folder.slots.some(slot=>slot?.type!=='item'&&!isSubfolder(slot))){
+    folder.slots=folder.slots.filter(slot=>slot?.type==='item'||isSubfolder(slot));migrated=true;
    }
   }
   if(migrated)localStorage.setItem(storageKey,JSON.stringify(state));
@@ -534,7 +568,7 @@ let surfaceWanted=false,surfaceRequest=0;
 let focusLossPending=false,focusLossTimer=0,focusLossTicket=0,externalDropActive=false;
 const nativeMargin=5;
 function nativeFailure(error){
- console.error('Stack Dock window:',error);
+ console.error('StackDock window:',error);
  notify('Window sizing unavailable. Check Tauri permissions and the developer console.');
 }
 // Put the HWND's caption strip above the usable work area, then exclude that
@@ -555,13 +589,17 @@ function nativeCover(...boxes){
  const bottom=Math.min(nativeArea.h,Math.ceil(Math.max(...boxes.map(b=>b.y+b.h))+nativeMargin));
  return {x,y,w:right-x,h:bottom-y};
 }
-const sameNativeBox=(a,b)=>a&&['x','y','w','h','radius','clipTop'].every(k=>a[k]===b[k]);
+const sameNativeBox=(a,b)=>a&&['x','y','w','h','radius','clipTop'].every(k=>a[k]===b[k])&&
+ ((!a.companion&&!b.companion)||(a.companion&&b.companion&&['x','y','w','h'].every(k=>a.companion[k]===b.companion[k])));
 async function setNativeRegion(target){
  if(sameNativeBox(nativeRegion,target))return;
  const px=value=>Math.round(value*nativeArea.scale);
- const x=px(target.x),y=px(target.y);
+ const x=px(target.x),y=px(target.y),other=target.companion;
+ const companion=other&&other.w>0&&other.h>0
+  ?[px(other.x),px(other.y),px(other.x+other.w),px(other.y+other.h)]:undefined;
  await nativeCore.invoke('set_dock_region',{x,y,width:px(target.x+target.w)-x,height:px(target.y+target.h)-y,
-  ...(target.radius>0?{radius:px(target.radius)}:{}),...(target.clipTop!==undefined?{clipTop:px(target.clipTop)}:{})});
+  ...(target.radius>0?{radius:px(target.radius)}:{}),...(target.clipTop!==undefined?{clipTop:px(target.clipTop)}:{}),
+  ...(companion?{companion}:{})});
  nativeRegion=target;
 }
 function moveHost(target){
@@ -619,7 +657,7 @@ function queueFocusLoss(){
  focusLossPending=true;clearTimeout(focusLossTimer);
  const ticket=++focusLossTicket;
  let lifted=false;
- const blocked=()=>ticket!==focusLossTicket||!focusLossPending||nativeBusy||surfaceWanted||dialog.open||phase==='opening'||launch.pending;
+ const blocked=()=>ticket!==focusLossTicket||!focusLossPending||nativeBusy||surfaceWanted||dialog.open||phase==='opening'||phase==='navigating'||launch.pending;
  const check=async()=>{
   if(blocked())return;
   const focused=await nativeWindow?.isFocused?.().catch(()=>undefined);
@@ -660,8 +698,14 @@ function expandForControls(callback){
 let clearHover=()=>{}, expandedIconAt=()=>null;
 let scheduleDropZone=()=>{};
 let phase='closed', activeId=null, lastId=null, serial=0, tracks=[], currentMetrics=null, menuFocus=null, savedFocus=null, toastTimer=0;
-let drag=null, dropCell=null, dockInsert=null, suppressClick=0, press=null, ignoreNativeMenuUntil=0, flight=null;
-const active=()=>state.folders.find(f=>f.id===activeId);
+let drag=null, dropCell=null, dockInsert=null, suppressClick=0, press=null, ignoreNativeMenuUntil=0, flight=null, outgoingGrid=null;
+let activeCacheState=null,activeCacheId=null,activeCacheFolder;
+function active(){
+ if(activeCacheState!==state||activeCacheId!==activeId){
+  activeCacheState=state;activeCacheId=activeId;activeCacheFolder=folderPath(activeId).at(-1);
+ }
+ return activeCacheFolder;
+}
 const MAX_DOCK_SHORTCUTS=160;
 const isDockShortcut=entry=>entry?.type==='item';
 function dockEntries(layout=state){
@@ -764,6 +808,7 @@ function art(key,source,size,image='',round=false,angle=0){
 // The desktop bridge resolves old local paths and optional thumbnails as icons come into view.
 let resolveShortcutVisual=null;
 function shortcutArt(t,size,radius,appearance){
+ if(isSubfolder(t))return art(t.icon,FOLDER_ICONS,size,t.image,radius,iconRotationOf(t,appearance));
  const image=customShortcutImage(t);
  const node=art(shortcutIconKey(t),APP_ICONS,size,image,radius,iconRotationOf(t,appearance));
  if(!image&&resolveShortcutVisual)resolveShortcutVisual(node,t,size,radius);
@@ -811,7 +856,8 @@ function dims(){
  const top=nativeArea?.gutter??0,w=nativeArea?.w??desktop.clientWidth,h=(nativeArea?.h??desktop.clientHeight)-top;
  return {w,h,top,p:Math.min(14,Math.floor(w/40)+4)};
 }
-function vertical(){return state.edge==='left'||state.edge==='right'}
+function dockIsVertical(edge,orientation){return orientation==='vertical'||(orientation!=='horizontal'&&verticalEdge(edge))}
+function vertical(){return dockIsVertical(state.edge,state.orientation)}
 function axisValue(s,key,axis){
  const setting=s[key+'Split']?s[key+axis]:undefined;
  return setting??s[key]??0;
@@ -852,8 +898,8 @@ function metrics(f){
 function box(w,h,r){
  const d=dims(), a=state.align==='start'?0:state.align==='end'?1:.5;
  w=Math.max(1,Math.min(w,d.w-2*d.p));h=Math.max(1,Math.min(h,d.h-2*d.p));
- const x=vertical()?(state.edge==='left'?d.p:d.w-d.p-w):d.p+a*(d.w-2*d.p-w);
- const y=d.top+(vertical()?d.p+a*(d.h-2*d.p-h):(state.edge==='top'?d.p:d.h-d.p-h));
+ const x=verticalEdge(state.edge)?(state.edge==='left'?d.p:d.w-d.p-w):d.p+a*(d.w-2*d.p-w);
+ const y=d.top+(verticalEdge(state.edge)?d.p+a*(d.h-2*d.p-h):(state.edge==='top'?d.p:d.h-d.p-h));
  return {x,y,w,h,r:Math.min(r,w/2,h/2)};
 }
 function dockBox(){
@@ -888,13 +934,12 @@ function clearFlight(){
  flight.destination?.classList.remove('flight-endpoint');
  flight.node.remove();flight=null;
 }
-function stopMotion(){++serial;tracks.forEach(x=>x.cancel());tracks=[];clearFlight();return serial}
+function stopMotion(){++serial;tracks.forEach(x=>x.cancel());tracks=[];clearFlight();outgoingGrid?.remove();outgoingGrid=null;return serial}
 function dockIcon(id){
  return [...dockView.querySelectorAll('.folder-btn')].find(b=>b.dataset.folder===id)?.querySelector('.art');
 }
-function startFlight(f,from,destination,source,duration,easing,opening,interrupted){
- const to=destination?.getBoundingClientRect();
- if(!f||!from?.width||!to?.width)return null;
+function startFlight(f,from,to,destination,source,duration,easing,opening,interrupted){
+ if(!f||!from?.width||!to?.width||!destination)return null;
  const node=E('div','folder-flight');
  node.setAttribute('aria-hidden','true');node.style.left=from.left+'px';node.style.top=from.top+'px';
  const startRadius=source?.style.getPropertyValue('--ir')||'50%';
@@ -973,10 +1018,16 @@ function renderGrid(f,retain=true){
  const before=gsView.querySelector('.scroll'),sx=retain?before?.scrollLeft||0:0,sy=retain?before?.scrollTop||0:0;
  const m=currentMetrics=metrics(f),s=f.style;
  gsView.style.setProperty('--pad-x',m.padX+'px');gsView.style.setProperty('--pad-y',m.padY+'px');gsView.style.setProperty('--heading-h',headingSpace(s)+'px');
+ const parent=folderParent(f);
  const heading=E('header','gs-heading'),badge=E('div','gs-heading-inner'),name=E('h2','',f.name);
  name.title=f.name;badge.style.height=(headingSize(s)+3)+'px';
- badge.append(art(f.icon,FOLDER_ICONS,headingSize(s),f.image,gridIconRadius(s),iconRotationOf(f,state.dock)),name);
+ badge.append(art(f.icon,FOLDER_ICONS,headingSize(s),f.image,gridIconRadius(s),iconRotationOf(f,parent?.style||state.dock)),name);
  heading.append(badge);
+ if(parent){
+  heading.classList.add('has-settings');
+  const back=B('‹','gs-settings sd-grid-back',e=>{void navigateGrid(parent,e.detail===0)});
+  back.setAttribute('aria-label','Back to '+parent.name);back.title='Back to '+parent.name;heading.append(back);
+ }
  if(s.settingsGear){
   heading.classList.add('has-settings');
   const settings=B('⚙','gs-settings',()=>{if(phase==='open')editSettings(f,'gs')});
@@ -990,7 +1041,9 @@ function renderGrid(f,retain=true){
  for(let r=0;r<m.rows;r++)for(let c=0;c<m.cols;c++){
   const cell=E('div','cell'),t=map.get(r+':'+c);cell.dataset.r=r;cell.dataset.c=c;
   if(t){
-   const b=B('','tile',ev=>{if(phase==='open'&&performance.now()>=suppressClick)launch(t)});
+   const b=B('','tile',ev=>{if(phase!=='open'||performance.now()<suppressClick)return;
+    if(isSubfolder(t))void navigateGrid(t,ev.detail===0);else void launch(t);
+   });
    b.dataset.tile=t.id;b.setAttribute('aria-label',t.name);
    const radius=gridIconRadius(s);
    b.append(highlightArt(shortcutArt(t,s.icon,radius,s),s,radius));
@@ -1011,7 +1064,8 @@ function morph(target,opening,finish){
  if(!state.dock.motion||reduced.matches||!island.animate){
   stopMotion();applyBox(target);views(opening);finish();return;
  }
- const f=active(),source=opening?dockIcon(f?.id):gsView.querySelector('.gs-heading .art');
+ const f=opening?active():state.folders.find(folder=>folder.id===lastId);
+ const source=opening?dockIcon(f?.id):active()===f?gsView.querySelector('.gs-heading .art'):null;
  const flyingArt=flight?.node.querySelector('.art');
  const flyingAngle=flyingArt?.querySelector(':scope > img,:scope > svg');
  const flyingArrow=flyingArt?.querySelector('.sd-folder-arrow');
@@ -1027,7 +1081,8 @@ function morph(target,opening,finish){
  const speed=100/clamp(Number.isFinite(state.dock.motionSpeed)?state.dock.motionSpeed:100,25,250);
  const duration=(opening?420:325)*speed, easing=opening?'cubic-bezier(.19,.84,.26,1)':'cubic-bezier(.38,.03,.32,1)';
  const destination=opening?gsView.querySelector('.gs-heading .art'):dockIcon(f?.id);
- const iconMotion=startFlight(f,fromIcon,destination,source,duration,opening?'cubic-bezier(.24,.74,.2,1)':easing,opening,interrupted);
+ const toIcon=destination?.getBoundingClientRect();
+ const iconMotion=startFlight(f,fromIcon,toIcon,destination,source,duration,opening?'cubic-bezier(.24,.74,.2,1)':easing,opening,interrupted);
  const hull=island.animate([{...boxFrame(from),boxShadow:previousShadow},{...boxFrame(target),boxShadow:island.style.boxShadow}],{duration,easing});
  const a=(node,start,end,{duration,delay})=>node.animate([{opacity:start},{opacity:end}],{fill:'backwards',easing:'ease-out',duration:duration*speed,delay:delay*speed});
  // Surface and content crossfade independently. The GS fill never uses dock opacity.
@@ -1070,6 +1125,78 @@ function openStack(id,keyboard=false){
    else{activeId=null;gsView.replaceChildren();currentMetrics=null}
  });
 }
+// Reveal the return tile without scrolling the desktop or the island itself.
+function revealGridTile(view,button){
+ const scroll=view.querySelector('.scroll');
+ if(!scroll||!button)return;
+ const bounds=scroll.getBoundingClientRect(),item=button.getBoundingClientRect();
+ const left=bounds.left+scroll.clientLeft,top=bounds.top+scroll.clientTop;
+ const closest=(start,end,min,max)=>start<min?start-min:end>max?end-max:0;
+ scroll.scrollLeft+=closest(item.left,item.right,left,left+scroll.clientWidth);
+ scroll.scrollTop+=closest(item.top,item.bottom,top,top+scroll.clientHeight);
+}
+// In-place navigation keeps one Grid Stack open. Reserve the full old/new
+// bounds before animating, as for the dock-to-grid flight.
+async function navigateGrid(next,keyboard=false){
+ const current=active();
+ if(!current||phase!=='open'||nativeBusy||dialog.open||launch.pending)return false;
+ const down=childrenOf(current).includes(next);
+ if(!down&&folderParent(current)!==next)return false;
+ closeMenu();clearPointer();clearHover(false);
+ const before=readBox(), fromShadow=getComputedStyle(island).boxShadow, goal=gridBox(next);
+ if(nativeWindow){
+  nativeBusy=true;
+  try{if(!await moveHost(nativeCover(before,goal)))return false}
+  finally{nativeBusy=false}
+  if(phase!=='open'||active()!==current||dialog.open){fitNative();return false}
+ }
+ const other=down?next:current;
+ const tile=(view,entry)=>[...view.querySelectorAll('.tile')].find(btn=>btn.dataset.tile===entry.id);
+ const source=down?tile(gsView,next)?.querySelector('.art'):gsView.querySelector('.gs-heading .art');
+ const fromIcon=source?.getBoundingClientRect();
+ const lastScroll=gsView.querySelector('.scroll');
+ const ticket=stopMotion();
+ setPhase('navigating');
+ const moving=state.dock.motion&&!reduced.matches&&island.animate;
+ let retiringArtwork=source;
+ if(moving){
+  outgoingGrid=gsView.cloneNode(true);
+  outgoingGrid.removeAttribute('id');outgoingGrid.classList.add('sd-outgoing-grid');
+  outgoingGrid.setAttribute('aria-hidden','true');outgoingGrid.inert=true;
+  outgoingGrid.style.width=before.w+'px';outgoingGrid.style.height=before.h+'px';
+  gsView.before(outgoingGrid);
+  const sc=outgoingGrid.querySelector('.scroll');
+  if(sc&&lastScroll){sc.scrollLeft=lastScroll.scrollLeft;sc.scrollTop=lastScroll.scrollTop}
+  retiringArtwork=(down?tile(outgoingGrid,next)?.querySelector('.art'):outgoingGrid.querySelector('.gs-heading .art'))||source;
+ }
+ const oldFill=gsGlass.style.getPropertyValue('--fill'),oldEdge=gsGlass.style.getPropertyValue('--edge');
+ activeId=next.id;renderGrid(next,false);applyBox(goal);views(true);
+ const returningTile=down?null:tile(gsView,current);
+ if(returningTile)revealGridTile(gsView,returningTile);
+ const destination=down?gsView.querySelector('.gs-heading .art'):returningTile?.querySelector('.art');
+ if(moving){
+  // Measure the destination in the final layout. Once island.animate starts,
+  // its first keyframe puts that same DOM node back in the old panel geometry.
+  const toIcon=destination?.getBoundingClientRect();
+  const duration=325*100/clamp(state.dock.motionSpeed||100,25,250),easing='cubic-bezier(.22,.76,.26,1)';
+  const travel=startFlight(other,fromIcon,toIcon,destination,retiringArtwork,duration,easing,down,null);
+  tracks=[
+   island.animate([{...boxFrame(before),boxShadow:fromShadow},{...boxFrame(goal),boxShadow:island.style.boxShadow}],{duration,easing}),
+   outgoingGrid.animate([{opacity:1},{opacity:0}],{duration:duration*.55,easing:'ease-out',fill:'forwards'}),
+   gsView.animate([{opacity:0},{opacity:1}],{duration:duration*.65,delay:duration*.22,easing:'ease-out',fill:'backwards'}),
+   gsGlass.animate([{backgroundColor:oldFill,borderColor:oldEdge},
+    {backgroundColor:gsGlass.style.getPropertyValue('--fill'),borderColor:gsGlass.style.getPropertyValue('--edge')}],{duration,easing})
+  ];
+  if(travel)tracks.push(travel);
+  await Promise.allSettled(tracks.map(animation=>animation.finished));
+  if(ticket!==serial)return phase==='open'&&active()===next;
+ }
+ clearFlight();outgoingGrid?.remove();outgoingGrid=null;tracks=[];
+ setPhase('open');fitNative(goal);
+ if(keyboard)(down?gsView.querySelector('.tile,.sd-grid-back')||gsView:tile(gsView,current)||gsView).focus({preventScroll:true});
+ if(focusLossPending)queueFocusLoss();
+ return true;
+}
 function closeStack(refocus=true){
  if(!['opening','open'].includes(phase)||nativeBusy||launch.pending)return;
  closeMenu();clearPointer();
@@ -1100,7 +1227,7 @@ async function launch(t) {
 
   if (!core?.invoke) {
     dialogBuild('Desktop app required',
-      'Launch shortcuts from the Stack Dock desktop app.',
+      'Launch shortcuts from the StackDock desktop app.',
       'OK', () => {}, () => {});
     return;
   }
@@ -1168,13 +1295,13 @@ function placeEntries(f,where,entries){
  return placed;
 }
 function reposition(f,t,where){
- if(t.r===where.r&&t.c===where.c)return;
+ if(!f.slots.includes(t)||t.r===where.r&&t.c===where.c)return;
  const swap=entryAt(f,where);
  if(swap){swap.r=t.r;swap.c=t.c}
  t.r=where.r;t.c=where.c;persist();refresh();
 }
 function erase(f,t){
- if(!state.folders.includes(f)||!f.slots.includes(t))return;
+ if(!folderPath(f.id).includes(f)||!f.slots.includes(t))return;
  const buttons=[...gsView.querySelectorAll('.tile')],index=buttons.findIndex(button=>button.dataset.tile===t.id);
  const node=buttons[index],hadFocus=!!node&&(document.activeElement===node||savedFocus===node);
  f.slots=f.slots.filter(item=>item!==t);persist();
@@ -1192,7 +1319,7 @@ function changeColumn(f, col, insert) {
   for(const t of f.slots)if(t.c>=col)t.c++;
   f.cols++;
  }else{
-  if(f.cols<=1||col<0||col>=f.cols||f.slots.some(t=>t.c===col&&t.type==='item'))return false;
+  if(f.cols<=1||col<0||col>=f.cols||f.slots.some(t=>t.c===col))return false;
   f.slots=f.slots.filter(t=>t.c!==col);
   for(const t of f.slots)if(t.c>col)t.c--;
   f.cols--;
@@ -1248,7 +1375,11 @@ function dockMenu(x,y,entry){
    mi(link?'Open Link':'Open Destination',()=>link?void launch(entry):void openDestination(entry));
    sep();
   }
-  mi('Settings…',()=>editSettings(shortcut?null:entry,entry&&!shortcut?'folder':'dock'));
+  if(entry&&!shortcut)mi('Folder settings…',()=>editSettings(entry,'folder'));
+  else{
+   mi('Settings…',()=>editSettings(null,'general'));
+   mi('Dock settings…',()=>editSettings(null,'dock'));
+  }
   if(entry){
    mi(shortcut?'Move shortcut earlier':'Move folder earlier',()=>reorderDock(entry,i-1),{disabled:i===0});
    mi(shortcut?'Move shortcut later':'Move folder later',()=>reorderDock(entry,i+2),{disabled:i===items.length-1});
@@ -1258,29 +1389,54 @@ function dockMenu(x,y,entry){
   mi('New folder…',()=>editSettings(null,'folder',true));
   mi('Add shortcut to dock…',()=>editShortcut(null,null),{disabled:(state.dockShortcuts?.length||0)>=MAX_DOCK_SHORTCUTS});
   if(shortcut){sep();mi('Remove shortcut',()=>removeDockEntry(entry),{danger:true});}
-  else if(entry&&state.folders.length>1){sep();mi('Remove folder…',()=>confirm('Remove '+entry.name+'?','This removes the folder and its shortcuts from Stack Dock.',()=>removeDockEntry(entry)),{danger:true})}
+  else if(entry&&state.folders.length>1){sep();mi('Remove folder…',()=>confirm('Remove '+entry.name+'?','This removes the folder and its shortcuts from StackDock.',()=>removeDockEntry(entry)),{danger:true})}
+ });
+}
+function createSubfolder(parent,where){
+ if(folderPath(parent.id).length>=MAX_FOLDER_DEPTH||entryAt(parent,where))return;
+ const draft=folderDraft(parent);
+ let name;
+ dialogBuild('New subfolder','Create a folder in '+parent.name+'.','Create folder',body=>{
+  name=field(body,'Folder name','text','',{required:true,maxLength:40});
+ },()=>{
+  const title=name.value.trim();
+  if(!title)throw Error('Enter a folder name.');
+  if(!folderPath(parent.id).includes(parent)||entryAt(parent,where))throw Error('That grid cell is no longer available.');
+  const color=nextFolderColorIndex();
+  Object.assign(draft,{name:title,r:where.r,c:where.c,icon:folderIconKey(color)});
+  parent.slots.push(draft);advanceFolderColor();persist();
+  return refresh;
  });
 }
 function gridMenu(x,y,target,explicit=null){
  if(phase!=='open'||!active())return;
  const f=active(),where=explicit||locate(x,y),tile=target?.closest('.tile');
  if(!where)return;
- const existing=entryAt(f,where),t=tile&&f.slots.find(v=>v.id===tile.dataset.tile);
+ const t=tile?f.slots.find(v=>v.id===tile.dataset.tile):entryAt(f,where);
+ const parent=folderParent(f);
  showMenu(x,y,()=>{
    mt(t?t.name:f.name+' · Row '+(where.r+1)+', column '+(where.c+1));
-   if(t){
+   if(isSubfolder(t)){
+    mi('Open subfolder',()=>void navigateGrid(t));
+    mi('Folder settings…',()=>editSettings(t,'folder'));
+    mi('Remove subfolder…',()=>confirm('Remove '+t.name+'?','Remove this subfolder and its contents from StackDock. Your original files are not deleted.',()=>erase(f,t)),{danger:true});
+   }else if(t){
     mi('Shortcut properties…',()=>editShortcut(f,where,t));
     const link=['url','uri'].includes(t.kind||guess(t.target));
     mi(link?'Open Link':'Open Destination',()=>link?void launch(t):void openDestination(t));
     mi('Remove shortcut',()=>erase(f,t),{danger:true});
-   }else mi('Add shortcut here…',()=>editShortcut(f,where));
+   }else{
+    mi('Add shortcut here…',()=>editShortcut(f,where));
+    mi('New subfolder…',()=>createSubfolder(f,where),{disabled:folderPath(f.id).length>=MAX_FOLDER_DEPTH});
+   }
    sep();
    mi('Insert row below',()=>addRow(f,where),{disabled:f.rows>=MAX_ROWS});
    mi('Insert column right',()=>changeColumn(f,where.c+1,true),{disabled:f.cols>=MAX_COLUMNS});
-   if(f.rows>1&&!f.slots.some(v=>v.r===where.r&&v.type==='item'))mi('Remove empty row',()=>{f.slots=f.slots.filter(v=>v.r!==where.r);f.slots.forEach(v=>{if(v.r>where.r)v.r--});f.rows--;persist();refresh()});
-   if(f.cols>1&&!f.slots.some(v=>v.c===where.c&&v.type==='item'))mi('Remove empty column',()=>changeColumn(f,where.c,false));
+   if(f.rows>1&&!f.slots.some(v=>v.r===where.r))mi('Remove empty row',()=>{f.slots=f.slots.filter(v=>v.r!==where.r);f.slots.forEach(v=>{if(v.r>where.r)v.r--});f.rows--;persist();refresh()});
+   if(f.cols>1&&!f.slots.some(v=>v.c===where.c))mi('Remove empty column',()=>changeColumn(f,where.c,false));
    sep();
    mi('Grid Stack settings…',()=>editSettings(f,'gs'));
+   if(parent)mi('Back to parent',()=>void navigateGrid(parent));
    mi('Close grid',()=>closeStack());
  });
 }
@@ -1295,7 +1451,7 @@ function context(e){
 document.addEventListener('contextmenu',context);
 document.addEventListener('keydown',e=>{
  if(dialog.open)return;
- if(e.key==='Escape'){if(!menu.hidden){e.preventDefault();closeMenu(true)}else if(['open','opening'].includes(phase)){e.preventDefault();closeStack()}return}
+ if(e.key==='Escape'){if(!menu.hidden){e.preventDefault();closeMenu(true)}else if(['open','opening'].includes(phase)){e.preventDefault();const parent=phase==='open'&&folderParent(active());if(parent)void navigateGrid(parent,true);else closeStack()}return}
  if((e.key==='ContextMenu'||e.shiftKey&&e.key==='F10')&&island.contains(document.activeElement)){
   e.preventDefault();const node=document.activeElement,r=node.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;
   if(phase==='open')gridMenu(x,y,node);else if(phase==='closed')dockMenu(x,y,dockEntryAt(node));
@@ -1367,7 +1523,7 @@ function insideIsland(x,y){
 }
 island.addEventListener('pointerdown',e=>{
  if(e.button!==0||!['open','closed'].includes(phase))return;
- if(e.target.closest('.gs-settings'))return;
+ if(e.target.closest('.gs-settings')||dialog.open)return;
  const tile=e.target.closest('.tile')||expandedIconAt(e)?.closest('.tile'),f=active();
  const item=tile&&f?.slots.find(x=>x.id===tile.dataset.tile);
  const dockButton=phase==='closed'&&(e.target.closest('.folder-btn')||expandedIconAt(e));
@@ -1486,6 +1642,7 @@ const panelGlyphs={
  folder:'<path d="M3 7a2 2 0 0 1 2-2h4.2l2 2.4H19a2 2 0 0 1 2 2v8.1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
  gs:'<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/>',
  search:'<circle cx="10.5" cy="10.5" r="6.2"/><path d="m15 15 5 5"/>',
+ gear:'<circle cx="12" cy="12" r="3"/><path d="M10 2.8h4l.55 2.48 1.66.96 2.42-.75 2 3.46-1.84 1.73v1.96l1.84 1.73-2 3.46-2.42-.75-1.66.96L14 20.5h-4l-.55-2.48-1.66-.96-2.42.75-2-3.46 1.84-1.73v-1.96L3.37 8.93l2-3.46 2.42.75 1.66-.96z"/>',
  properties:'<rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8m-8 4h8m-8 4h5"/>'
 };
 function panelGlyph(node,key){
@@ -1502,7 +1659,8 @@ function propertyWorkspace(body,hero,extra=null){
 }
 function dialogBuildHere(title,desc,submit,build,save,settings=false){
  clearHover(false);
- const properties=/^(Shortcut properties|Add shortcut here)$/.test(title);
+ const properties=/^(Shortcut properties|Add shortcut here)$/.test(title),liveSettings=settings&&title==='Settings';
+ dialog.classList.toggle('sd-live-settings',liveSettings);
  savedFocus=document.activeElement;dialog.classList.toggle('settings-dialog',settings);
  dialog.classList.toggle('sd-properties',properties);form.noValidate=settings;
  form.replaceChildren();
@@ -1513,7 +1671,7 @@ function dialogBuildHere(title,desc,submit,build,save,settings=false){
  const head=E('div','dialogtop'),text=E('div'),h=E('h2','',title);h.id='dialogTitle';
  if(settings||properties){
   const brand=E('div','sd-panel-brand');
-  const mark=panelGlyph(E('span','sd-panel-mark'),settings?'dock':'properties');
+  const mark=panelGlyph(E('span','sd-panel-mark'),settings?'gear':'properties');
   if(settings)text.append(E('strong','','StackDock'),h);
   else text.append(h,E('p','',desc));
   brand.append(mark,text);
@@ -1524,25 +1682,34 @@ function dialogBuildHere(title,desc,submit,build,save,settings=false){
  const body=E('div','dialogbody'),error=E('div','err');error.hidden=true;error.setAttribute('role','alert');
  build(body,error);body.append(error);
  const foot=E('div','dialogfoot'),cancel=B('Cancel','quiet',()=>dialog.close()),ok=B(submit,'primary');ok.type='submit';
- if(settings||properties)foot.append(E('span','sd-panel-footnote',properties?'Changes apply to this shortcut only.':'Save to apply your changes.'));
- foot.append(cancel,ok);form.append(head,body,foot);
+ const apply=liveSettings?B('Apply','quiet',()=>submitDialog(false)):null;
+ const footnote=E('span','sd-panel-footnote',properties?'Changes apply to this shortcut only.':
+  liveSettings?'Apply to see changes, or Done to apply and close.':'Save to apply your changes.');
+ if(liveSettings)footnote.setAttribute('role','status');
+ if(settings||properties)foot.append(footnote);
+ foot.append(cancel,...(apply?[apply]:[]),ok);form.append(head,body,foot);
  if(movable)installDialogResize(settings?'settings':'properties');
  const submitError=err=>{error.textContent=err.message||String(err);error.hidden=false;};
- function complete(after){dialog.close();if(typeof after==='function')after();}
- form.onsubmit=e=>{
-  e.preventDefault();if(ok.disabled)return;error.hidden=true;
+ function submitDialog(shouldClose){
+  if(ok.disabled)return;error.hidden=true;
+  const complete=after=>{
+   if(shouldClose)dialog.close();
+   if(typeof after==='function')after();
+   if(!shouldClose){footnote.textContent='Settings applied.';dialogMoved();}
+  };
   try{
    const after=save();
    if(after&&typeof after.then==='function'){
-    ok.disabled=cancel.disabled=cancelX.disabled=true;
+    const locked=[ok,cancel,cancelX,...(apply?[apply]:[])];locked.forEach(button=>button.disabled=true);
     const preventClose=event=>event.preventDefault();
     dialog.addEventListener('cancel',preventClose);
-    Promise.resolve(after).then(complete,submitError).finally(()=>{
-     ok.disabled=cancel.disabled=cancelX.disabled=false;dialog.removeEventListener('cancel',preventClose);
+    Promise.resolve(after).then(complete).catch(submitError).finally(()=>{
+     locked.forEach(button=>button.disabled=false);dialog.removeEventListener('cancel',preventClose);
     });
    }else complete(after);
   }catch(err){submitError(err);}
- };
+ }
+ form.onsubmit=e=>{e.preventDefault();submitDialog(true);};
  dialog.setAttribute('aria-labelledby','dialogTitle');dialog.showModal();(body.querySelector(settings?'[role=tab][aria-selected=true]':'input:not([type=file]), select, button')||cancel).focus({preventScroll:true});
 }
 dialog.addEventListener('close',()=>{if(savedFocus?.isConnected)savedFocus.focus({preventScroll:true});else if(phase==='open')gsView.focus({preventScroll:true});savedFocus=null;fitNative()});
@@ -1576,6 +1743,45 @@ function select(parent,label,choices,value){
  const l=E('label','field'),s=E('select');s.setAttribute('aria-label',label);l.append(E('span','',label),s);
  for(const [v,t] of choices){const o=E('option','',t);o.value=v;s.append(o)}
  s.value=value;parent.append(l);return s
+}
+// Button-sized choices, with arrow-key navigation and the same value/change
+// interface the appearance controls use for longer drop-down selections.
+function segmented(parent,label,options,value){
+ const row=E('div','field sd-segment-row'),title=E('span','',label),control=E('div','sd-segments');
+ control.setAttribute('role','group');control.setAttribute('aria-label',label);
+ let choices=[],current=String(value),disabled=false;
+ const sync=()=>[...control.children].forEach(button=>{
+  const selected=button.dataset.value===current;
+  button.setAttribute('aria-pressed',String(selected));button.tabIndex=selected&&!disabled?0:-1;button.disabled=disabled;
+ });
+ function choose(next){
+  if(disabled||next===current)return;
+  current=next;sync();control.dispatchEvent(new Event('change',{bubbles:true}));
+ }
+ control.setChoices=next=>{
+  choices=next.map(([key,name])=>[String(key),name]);
+  if(!choices.some(([key])=>key===current))current=choices[0]?.[0]||'';
+  control.replaceChildren(...choices.map(([key,name])=>{
+   const button=B(name,'',()=>choose(key));button.dataset.value=key;return button;
+  }));
+  sync();
+ };
+ Object.defineProperties(control,{
+  value:{get:()=>current,set:next=>{const key=String(next);if(choices.some(([v])=>v===key)){current=key;sync();}}},
+  disabled:{get:()=>disabled,set:next=>{disabled=!!next;control.setAttribute('aria-disabled',String(disabled));sync();}}
+ });
+ control.addEventListener('keydown',e=>{
+  if(disabled||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key))return;
+  const i=choices.findIndex(([key])=>key===current);
+  if(i<0)return;e.preventDefault();e.stopPropagation();
+  const next=e.key==='Home'?0:e.key==='End'?choices.length-1:(i+(['ArrowLeft','ArrowUp'].includes(e.key)?choices.length-1:1))%choices.length;
+  choose(choices[next][0]);control.children[next]?.focus({preventScroll:true});
+ });
+ control.setChoices(options);row.append(title,control);parent.append(row);return control;
+}
+function setSelectChoices(control,choices,value){
+ control.replaceChildren(...choices.map(([id,label])=>{const option=E('option','',label);option.value=id;return option}));
+ control.value=value;
 }
 function check(parent,label,value){const l=E('label','check'),n=E('input');n.type='checkbox';n.checked=!!value;l.append(n,E('span','',label));parent.append(l);return n}
 function settingsCard(body,title,group){
@@ -1791,12 +1997,11 @@ function iconPicker(body,source,initial,image,size,round,error,onChange=()=>{},p
 let generalLaunchControls=()=>()=>({});
 let stylePreviewIcon=()=>{};
 function editSettings(selected=null,initial='dock',creating=false){
- const savedColor=state.general?.nextFolderColor;
- const nextFolderColor=Number.isInteger(savedColor)&&savedColor>=0&&savedColor<FOLDER_KEYS.length
-  ?savedColor:state.folders.length%FOLDER_KEYS.length;
- const newFolder={id:uid(),name:'',icon:folderIconKey(nextFolderColor),image:'',cols:5,rows:3,slots:[],style:{...gsDefaults}};
+ const newFolder=creating?folderDraft():null;
  const folders=creating?[newFolder]:state.folders;
- let folder=selected||active()||folders[0],tab=initial,collectDock,collectGeneral,applyStartup,edge,alignment,activate,targetWrap,tablist,scroll;
+ let folder=creating?newFolder:selected||active()||folders[0];
+ let rootFolder=folderPath(folder.id)[0]||folder;
+ let tab=initial,collectDock,collectGeneral,applyStartup,edge,alignment,orientation,activate,syncSelectors,targetWrap,tablist,scroll;
  const cache=new Map(),previews=new Map(),labels={general:'General',dock:'Dock',folder:'Folder',gs:'Grid Stack'};
  const groups={general:[['behavior','Behavior'],['launch','Launch indicator'],['themes','Themes'],['backup','Layout Backup']],dock:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects']],
   folder:[['identity','Folder icon']],gs:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects']]};
@@ -1804,7 +2009,7 @@ function editSettings(selected=null,initial='dock',creating=false){
  const pageCopy={
   general:'Startup, motion, hover behavior, themes and backups for StackDock.',
   dock:'Set the dock’s screen position, appearance and icon behavior.',
-  folder:'Customize the icon that opens this folder from the dock.',
+  folder:'Customize a dock folder or a subfolder in its Grid Stack.',
   gs:'Set the grid layout, panel appearance and effects for this folder.'
  };
  let groupBar,previewSlot,previewHint,launchStage,launchSample,layoutInfo,configureLaunchPreview=()=>{};
@@ -1814,7 +2019,7 @@ function editSettings(selected=null,initial='dock',creating=false){
  function preview(draw,s,f,type,controls=null){
   if(!draw?.isConnected||!draw.clientWidth||draw.closest('[hidden]'))return;
   const hull=E('div','sample-shell'),glass=E('div','glass'),row=E('div','sample-row');
-  const vertical=type==='dock'&&verticalEdge(edge.value);
+  const vertical=type==='dock'&&dockIsVertical(edge.value,orientation.value);
   if(type==='dock'){draw.dataset.edge=edge.value;draw.dataset.align=alignment.value;if(vertical)row.style.flexDirection='column'}
   const p=spacingValues(s);
   const cols=type==='gs'?clamp(Math.trunc(+controls.cols.value||f.cols),1,MAX_COLUMNS):1;
@@ -1848,22 +2053,25 @@ function editSettings(selected=null,initial='dock',creating=false){
   if(type==='gs'){
    const title=E('div','sample-row sample-name');
    const ico=readIcon(f);
-   const dockAngle=cache.get(f.id)?.rotation()??iconRotationOf(f,collectDock());
+   const dockAngle=cache.get(f.id)?.rotation()??iconRotationOf(f,folderParent(f)?.style||collectDock());
    title.style.gap='5px';title.append(art(ico.icon,FOLDER_ICONS,Math.round(headingSize(s)*.66),ico.image,gridIconRadius(s),dockAngle),E('span','',cache.get(f.id)?.name.value||f.name||'New folder'));hull.append(title);
    const cellMin=Math.max(4,Math.round(cellHeight*k))+'px';
    const cellW=Math.max(4,Math.round(cellWidth*k))+'px';
    row.classList.add('sd-preview-grid');
    row.style.gridTemplateColumns='repeat('+cols+','+cellW+')';
    row.style.gridAutoRows=cellMin;
-   const cells=new Map(f.slots.filter(t=>t.type==='item').map(t=>[t.r*MAX_COLUMNS+t.c,t]));
+   const cells=new Map(f.slots.map(t=>[t.r*MAX_COLUMNS+t.c,t]));
    for(let r=0;r<shownRows;r++)for(let col=0;col<cols;col++){
     const t=cells.get(r*MAX_COLUMNS+col);
     if(!t){row.append(E('span','sd-preview-cell'));continue;}
     const item=E('div','sample-item'),radius=gridIconRadius(s),size=Math.max(4,Math.round(s.icon*k));
-    item.append(highlightArt(shortcutArt(t,size,radius,s),s,radius,k));
+    const child=cache.get(t.id),ico=isSubfolder(t)?readIcon(t):null;
+    const image=ico?art(ico.icon,FOLDER_ICONS,size,ico.image,radius,child?.rotation()??iconRotationOf(t,s)):shortcutArt(t,size,radius,s);
+    item.append(highlightArt(image,s,radius,k));
     iconEffects(item,shortcutIconKey(t),APP_ICONS,size,customShortcutImage(t),radius,s,k,t);
-    stylePreviewIcon(item,s,k,t.name);
-    if(s.labels){const label=E('small','',t.name);label.style.maxWidth=cellW;label.style.fontSize=Math.max(5,(s.labelFont??11)*k)+'px';item.append(label);}
+    const title=child?.name.value||t.name;
+    stylePreviewIcon(item,s,k,title);
+    if(s.labels){const label=E('small','',title);label.style.maxWidth=cellW;label.style.fontSize=Math.max(5,(s.labelFont??11)*k)+'px';item.append(label);}
     row.append(item);
    }
    layoutInfo.textContent=cols+' columns × '+rowCount+' rows'+(shownRows<rowCount?' · showing the first '+shownRows+' rows':'');
@@ -1902,10 +2110,10 @@ function editSettings(selected=null,initial='dock',creating=false){
   }
   if(tab==='general')preview(previews.get('general'),d,folder,'dock');
   else if(tab==='dock')preview(previews.get('dock'),d,folder,'dock');
-  else if(tab==='folder')preview(controls.folderPreview,d,folder,'folder',controls);
+  else if(tab==='folder')preview(controls.folderPreview,folderParent(folder)?.style||d,folder,'folder',controls);
   else preview(controls.gsPreview,controls.style(),folder,'gs',controls);
  }
- dialogBuild(creating?'New folder':'Settings','Adjust app behavior, the dock, and each grid stack.',creating?'Create folder':'Save settings',(body,error)=>{
+ dialogBuild(creating?'New folder':'Settings','Adjust app behavior, the dock, and each grid stack.',creating?'Create folder':'Done',(body,error)=>{
   const shell=E('div','settings-shell'),rail=E('aside','settings-rail'),center=E('div','settings-center');
   const search=E('label','sd-panel-search'),query=E('input');
   query.type='search';query.placeholder='Filter this page…';query.autocomplete='off';
@@ -1919,8 +2127,18 @@ function editSettings(selected=null,initial='dock',creating=false){
   const head=E('header','settings-page-head'),pageTitle=E('h3'),pageDescription=E('p');
   head.append(pageTitle,pageDescription);
   const targetRow=E('div','settings-target');targetWrap=targetRow;
-  const chooser=select(targetRow,'Editing folder',folders.map(f=>[f.id,f.name||'New folder']),folder.id);
-  chooser.onchange=()=>{folder=folders.find(f=>f.id===chooser.value);show(tab)};
+  const chooser=select(targetRow,'Editing folder',[],rootFolder.id);
+  const subChooser=select(targetRow,'Editing subfolder',[],folder.id);
+  syncSelectors=()=>{
+   setSelectChoices(chooser,folders.map(f=>[f.id,f.name||'New folder']),rootFolder.id);
+   const nested=folderTree([rootFolder]).slice(1);
+   subChooser.parentElement.hidden=!nested.length;
+   setSelectChoices(subChooser,[[rootFolder.id,'This folder'],...nested.map(({folder:f,path})=>
+    [f.id,path.slice(1).map(part=>part.name).join(' › ')])],folder.id);
+  };
+  syncSelectors();
+  chooser.onchange=()=>{rootFolder=folders.find(f=>f.id===chooser.value);folder=rootFolder;syncSelectors();show(tab)};
+  subChooser.onchange=()=>{folder=folderTree([rootFolder]).find(({folder:f})=>f.id===subChooser.value)?.folder||rootFolder;show(tab)};
   groupBar=E('div','settings-groups');
   groupBar.setAttribute('aria-label','Settings categories');
   scroll=E('div','settings-body');
@@ -1949,7 +2167,7 @@ function editSettings(selected=null,initial='dock',creating=false){
   const sliderLabels=check(settingsCard(general,'Settings display','behavior'),'Show default values on sliders',prefs.sliderDefaults);
   sliderLabels.onchange=()=>applySliderLabels(sliderLabels.checked);applySliderLabels(sliderLabels.checked);
   const startup=settingsCard(general,'Windows startup','behavior');
-  const startupInput=check(startup,'Start Stack Dock when I sign in',false);
+  const startupInput=check(startup,'Start StackDock when I sign in',false);
   const startupInfo=E('p','note','Checking Windows startup status…');
   startup.append(startupInfo);startupInput.disabled=true;
   let originalStartup=false;
@@ -1961,7 +2179,12 @@ function editSettings(selected=null,initial='dock',creating=false){
       'Use an installed or release build to enable startup.';
    }).catch(()=>{startupInfo.textContent='Windows startup settings could not be read.';});
   }else startupInfo.textContent='Available in the Windows desktop app.';
-  applyStartup=()=>startupInput.checked===originalStartup?null:nativeCore.invoke('stack_dock_startup',{enabled:startupInput.checked});
+  applyStartup=()=>{
+   const requested=startupInput.checked;
+   return requested===originalStartup?null:nativeCore.invoke('stack_dock_startup',{enabled:requested}).then(()=>{
+    originalStartup=requested;
+   });
+  };
   const behavior=settingsCard(general,'Interaction','behavior');
   const collapse=check(behavior,'Close the grid when I switch apps',prefs.collapseOnFocusLoss);
   const anim=check(behavior,'Animate opening and closing',state.dock.motion);
@@ -1993,14 +2216,15 @@ function editSettings(selected=null,initial='dock',creating=false){
     else backup.append(E('p','note','Layout backups are available in the Windows desktop app.'));
     addResetSection(general);
    }
-  collectGeneral=()=>({general:{hoverNames:names.checked,hoverTargets:targets.checked,hoverDelay:+delay.value,collapseOnFocusLoss:collapse.checked,imageThumbnails:thumbs.checked,sliderDefaults:sliderLabels.checked,nextFolderColor:creating?(nextFolderColor+1)%FOLDER_KEYS.length:nextFolderColor},
+  collectGeneral=()=>({general:{hoverNames:names.checked,hoverTargets:targets.checked,hoverDelay:+delay.value,collapseOnFocusLoss:collapse.checked,imageThumbnails:thumbs.checked,sliderDefaults:sliderLabels.checked},
    dock:{motion:anim.checked,motionSpeed:+speed.value,...configureLaunch()}});
   previews.set('general',previewBox());previews.set('dock',previewBox());
   const position=settingsCard(dock,'Screen position','layout');
-  edge=select(position,'Screen edge',[['top','Top'],['bottom','Bottom'],['left','Left'],['right','Right']],state.edge);
-  const choices=()=>verticalEdge(edge.value)?[['start','Top'],['center','Center'],['end','Bottom']]:[['start','Left'],['center','Center'],['end','Right']];
-  alignment=select(position,'Alignment',choices(),state.align);
-  edge.onchange=()=>{const a=alignment.value;alignment.replaceChildren(...choices().map(([v,n])=>{const x=E('option','',n);x.value=v;return x}));alignment.value=a;draw()};
+  edge=segmented(position,'Screen edge',[['top','Top'],['bottom','Bottom'],['left','Left'],['right','Right']],state.edge);
+  const choices=()=>verticalEdge(edge.value)?[['start','Top'],['center','Middle'],['end','Bottom']]:[['start','Left'],['center','Center'],['end','Right']];
+  alignment=segmented(position,'Alignment',choices(),state.align);
+  orientation=segmented(position,'Orientation',[['auto','Follow edge'],['horizontal','Horizontal'],['vertical','Vertical']],state.orientation||'auto');
+  edge.addEventListener('change',()=>{alignment.setChoices(choices());draw()});
   collectDock=appearance(dock,{...dockDefaults,...state.dock},false);
   function ensure(f){
    if(cache.has(f.id))return cache.get(f.id);
@@ -2016,7 +2240,8 @@ function editSettings(selected=null,initial='dock',creating=false){
    const dockCorner=field(identity,'Dock icon roundness','range',Number.parseFloat(dockIconRadius(f,collectDock())),{min:0,max:50,datasetUnit:'%',defaultValue:dockRoundness(dockDefaults),displayScale:2});
    dockCorner.disabled=!ownCorner.checked;ownCorner.onchange=()=>{dockCorner.disabled=!ownCorner.checked;};
    size.disabled=!useSize.checked;useSize.onchange=()=>{size.disabled=!useSize.checked;if(useSize.checked&&size.value==state.dock.icon){size.value=collectDock().icon;size.dispatchEvent(new Event('input'))}};
-   const arrow=folderArrowControls(settingsCard(folderPane,'Folder arrow','identity'),f.arrowOverride,()=>{
+   const arrowFields=settingsCard(folderPane,'Folder arrow','identity');
+   const arrow=folderArrowControls(arrowFields,f.arrowOverride,()=>{
     const global=folderArrowStyle(null,collectDock());
     return {enabled:global.folderArrow,x:global.folderArrowX,y:global.folderArrowY,rotation:global.folderArrowRotation};
    });
@@ -2030,8 +2255,14 @@ function editSettings(selected=null,initial='dock',creating=false){
    const icon=iconPicker(folderPane,FOLDER_ICONS,f.icon,f.image,37,true,error,pick=>{
     syncPalette(pick);queueMicrotask(draw);
    },f);
-   const inheritedRotation=()=>iconAngle(collectDock().iconRotation);
-   const overrideRotation=iconRotationOverride(icon.fields||folderPane,'Override dock icon rotation','Folder icon rotation',f.iconRotation,inheritedRotation);
+   const parent=folderParent(f);
+   if(parent){
+    for(const field of [useSize,size,ownCorner,dockCorner])field.parentElement.hidden=true;
+    arrowFields.parentElement.dataset.dockOnly='true';
+    identity.append(E('p','note','A subfolder follows its parent grid’s icon size and shape.'));
+   }
+   const inheritedRotation=()=>iconAngle(parent?(cache.get(parent.id)?.style()||parent.style).iconRotation:collectDock().iconRotation);
+   const overrideRotation=iconRotationOverride(icon.fields||folderPane,parent?'Override grid icon rotation':'Override dock icon rotation','Folder icon rotation',f.iconRotation,inheritedRotation);
    const rotation=()=>overrideRotation()??inheritedRotation();
    rotation.refresh=overrideRotation.refresh;
    const rotate=overrideRotation.toggle;
@@ -2059,7 +2290,7 @@ function editSettings(selected=null,initial='dock',creating=false){
    const launch=key==='general'&&group==='launch'&&launchSample;
    const sample=launch?launchStage:key==='dock'||key==='general'?previews.get(key):key==='folder'?c.folderPreview:c.gsPreview;
    previewHint.textContent=launch?'This shows the appearance of the launch indicator.':
-    key==='folder'?'Preview of this folder on the dock.':'Hover over the preview icons to try effects.';
+    key==='folder'?(folderParent(c.f)?'Preview of this subfolder icon.':'Preview of this folder on the dock.'):'Hover over the preview icons to try effects.';
    previewSlot.replaceChildren(previewTitle,sample,previewHint,...(key==='gs'?[layoutInfo]:[]));
   }
   function filter(){
@@ -2076,7 +2307,7 @@ function editSettings(selected=null,initial='dock',creating=false){
     const titleMatch=matches(title);
     const matchedRows=controls.filter(row=>!row.hidden&&matches(title+' '+row.textContent));
     const inGroup=!group||group===activeGroups[tab];
-    card.hidden=words.length?!titleMatch&&!matchedRows.length&&!matches(card.textContent):!inGroup;
+    card.hidden=card.dataset.dockOnly==='true'||(words.length?!titleMatch&&!matchedRows.length&&!matches(card.textContent):!inGroup);
     for(const row of controls)row.classList.toggle('sd-filter-out',!!words.length&&!titleMatch&&!!matchedRows.length&&!matchedRows.includes(row));
     if(!card.hidden)shown++;
    }
@@ -2105,7 +2336,7 @@ function editSettings(selected=null,initial='dock',creating=false){
    currentPane=node;scroll.replaceChildren(empty,node);
    choose(activeGroups[key]||categories[0][0]);
   }
-  activate=(f,key)=>{query.value='';folder=f;chooser.value=f.id;show(key)};
+  activate=(f,key)=>{query.value='';folder=f;rootFolder=folderPath(f.id)[0]||f;syncSelectors();show(key)};
   body.append(shell);
   query.addEventListener('input',()=>{filter();scroll.scrollTop=0;});
   query.addEventListener('search',filter);
@@ -2142,12 +2373,13 @@ function editSettings(selected=null,initial='dock',creating=false){
    if(c.f.slots.some(t=>t.r>=rows))invalid(c,'gs',c.rows,'Move shortcuts out of the rows you want to remove first.');
    changes.push([c.f,{name,...icon,folderHoverLabels:c.folderHoverLabels.checked,dockIconShape:undefined,dockIconCorner:c.ownCorner.checked?+c.dockCorner.value:undefined,triggerSize:c.useSize.checked?+c.size.value:0,arrowOverride:c.arrow(),iconRotation:c.rotate.checked?c.rotation():undefined,cols,rows,style:{...c.style(),settingsGear:c.settingsGear.checked}}]);
   }
-  const personal=collectGeneral(),dock={...collectDock(),...personal.dock},nextEdge=edge.value,nextAlign=alignment.value;
+  const personal=collectGeneral(),dock={...collectDock(),...personal.dock},nextEdge=edge.value,nextAlign=alignment.value,nextOrientation=orientation.value;
   const commit=()=>{
    for(const [f,v] of changes)Object.assign(f,v);
-   if(creating)saveDockOrder([...dockEntries(),newFolder]);
-   state.dock=dock;state.general=personal.general;state.edge=nextEdge;state.align=nextAlign;
-   persist();return ()=>{if(phase==='open')renderDock();refresh()};
+   state.dock=dock;state.general={...state.general,...personal.general};
+   state.edge=nextEdge;state.align=nextAlign;state.orientation=nextOrientation;
+   if(creating){saveDockOrder([...dockEntries(),newFolder]);advanceFolderColor();}
+   persist();return ()=>{if(phase==='open')renderDock();refresh();syncSelectors();};
   };
   const startup=applyStartup();
   return startup?startup.then(commit):commit();
@@ -2197,7 +2429,7 @@ function editShortcut(f,where,t){
 }
 async function openDestination(t){
  try{
-  if(!nativeCore?.invoke)throw Error('Open destinations from the Stack Dock desktop app.');
+  if(!nativeCore?.invoke)throw Error('Open destinations from the StackDock desktop app.');
   await nativeCore.invoke('open_shortcut_destination',{target:t.target});
  }catch(error){
   dialogBuild('Could not open destination',String(error),'OK',()=>{},()=>{});
@@ -2209,7 +2441,7 @@ window.addEventListener('resize',()=>{
  clearTimeout(resized);resized=setTimeout(()=>{
   closeMenu();clearPointer();
   if(phase==='closing'){stopMotion();finishClose(false)}
-  else if(phase==='opening'){stopMotion();setPhase('open');refresh()}
+  else if(phase==='opening'||phase==='navigating'){stopMotion();setPhase('open');refresh()}
   else refresh();
  },50)
 });

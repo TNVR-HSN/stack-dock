@@ -512,6 +512,7 @@ pub async fn stack_dock_layout_backup(
     app: tauri::AppHandle,
     window: tauri::WebviewWindow,
     data: Option<String>,
+    file_name: Option<String>,
 ) -> Result<Option<String>, String> {
     const LIMIT: u64 = 8 * 1024 * 1024;
     spawn_blocking(move || {
@@ -521,8 +522,8 @@ pub async fn stack_dock_layout_backup(
                 return Err("The layout is too large to export.".into());
             }
             let Some(item) = picker
-                .set_title("Export Stack Dock layout")
-                .set_file_name("stack-dock-layout.json")
+                .set_title("Export StackDock layout")
+                .set_file_name(file_name.unwrap_or_else(|| "stack-dock-layout.json".to_owned()))
                 .blocking_save_file()
             else {
                 return Ok(None);
@@ -531,7 +532,7 @@ pub async fn stack_dock_layout_backup(
             std::fs::write(&path, text).map_err(|e| e.to_string())?;
             Ok(Some(path.to_string_lossy().into_owned()))
         } else {
-            let Some(item) = picker.set_title("Import Stack Dock layout").blocking_pick_file() else {
+            let Some(item) = picker.set_title("Import StackDock layout").blocking_pick_file() else {
                 return Ok(None);
             };
             let path = item.into_path().map_err(|e| e.to_string())?;

@@ -1,22 +1,22 @@
-// Load once, after stack-dock-native.js. Works with the fixed-host Stack Dock.
+// Load once, after stack-dock-native.js. Works with the fixed-host StackDock.
 (() => {
   'use strict';
   const invoke = window.__TAURI__?.core?.invoke;
   const style = document.createElement('style');
   style.textContent = `
-#dockView .folder-btn,#gsView .tile{position:relative;padding:0}
+#dockView .folder-btn,:is(#gsView,.sd-outgoing-grid) .tile{position:relative;padding:0}
 #dockView .folder-btn{gap:0}
 #dockView .folder-btn>.folder-label{line-height:14px;margin-top:3px}
-#dockView .folder-btn:hover,#gsView .tile:hover,.sample-item:hover{background:none;position:relative;z-index:1}
-#dockView .folder-btn>.art,#gsView .tile>.art,.sample-item>.art{position:relative;overflow:visible;z-index:1}
-#dockView .folder-btn>.art>img,#dockView .folder-btn>.art>svg,#gsView .tile>.art>img,#gsView .tile>.art>svg,.sample-item>.art>img,.sample-item>.art>svg{border-radius:inherit}
+#dockView .folder-btn:hover,:is(#gsView,.sd-outgoing-grid) .tile:hover,.sample-item:hover{background:none;position:relative;z-index:1}
+#dockView .folder-btn>.art,:is(#gsView,.sd-outgoing-grid) .tile>.art,.sample-item>.art{position:relative;overflow:visible;z-index:1}
+#dockView .folder-btn>.art>img,#dockView .folder-btn>.art>svg,:is(#gsView,.sd-outgoing-grid) .tile>.art>img,:is(#gsView,.sd-outgoing-grid) .tile>.art>svg,.sample-item>.art>img,.sample-item>.art>svg{border-radius:inherit}
 .sample-item>.art::after{content:"";position:absolute;inset:calc(-1 * var(--highlight-area,0px));pointer-events:none;border-radius:var(--highlight-round,var(--ir,25%));opacity:0;background:var(--sd-highlight-fill,transparent);box-shadow:var(--sd-highlight-inset,inset 0 0 0 2px #fff);transition:opacity .12s}
 .sample-item:hover>.art::after{opacity:calc(var(--sd-hover,.14) * var(--sd-highlight-enabled,1))}
-#gsView .tile{gap:0;justify-content:flex-start}
-#gsView.sd-labels .tile{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:var(--sd-icon-size) var(--sd-reflect) var(--sd-label-space);row-gap:2px;align-content:start;justify-items:center}
-#gsView.sd-labels .tile>.art{grid-row:1}
-#gsView.sd-labels .tile>.icon-effects{grid-row:2}
-#gsView.sd-labels .tile>.caption{grid-row:3;align-self:start;font-size:var(--sd-label-font);line-height:1.2;height:2.4em;max-height:2.4em;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;text-overflow:ellipsis}
+:is(#gsView,.sd-outgoing-grid) .tile{gap:0;justify-content:flex-start}
+:is(#gsView,.sd-outgoing-grid).sd-labels .tile{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:var(--sd-icon-size) var(--sd-reflect) var(--sd-label-space);row-gap:2px;align-content:start;justify-items:center}
+:is(#gsView,.sd-outgoing-grid).sd-labels .tile>.art{grid-row:1}
+:is(#gsView,.sd-outgoing-grid).sd-labels .tile>.icon-effects{grid-row:2}
+:is(#gsView,.sd-outgoing-grid).sd-labels .tile>.caption{grid-row:3;align-self:start;font-size:var(--sd-label-font);line-height:1.2;height:2.4em;max-height:2.4em;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;text-overflow:ellipsis}
 #iconHover{position:fixed;inset:0;z-index:12;pointer-events:none}
 .sd-hover-ring,.sd-hover-art,.sd-hover-label{position:fixed;pointer-events:none}
 .sd-hover-art{z-index:1}
@@ -25,8 +25,9 @@
 .sd-hover-target{font-size:max(9px,calc(var(--sd-tip-size,12px) - 1px));font-weight:400;color:#eee1f4;white-space:pre-wrap;unicode-bidi:plaintext;max-height:40dvh;overflow:hidden}
  .sample-item>.art{transition:transform var(--sd-hover-duration,0ms) var(--sd-hover-easing,ease-out)}
 .sample-item:hover>.art{transform:var(--sd-hover-transform,none)}
-.sample-item .sd-hover-label{position:absolute;top:100%;width:max-content;max-width:155px;display:none}
-.sample-item:hover>.sd-hover-label{display:grid}
+.sample-item .sd-hover-label{position:absolute;top:100%;width:max-content;max-width:155px;opacity:0;visibility:hidden;transition:opacity 70ms ease,visibility 0s linear 70ms}
+.sample-item:hover>.sd-hover-label{opacity:1;visibility:visible;transition-delay:0s}
+@media(prefers-reduced-motion:reduce){.sample-item .sd-hover-label{transition:none}}
 .sd-edge-grow{position:fixed;z-index:51;pointer-events:none;background:#d99bff80;border:1px solid #ead1ff;border-radius:5px}
 .launch-view,.launch-sample{display:flex;align-items:center;gap:var(--launch-gap,12px);padding:0 var(--launch-pad,16px);color:var(--launch-text,#fff);min-width:0}
 .launch-view{position:absolute;inset:0;pointer-events:none}
@@ -126,7 +127,7 @@
     const hover=slider(panel,'hoverOpacity','Highlight opacity',0,100,'%',40);
     const area=slider(panel,'highlightArea','Highlight area',0,32,' px',0);
     const fill=slider(panel,'highlightFill','Inside fill',0,100,'%',30);
-    const fillStyle=select(panel,'Fill style',[[0,'Hard ring'],[1,'Soft Ring']],s.highlightSoft!==false?'1':'0');
+    const fillStyle=segmented(panel,'Fill style',[[0,'Hard ring'],[1,'Soft Ring']],s.highlightSoft!==false?'1':'0');
     const hit=settingsCard(body,'Pointer detection','hover');
     const hitExpand=check(hit,'Extend hover and click area',s.hitExpand);
     hitExpand.parentElement.classList.add('card-toggle');
@@ -163,13 +164,13 @@
     };
     reflected.addEventListener('change',updateDepth);shadow.addEventListener('change',updateDepth);updateDepth();
     const motion=settingsCard(body,'Hover motion','effects');
-    const mode=select(motion,'Hover effect',[[0,'None'],[1,'Enlarge'],[2,'Lift'],[3,'Enlarge + lift'],
+    const mode=segmented(motion,'Hover effect',[[0,'None'],[1,'Enlarge'],[2,'Lift'],[3,'Enlarge + lift'],
       [4,'Tilt'],[5,'Enlarge + lift + tilt']],String(s.hoverMode??0));
     const scale=slider(motion,'hoverScale','Enlarge to',100,200,'%',125);
     const lift=slider(motion,'hoverLift','Lift distance',0,48,' px',10);
     const angle=slider(motion,'hoverAngle','Tilt angle',-30,30,'°',10);
     const duration=slider(motion,'hoverDuration','Duration',0,900,' ms',160);
-    const curve=select(motion,'Motion curve',[[0,'Linear'],[1,'Ease out'],[2,'Ease in/out'],[3,'Spring']],String(s.hoverCurve??1));
+    const curve=segmented(motion,'Motion curve',[[0,'Linear'],[1,'Ease out'],[2,'Ease in/out'],[3,'Spring']],String(s.hoverCurve??1));
     const syncMotion=()=>{
       const m=+mode.value;
       scale.disabled=![1,3,5].includes(m);lift.disabled=![2,3,5].includes(m);angle.disabled=![4,5].includes(m);
@@ -209,20 +210,31 @@
   // Detached hover layer avoids clipping at the edge of either scroll container.
   const hoverLayer=$('iconHover');
   const svgNS='http://www.w3.org/2000/svg',svgNode=name=>document.createElementNS(svgNS,name);
-  let hovered=null, hoverTimer=0, hoverAnimation=null, hoverLayout=null, hoveredArt=null;
+  let hovered=null, hoverTimer=0, hoverAnimation=null, hoverLayout=null, hoveredArt=null, labelFade=null;
+  const HOVER_LABEL_FADE=70;
   const baseFitNative=fitNative;
   fitNative=function(grid){
-    if(!hovered||hoverLayer.hidden||!fixedHost||!nativeArea||!hoverLayout||nativeBusy||surfaceWanted||!menu.hidden||dialog.open){
+    if((!hovered&&!labelFade)||hoverLayer.hidden||!fixedHost||!nativeArea||!hoverLayout||nativeBusy||surfaceWanted||!menu.hidden||dialog.open){
       return baseFitNative(grid);
     }
     return moveHost(nativeCover(readBox(),hoverLayout));
   };
   clearHover=function(refit=true){
-    const wasVisible=!hoverLayer.hidden;
+    if(refit&&labelFade&&!hovered)return;
+    const wasVisible=!hoverLayer.hidden, label=hovered&&hoverLayer.querySelector('.sd-hover-label');
+    const canFade=refit&&label&&label.style.visibility!=='hidden'&&label.animate&&hoverLayout&&!reduced.matches;
+    const alpha=canFade?Number(getComputedStyle(label).opacity):0;
+    const stale=labelFade;labelFade=null;stale?.cancel();
     hovered=null;clearTimeout(hoverTimer);hoverTimer=0;hoverAnimation?.cancel();hoverAnimation=null;
-    hoveredArt?.classList.remove('sd-hover-original');hoveredArt=null;hoverLayout=null;
-    hoverLayer.hidden=true;hoverLayer.replaceChildren();
-    if(refit&&wasVisible)fitNative();
+    hoveredArt?.classList.remove('sd-hover-original');hoveredArt=null;
+    const clear=()=>{hoverLayout=null;hoverLayer.hidden=true;hoverLayer.replaceChildren();if(refit&&wasVisible)fitNative();};
+    if(canFade&&alpha>0){
+      hoverLayer.replaceChildren(label);
+      const motion=label.animate([{opacity:alpha},{opacity:0}],{duration:HOVER_LABEL_FADE,easing:'ease-out',fill:'forwards'});
+      labelFade=motion;
+      const finish=()=>{if(labelFade===motion){labelFade=null;clear();}};
+      motion.finished.then(finish,finish);
+    }else clear();
   };
   const hoverEasings=['linear','ease-out','ease-in-out','cubic-bezier(.2,1.27,.34,1)'];
   function hoverMotion(s,k=1){
@@ -339,11 +351,12 @@
     const trail=E('span','sd-hover-target',entry.target||'');
     trail.hidden=true;label.append(title,trail);
     styleHoverLabel(label,s);
-    const labelsEnabled=s.hoverLabels!==false&&(!onDock||entry.folderHoverLabels!==false);
+    const labelsEnabled=s.hoverLabels!==false&&(!(onDock||isSubfolder(entry))||entry.folderHoverLabels!==false);
     const showDetails=labelsEnabled&&general.hoverTargets&&!!entry.target;
     title.hidden=!showHoverName(s,general,labelsEnabled);
     if(!title.hidden||showDetails)hoverLayer.append(label);
     hoverLayer.hidden=false;
+    let labelShown=false;
     function layout(){
       if(hovered!==button)return;
       if(label.isConnected&&(!title.hidden||!trail.hidden)){
@@ -357,7 +370,11 @@
         place(label,x,y);
         lowX=Math.min(lowX,x);lowY=Math.min(lowY,y);highX=Math.max(highX,x+bounds.width);highY=Math.max(highY,y+bounds.height);
       }else{label.style.visibility='hidden';}
-      if(!title.hidden||!trail.hidden)label.style.visibility='';
+      if(!title.hidden||!trail.hidden){
+        label.style.visibility='';
+        if(!labelShown&&!reduced.matches&&label.animate)label.animate([{opacity:0},{opacity:1}],{duration:HOVER_LABEL_FADE,easing:'ease-out'});
+        labelShown=true;
+      }
       hoverLayout={x:lowX+nativeHost.x,y:lowY+nativeHost.y,w:highX-lowX,h:highY-lowY};
       fitNative();
     }
@@ -451,7 +468,7 @@
     let w = minWidth;
     // Every tile uses the same width and every tile reserves exactly two label lines.
     for (const item of folder.slots) {
-      if (item.type !== 'item') continue;
+      if (item.type !== 'item' && !isSubfolder(item)) continue;
       while (w < 200 && !fits(item.name,w-8)) w = Math.min(200,w+4);
       if (w === 200) break;
     }
@@ -530,7 +547,7 @@
       }
       return true;
     } catch(error) {
-      console.warn('Stack Dock launch indicator:',error);
+      console.warn('StackDock launch indicator:',error);
       return true;
     } finally {
       release(incoming);release(outgoing);flying?.remove();
@@ -551,7 +568,7 @@
         b.setAttribute('aria-pressed',String(state.edge===edge));
       }
       sep();
-      const names = vertical()?['Top','Center','Bottom']:['Left','Center','Right'];
+      const names = verticalEdge(state.edge)?['Top','Middle','Bottom']:['Left','Center','Right'];
       ['start','center','end'].forEach((a,i)=>{
         const b=mi('Align '+names[i],()=>position(state.edge,a),{hint:state.align===a?'✓':''});
         b.setAttribute('aria-pressed',String(state.align===a));
@@ -751,11 +768,11 @@
   // Fit the first region and reserve real taskbar space before revealing the window.
   async function bootWidget() {
     await nativeReady;
-    if(!fixedHost) console.warn('Stack Dock: using the existing non-fixed window fallback.');
+    if(!fixedHost) console.warn('StackDock: using the existing non-fixed window fallback.');
     try {await updateArea(true);} catch(error) {console.warn('Could not adjust for the taskbar:',error);}
     await invoke('start_desktop_widget',{});
     scheduleDropZone();
     setInterval(()=>void updateArea().catch(error=>console.warn('Dock work area:',error)),1000);
   }
-  void bootWidget().catch(error=>console.error('Stack Dock desktop widget:',error));
+  void bootWidget().catch(error=>console.error('StackDock desktop widget:',error));
 })();

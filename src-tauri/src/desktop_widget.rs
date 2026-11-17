@@ -69,7 +69,7 @@ pub fn start_desktop_widget(window: tauri::WebviewWindow) -> Result<(), String> 
                 SetWindowPos(hwnd, ptr::null_mut(), 0, 0, 0, 0,
                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
             },
-            Err(error) => eprintln!("[Stack Dock] Could not show window: {error}"),
+            Err(error) => eprintln!("[StackDock] Could not show window: {error}"),
         }
     }).map_err(|e| e.to_string())
 }

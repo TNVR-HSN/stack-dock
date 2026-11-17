@@ -1,4 +1,4 @@
-// Load after Stack Dock's existing classic inline script.
+// Load after StackDock's existing classic inline script.
 (() => {
   'use strict';
   const bridge = window.__TAURI__;
@@ -102,7 +102,7 @@
   };
   // Upgrade old dropped links without replacing manually picked icons or launch targets.
   async function fillExistingIconSources(layout) {
-    const items=[...(layout.dockShortcuts||[]),...layout.folders.flatMap(folder=>folder.slots)];
+    const items=[...(layout.dockShortcuts||[]),...folderTree(layout.folders).flatMap(({folder})=>folder.slots.filter(item=>item.type==='item'))];
     const candidates=new Map();
     for(const item of items){
       if(!needsIconSource(item))continue;
@@ -194,8 +194,9 @@ dialog.sd-panel-region{box-shadow:none}
     closeMenu(false);
     stopModalRegion();
     const generation = modalGeneration;
+    const liveSettings=args[5]===true&&args[0]==='Settings';
     dialog.classList.add('sd-panel-region');
-    document.documentElement.classList.add('sd-modal-active');
+    document.documentElement.classList.toggle('sd-modal-active',!liveSettings);
     try {
       dialogBuildHere(...args);
     } catch (error) {
@@ -220,7 +221,8 @@ dialog.sd-panel-region{box-shadow:none}
       const region = {
         x, y, w: panel.width, h: panel.height,
         ...(y < clipTop || x < 0 ? {clipTop} : {}),
-        radius: parseFloat(getComputedStyle(dialog).borderTopLeftRadius) || 0
+        radius: parseFloat(getComputedStyle(dialog).borderTopLeftRadius) || 0,
+        ...(liveSettings?{companion:nativeCover(readBox())}:{})
       };
       if (region.w <= 0 || region.h <= 0) return;
       applying=true;
@@ -236,6 +238,7 @@ dialog.sd-panel-region{box-shadow:none}
     if (typeof ResizeObserver === 'function') {
       modalObserver = new ResizeObserver(schedule);
       modalObserver.observe(dialog);
+      if(liveSettings)modalObserver.observe(island);
     }
 
   };
@@ -610,7 +613,7 @@ dialog.sd-panel-region{box-shadow:none}
   const backupFormat = 'stack-dock-layout';
   let backupBusy = false;
   function validLayout(data) {
-    const fail = message => { throw Error('Invalid Stack Dock layout: ' + message); };
+    const fail = message => { throw Error('Invalid StackDock layout: ' + message); };
     const object = v => v && typeof v === 'object' && !Array.isArray(v);
     const string = (s, max) => typeof s === 'string' && s.length <= max;
     const int = (n, lo, hi) => Number.isInteger(n) && n >= lo && n <= hi;
@@ -665,7 +668,7 @@ dialog.sd-panel-region{box-shadow:none}
     }
 
     if (!object(data) || data.format !== backupFormat || data.version !== 1 || !object(data.layout)) {
-      fail('choose a version 1 JSON backup exported by Stack Dock.');
+      fail('choose a version 1 JSON backup exported by StackDock.');
     }
     const s = data.layout;
     if (!edge.includes(s.edge) || !align.includes(s.align) ||
@@ -682,23 +685,25 @@ dialog.sd-panel-region{box-shadow:none}
         icon:shortcutIconKey({...t,localType}), image:custom,
         ...(custom||(t.iconMode==='source'&&string(t.iconPath,32768)&&t.iconPath)?iconSource(t):{iconMode:needsIconSource(t)?'shell':'default'}) };
     }
-    const folders = s.folders.map((f,folderIndex) => {
+    function readFolder(f,folderIndex,depth=1,location={}){
+      if(depth>MAX_FOLDER_DEPTH)fail('too many nested folders.');
       if (!object(f) || !keys(f.id) || seenIds.has(f.id) || !string(f.name, 100) || !f.name.trim() ||
           !int(f.cols, 1, 12) || !int(f.rows, 1, MAX_ROWS) ||
           !Array.isArray(f.slots) ||
           f.slots.length > f.cols * f.rows || !picture(f.image)) fail('bad folder or grid dimensions.');
       seenIds.add(f.id);
-      const cells = new Set(), ids = new Set();
+      const cells = new Set();
       // Older version-one exports contain synthetic empty cells. Do not restore them.
       const slots = f.slots.filter(t=>t?.type !== 'spacer').map(t => {
-        if (!object(t) || !keys(t.id) || ids.has(t.id) || !int(t.r,0,f.rows-1) ||
+        if (!object(t) || !keys(t.id) || seenIds.has(t.id) || !int(t.r,0,f.rows-1) ||
             !int(t.c,0,f.cols-1) || cells.has(t.r + ':' + t.c)) fail('duplicate or invalid shortcut position.');
         cells.add(t.r + ':' + t.c);
-        ids.add(t.id);
         const slot = { id:t.id, r:t.r, c:t.c, type:t.type };
+        if(isSubfolder(t))return readFolder(t,folderIndex,depth+1,slot);
+        seenIds.add(t.id);
         return readShortcut(t,slot);
       });
-      return { id:f.id, name:f.name, cols:f.cols, rows:f.rows, slots,
+      return { ...location,id:f.id, name:f.name, cols:f.cols, rows:f.rows, slots,
         folderHoverLabels:f.folderHoverLabels!==false,
         style:appearanceCopy(f.style, gsDefaults),
         dockIconShape:['default','rounded','raw'].includes(f.dockIconShape) ? f.dockIconShape : 'default',
@@ -711,7 +716,8 @@ dialog.sd-panel-region{box-shadow:none}
         triggerSize:int(f.triggerSize,24,74) ? f.triggerSize : 0,
         icon:Object.hasOwn(FOLDER_ICONS,f.icon) ? f.icon : folderIconKey(folderIndex),
         image:f.image || '', ...iconSource(f) };
-    });
+    }
+    const folders=s.folders.map((f,i)=>readFolder(f,i));
     const general={...generalDefaults};
     for(const [key,fallback] of Object.entries(generalDefaults)){
       const value=s.general?.[key];
@@ -719,7 +725,8 @@ dialog.sd-panel-region{box-shadow:none}
       if(typeof fallback==='boolean'?typeof value!=='boolean':!int(value,0,5000))fail('invalid General setting.');
       general[key]=value;
     }
-    general.nextFolderColor=int(s.general?.nextFolderColor,0,FOLDER_KEYS.length-1)?s.general.nextFolderColor:folders.length%FOLDER_KEYS.length;
+    general.nextFolderColor=nextFolderColorIndex(s);
+    general.folderPalette=FOLDER_PALETTE;
     const dockShortcuts=s.dockShortcuts===undefined?[]:s.dockShortcuts;
     if(!Array.isArray(dockShortcuts)||dockShortcuts.length>MAX_DOCK_SHORTCUTS)fail('invalid direct dock shortcuts.');
     const restoredShortcuts=dockShortcuts.map(t=>{
@@ -730,16 +737,17 @@ dialog.sd-panel-region{box-shadow:none}
     const dockOrder=[];
     if(s.dockOrder!==undefined){
       if(!Array.isArray(s.dockOrder)||s.dockOrder.length>100+MAX_DOCK_SHORTCUTS)fail('invalid dock order.');
+      const ordered=new Set([...folders,...restoredShortcuts].map(entry=>entry.id));
       for(const id of s.dockOrder){
-        if(seenIds.delete(id))dockOrder.push(id);
+        if(ordered.delete(id))dockOrder.push(id);
       }
     }
-    return { edge:s.edge, align:s.align, general, uiTheme:normalizeUiTheme(s.uiTheme), dock:appearanceCopy(s.dock, dockDefaults), folders,
+    return { edge:s.edge, align:s.align, orientation:['horizontal','vertical'].includes(s.orientation)?s.orientation:'auto', general, uiTheme:normalizeUiTheme(s.uiTheme), dock:appearanceCopy(s.dock, dockDefaults), folders,
       dockShortcuts:restoredShortcuts,dockOrder };
   }
 
   const notice = message => {
-    if (!dialog.open) dialogBuild('Stack Dock', message, 'OK', () => {}, () => {});
+    if (!dialog.open) dialogBuild('StackDock', message, 'OK', () => {}, () => {});
   };
   function replaceLayout(next) {
     // Commit to storage first. A quota error must not overwrite the visible layout.
@@ -762,13 +770,21 @@ dialog.sd-panel-region{box-shadow:none}
     backupBusy = true;
     try {
       const data = exporting ? JSON.stringify({ format:backupFormat, version:1, layout:state }, null, 2) : null;
-      const result = await call('stack_dock_layout_backup', { data });
+      let fileName = null;
+      if (exporting) {
+        const now = new Date();
+        const two = n => String(n).padStart(2, '0');
+        const date = [now.getFullYear(), two(now.getMonth() + 1), two(now.getDate())].join('-');
+        const time = [now.getHours(), now.getMinutes(), now.getSeconds()].map(two).join('-');
+        fileName = `${backupFormat}_${date}_${time}.json`;
+      }
+      const result = await call('stack_dock_layout_backup', { data, fileName });
       if (result === null) return;
       if (exporting) {
         report('Layout exported to ' + result);
       } else {
         const next = validLayout(JSON.parse(result));
-        const count = next.folders.reduce((n, f) => n + f.slots.filter(t => t.type === 'item').length, 0);
+        const count = folderTree(next.folders).reduce((n, {folder}) => n + folder.slots.filter(t => t.type === 'item').length, 0);
         confirmReplacement(next, 'Import ' + next.folders.length + ' folders and ' + count +
           ' shortcuts? This replaces your current layout. Windows paths are restored as saved.');
       }
@@ -881,7 +897,15 @@ dialog.sd-panel-region{box-shadow:none}
         await launch(item);
         return;
       }
-      if (phase === 'closed') openStack(folder.id);
+      const path=folderPath(folder.id);
+      if(!path.length)throw Error('The shortcut’s folder is no longer available.');
+      if(phase==='closed'){
+        openStack(path[0].id);
+        if(!await waitForPhase('open')||active()!==path[0])throw Error('Could not open the shortcut’s dock folder.');
+        for(const next of path.slice(1)){
+          if(!await navigateGrid(next))throw Error('Could not open the shortcut’s subfolder.');
+        }
+      }
       if (!await waitForPhase('open') || active() !== folder || !folder.slots.includes(item)) {
         throw Error('Could not open the shortcut’s folder.');
       }
@@ -897,11 +921,14 @@ dialog.sd-panel-region{box-shadow:none}
   function showShortcutSearch() {
     if (dialog.open || searchLaunchPending || !['closed','open'].includes(phase)) return;
     let field, results, summary, matches = [], selected = 0;
-    const record=(folder,item)=>({folder,item,name:item.name.toLowerCase(),location:folder?.name||'Dock',
-      searchable:(item.name+' '+(folder?.name||'Dock')+' '+item.target).toLowerCase()});
+    const record=(folder,item,path=[])=>{
+      const location=path.map(part=>part.name).join(' › ')||'Dock';
+      return {folder,item,name:item.name.toLowerCase(),location,
+        searchable:(item.name+' '+location+' '+item.target).toLowerCase()};
+    };
     const records=[
       ...(state.dockShortcuts||[]).map(item=>record(null,item)),
-      ...state.folders.flatMap(folder=>folder.slots.filter(item=>item.type==='item').map(item=>record(folder,item)))
+      ...folderTree(state.folders).flatMap(({folder,path})=>folder.slots.filter(item=>item.type==='item').map(item=>record(folder,item,path)))
     ];
     const choose = entry => {
       if (!entry) return;
@@ -1000,9 +1027,9 @@ dialog.sd-panel-region{box-shadow:none}
         build();
         sep();
         mi('Find shortcut…', showShortcutSearch, { hint:'Ctrl+F' });
-        const appMenu = mi('Stack Dock', ({x,y}) => {
+        const appMenu = mi('StackDock', ({x,y}) => {
           showMenu(x,y, () => {
-            mt('Stack Dock');
+            mt('StackDock');
             mi('Back', ({x,y}) => dockMenu(x,y,folder), { hint:'‹' });
             sep();
             mi('Export layout…', () => void backupLayout(true));
@@ -1050,7 +1077,7 @@ dialog.sd-panel-region{box-shadow:none}
   window.addEventListener('resize',scheduleDropZone);
   const footerNotice = text => {
     if (dialog.open) return;
-    dialogBuild('Stack Dock', text, 'OK', () => {}, () => {});
+    dialogBuild('StackDock', text, 'OK', () => {}, () => {});
   };
   let activeDropCount=0;
   let dropInvalidation=0;
@@ -1108,7 +1135,7 @@ dialog.sd-panel-region{box-shadow:none}
           ...item,id:uid(),type:'item',args:'',cwd:'',icon:shortcutIconKey(item),...iconSourceFields(iconSource)
         }));
         if(!entries.length){if(sequence===dropInvalidation)footerNotice('No accessible files or folders were found.');return;}
-        if(f&&!state.folders.includes(f))return;
+        if(f&&!folderPath(f.id).includes(f))return;
         const current=order?dockEntries():[];
         const index=at===undefined?current.length:current.findIndex(entry=>entry.id===at);
         const n=f?placeEntries(f,where,entries):insertDockShortcuts(entries,index<0?current.length:index);

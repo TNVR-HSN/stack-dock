@@ -62,6 +62,7 @@ fn set_dock_region(
     height: i32,
     radius: Option<i32>,
     clip_top: Option<i32>,
+    companion: Option<[i32; 4]>,
 ) -> Result<(), String> {
     #[cfg(windows)]
     {
@@ -90,6 +91,11 @@ fn set_dock_region(
             return Err("Invalid dock region".into());
         }
 
+        if let Some([left, top, right, bottom]) = companion {
+            if left < 0 || top < 0 || right <= left || bottom <= top {
+                return Err("Invalid companion dock region".into());
+            }
+        }
         let right = x.checked_add(width).ok_or("Dock region is too wide")?;
         let bottom = y.checked_add(height).ok_or("Dock region is too tall")?;
 
@@ -119,6 +125,22 @@ fn set_dock_region(
                     return Err("Windows could not clip the dialog".into());
                 }
             }
+            // Keep the dock visible behind Settings without exposing the
+            // transparent desktop between the two surfaces to hit testing.
+            if let Some([left, top, right, bottom]) = companion {
+                let dock = CreateRectRgn(left, top, right, bottom);
+                if dock.is_null() {
+                    DeleteObject(region);
+                    return Err("Windows could not create the companion dock region".into());
+                }
+                const RGN_OR: i32 = 2;
+                let status = CombineRgn(region, region, dock, RGN_OR);
+                DeleteObject(dock);
+                if status == 0 {
+                    DeleteObject(region);
+                    return Err("Windows could not combine the Settings and dock regions".into());
+                }
+            }
             if SetWindowRgn(hwnd.0 as *mut c_void, region, 1) == 0 {
                 DeleteObject(region);
                 return Err("Windows could not apply the dock region".into());
@@ -130,7 +152,7 @@ fn set_dock_region(
 
     #[cfg(not(windows))]
     {
-        let _ = (window, x, y, width, height, radius, clip_top);
+        let _ = (window, x, y, width, height, radius, clip_top, companion);
         Err("Dock regions are only supported on Windows".into())
     }
 }
@@ -172,11 +194,11 @@ fn launch_program(target: String, arguments: String, start_in: String) -> Result
 
         match command.spawn() {
             Ok(child) => {
-                eprintln!("[Stack Dock] Started {} (PID {})", exe.display(), child.id());
+                eprintln!("[StackDock] Started {} (PID {})", exe.display(), child.id());
                 Ok(())
             }
             Err(error) => {
-                eprintln!("[Stack Dock] Could not start {}: {}", exe.display(), error);
+                eprintln!("[StackDock] Could not start {}: {}", exe.display(), error);
                 Err(error.to_string())
             }
         }

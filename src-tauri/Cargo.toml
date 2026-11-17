@@ -1,7 +1,7 @@
 [package]
 name = "stack-dock"
 version = "0.1.0"
-description = "Stack Dock desktop shortcut organizer"
+description = "StackDock desktop shortcut organizer"
 edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

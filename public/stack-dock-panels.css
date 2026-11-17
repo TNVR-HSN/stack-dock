@@ -168,3 +168,22 @@
  #dialog .sd-property-shell{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
  #dialog .sd-property-preview{grid-row:1}
 }
+
+/* Settings leaves the live dock visible. Its two native clip regions are
+   combined separately so the transparent area in between stays uncovered. */
+#dialog.sd-live-settings::backdrop{background:transparent}
+#dialog .settings-target{display:grid;gap:8px}
+#dialog .settings-target .field{flex-wrap:wrap}
+#dialog .settings-target select{text-overflow:ellipsis;max-width:min(360px,100%)}
+#dialog .sd-segment-row{grid-template-columns:minmax(90px,1fr) minmax(0,auto)}
+#dialog .sd-segments{
+ display:flex;flex-wrap:wrap;justify-content:flex-end;gap:3px;padding:3px;border-radius:9px;
+ border:1px solid var(--sd-ui-line);background:var(--sd-ui-input)
+}
+#dialog .sd-segments button{
+ min-height:28px;padding:4px 10px;border:1px solid transparent;border-radius:6px;
+ background:transparent;color:var(--sd-ui-input-muted);line-height:1.2
+}
+#dialog .sd-segments button:not(:disabled):hover,#dialog .sd-segments button[aria-pressed=true]{
+ background:var(--sd-ui-selected);color:var(--sd-ui-selected-text);border-color:var(--sd-ui-selected-border)
+}
