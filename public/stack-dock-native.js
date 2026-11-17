@@ -9,7 +9,7 @@
   // A small, bounded session cache keeps artwork off disk backups and avoids
   // repeatedly asking Windows to classify the same path or decode the same image.
   const imagePath = path => /\.(png|jpe?g|gif|webp|bmp|ico)$/i.test(path);
-  const thumbnailEnabled = item => item.imageThumbnail ?? (state.general?.imageThumbnails === true);
+  const thumbnailEnabled = item => item.imageThumbnail ?? state.general?.imageThumbnails ?? generalDefaults.imageThumbnails;
   const metadata = new Map(), thumbnails = new Map(), sourceIcons = new Map(), discoveredIcons = new Map();
   let activeThumbnails = 0;
   const thumbnailQueue = [];
@@ -221,12 +221,11 @@ dialog.sd-panel-region{box-shadow:none}
       const region = {
         x, y, w: panel.width, h: panel.height,
         ...(y < clipTop || x < 0 ? {clipTop} : {}),
-        radius: parseFloat(getComputedStyle(dialog).borderTopLeftRadius) || 0,
-        ...(liveSettings?{companion:nativeCover(readBox())}:{})
+        radius: parseFloat(getComputedStyle(dialog).borderTopLeftRadius) || 0
       };
       if (region.w <= 0 || region.h <= 0) return;
       applying=true;
-      void moveHost(region).then(ok => {
+      void moveHost(liveSettings?undefined:region).then(ok => {
         applying=false;
         if (!dialog.open||generation!==modalGeneration) return;
         if (!ok) dialog.close();
@@ -1026,20 +1025,20 @@ dialog.sd-panel-region{box-shadow:none}
       return baseShow(px, py, () => {
         build();
         sep();
-        mi('Find shortcut…', showShortcutSearch, { hint:'Ctrl+F' });
+        mi('Find shortcut…', showShortcutSearch, { hint:'Ctrl+F',editor:true });
         const appMenu = mi('StackDock', ({x,y}) => {
           showMenu(x,y, () => {
             mt('StackDock');
             mi('Back', ({x,y}) => dockMenu(x,y,folder), { hint:'‹' });
             sep();
-            mi('Export layout…', () => void backupLayout(true));
-            mi('Import layout…', () => void backupLayout(false));
+            mi('Export layout…', () => void backupLayout(true),{editor:true});
+            mi('Import layout…', () => void backupLayout(false),{editor:true});
             sep();
             mi('Exit', () => {
               if (phase === 'closed') call('exit_stack_dock', {}).catch(error => notice(String(error)));
             }, { danger:true });
           });
-        }, { hint:'›' });
+          }, { hint:'›',editor:true });
         appMenu.setAttribute('aria-haspopup', 'true');
       }, position);
     };
@@ -1054,7 +1053,7 @@ dialog.sd-panel-region{box-shadow:none}
     if(dropZoneFrame)return;
     dropZoneFrame=requestAnimationFrame(()=>{
       dropZoneFrame=0;
-      const accepting=(phase==='open'||phase==='closed')&&menu.hidden&&!dialog.open&&!surfaceWanted;
+      const accepting=(phase==='open'||phase==='closed')&&menu.hidden&&!dockControlsBlocked()&&!surfaceWanted;
       const rect=accepting?island.getBoundingClientRect():null;
       const scale=window.devicePixelRatio||nativeArea?.scale||1;
       // Round the physical edges outwards instead of rounding the size
@@ -1076,6 +1075,7 @@ dialog.sd-panel-region{box-shadow:none}
   new MutationObserver(scheduleDropZone).observe(dialog,{attributes:true,attributeFilter:['open']});
   window.addEventListener('resize',scheduleDropZone);
   const footerNotice = text => {
+    if(liveSettingsOpen()){dialog.querySelector('.sd-panel-footnote').textContent=text;return;}
     if (dialog.open) return;
     dialogBuild('StackDock', text, 'OK', () => {}, () => {});
   };
@@ -1099,13 +1099,18 @@ dialog.sd-panel-region{box-shadow:none}
         clearDropTarget();
         return;
       }
-      if (!payload.position||dialog.open||!menu.hidden||!['closed','open'].includes(phase)) {
+      if (!payload.position||dockControlsBlocked()||!menu.hidden||!['closed','open'].includes(phase)) {
         externalDropActive=activeDropCount>0;
         clearDropTarget();
         return;
       }
       const scale=window.devicePixelRatio||nativeArea?.scale||1;
       const x=payload.position.x/scale, y=payload.position.y/scale;
+      if(settingsCoversPoint(x,y)){
+        externalDropActive=activeDropCount>0;
+        clearDropTarget();
+        return;
+      }
       const f=phase==='open'&&insideIsland(x,y)?active():null;
       const dockSlot=phase==='closed'?dockDropSlot(x,y):null;
       if(f&&payload.type!=='drop')scrollDropEdges(gsView.querySelector('.scroll'),x,y);

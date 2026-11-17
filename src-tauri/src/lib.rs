@@ -63,6 +63,7 @@ fn set_dock_region(
     radius: Option<i32>,
     clip_top: Option<i32>,
     companion: Option<[i32; 4]>,
+    popup: Option<[i32; 4]>,
 ) -> Result<(), String> {
     #[cfg(windows)]
     {
@@ -91,7 +92,7 @@ fn set_dock_region(
             return Err("Invalid dock region".into());
         }
 
-        if let Some([left, top, right, bottom]) = companion {
+        for [left, top, right, bottom] in [companion, popup].into_iter().flatten() {
             if left < 0 || top < 0 || right <= left || bottom <= top {
                 return Err("Invalid companion dock region".into());
             }
@@ -125,17 +126,17 @@ fn set_dock_region(
                     return Err("Windows could not clip the dialog".into());
                 }
             }
-            // Keep the dock visible behind Settings without exposing the
-            // transparent desktop between the two surfaces to hit testing.
-            if let Some([left, top, right, bottom]) = companion {
-                let dock = CreateRectRgn(left, top, right, bottom);
-                if dock.is_null() {
+            // Keep Settings, the dock, and its context menu interactive without
+            // exposing the transparent desktop between their regions.
+            for [left, top, right, bottom] in [companion, popup].into_iter().flatten() {
+                let extra = CreateRectRgn(left, top, right, bottom);
+                if extra.is_null() {
                     DeleteObject(region);
                     return Err("Windows could not create the companion dock region".into());
                 }
                 const RGN_OR: i32 = 2;
-                let status = CombineRgn(region, region, dock, RGN_OR);
-                DeleteObject(dock);
+                let status = CombineRgn(region, region, extra, RGN_OR);
+                DeleteObject(extra);
                 if status == 0 {
                     DeleteObject(region);
                     return Err("Windows could not combine the Settings and dock regions".into());
@@ -152,7 +153,7 @@ fn set_dock_region(
 
     #[cfg(not(windows))]
     {
-        let _ = (window, x, y, width, height, radius, clip_top, companion);
+        let _ = (window, x, y, width, height, radius, clip_top, companion, popup);
         Err("Dock regions are only supported on Windows".into())
     }
 }

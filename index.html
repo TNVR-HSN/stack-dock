@@ -18,7 +18,7 @@
 .gs-settings{position:absolute;right:0;top:0;width:25px;height:25px;border:0;border-radius:6px;background:transparent;padding:0;display:grid;place-items:center;font-size:17px;line-height:1}.gs-settings:hover{background:#ffffff22}
 .gs-heading-inner{height:28px;max-width:100%;display:flex;align-items:center;gap:8px}
 .gs-heading h2{min-width:0;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.25;font-weight:650;letter-spacing:.015em;text-shadow:0 1px 6px #000a}
-.gs-view .scroll{flex:1 1 0;height:auto}
+.gs-view .scroll{flex:1 1 0;height:auto;scrollbar-width:none}
 .folder-flight{position:fixed;z-index:6;pointer-events:none;transform-origin:center;will-change:transform}
 .flight-endpoint{visibility:hidden}.folders{display:flex;min-width:0;min-height:0;gap:var(--gap-y) var(--gap-x);padding:var(--pad-y) var(--pad-x);max-width:100%;max-height:100%;overflow:auto;scrollbar-width:none}.folders.vertical{flex-direction:column}.folders::-webkit-scrollbar{display:none}.folder-btn{border:none;background:none;flex:none;border-radius:15px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;padding:3px;width:var(--bw);height:var(--bh);transition:background .15s}.folder-btn:hover{background:#fff1}.folder-btn span:not(.art){font-size:10px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.art{display:block;flex:none;width:var(--size);height:var(--size);border-radius:var(--ir,25%);overflow:hidden}.art svg,.art img{width:100%;height:100%;display:block;object-fit:contain;pointer-events:none}
 .scroll{width:100%;height:100%;overflow:auto;scrollbar-width:thin;scrollbar-color:#b17dc07d transparent;overscroll-behavior:contain}.grid{display:grid;width:max-content;min-height:100%;grid-template-columns:repeat(var(--cols),var(--cellw));grid-auto-rows:var(--cellh);gap:var(--gap-y) var(--gap-x);align-content:start}.cell{display:grid;place-items:center;position:relative;border-radius:11px;min-width:0;min-height:0}.cell.drop-target{outline:1px dashed #efb3ff;outline-offset:-1px;background:#df9bf031;box-shadow:inset 0 0 0 2px #5f2e728c}.tile{width:100%;height:100%;border:0;background:none;min-width:0;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:2px;border-radius:10px;touch-action:none;user-select:none;-webkit-user-select:none}.tile:hover,.tile:focus-visible{background:#ffffff14}.tile.dragging{opacity:.32}.tile .caption{max-width:100%;flex:none;max-height:2.36em;font-size:11px;line-height:1.18;text-align:center;overflow-wrap:anywhere;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;text-shadow:0 1px 3px #000}.icon-effects{position:relative;display:block;flex:none;pointer-events:none;width:var(--effect-size);height:var(--effects-h)}
@@ -68,9 +68,6 @@ html.native-dock,html.native-dock body,html.native-dock #desktop{background:tran
 .native-dock dialog:modal{top:var(--sd-caption-gutter,0px);bottom:0;max-height:calc(100dvh - var(--sd-caption-gutter,0px) - 20px)}
 .native-dock .menu{max-height:calc(100dvh - var(--sd-caption-gutter,0px) - 14px)}
 #island[data-phase="opening"] .scroll,#island[data-phase="closing"] .scroll{overflow:hidden}
-.gs-view .scroll {
-  scrollbar-width: none;
-}
 /* Settings keep the tab, category and preview outside the scrolling controls. */
 dialog.settings-dialog{width:min(950px,calc(100% - 24px))}
 .settings-dialog form{height:min(760px,calc(100dvh - var(--sd-caption-gutter,0px) - 30px));max-height:none}
@@ -94,7 +91,7 @@ dialog.settings-dialog{width:min(950px,calc(100% - 24px))}
 
 .sd-folder-colors{margin-top:12px;padding:8px 5px 2px}
 .sd-folder-colors .note{margin:7px 0 0}
-.sd-color-swatches{display:flex;justify-content:center;gap:7px;margin-top:7px}
+.sd-color-swatches{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:7px;margin-top:7px}
 .sd-color-swatches button{padding:4px;border-radius:50%;border:1px solid transparent;background:#ffffff08;display:grid;place-items:center}
 .sd-color-swatches button:hover{background:#ffffff17}
 .sd-color-swatches button[aria-pressed=true]{background:#ffffff18;border-color:#ecd4fa;box-shadow:0 0 0 2px #e2aff329}
@@ -126,7 +123,10 @@ dialog.settings-dialog{width:min(950px,calc(100% - 24px))}
 #settings-pane-folder .fields>.field:first-child{grid-column:1/-1}
 dialog.sd-movable .dialogtop{touch-action:none;user-select:none}
 dialog.sd-movable .dialogtop button{cursor:pointer}
-dialog.sd-movable.sd-dialog-placed:modal{margin:0;right:auto;bottom:auto;left:var(--panel-x);top:var(--panel-y)}
+dialog.sd-live-settings{position:fixed;inset:var(--sd-caption-gutter,0px) 0 0;margin:auto;height:fit-content;max-height:calc(100dvh - var(--sd-caption-gutter,0px) - 20px);z-index:14}
+dialog.sd-live-settings.sd-settings-initial-position{max-width:var(--sd-live-width);max-height:var(--sd-live-height)}
+dialog.sd-live-settings.sd-settings-initial-position form{max-height:calc(var(--sd-live-height) - 2px)}
+dialog.sd-movable.sd-dialog-placed:is(:modal,.sd-live-settings){margin:0;right:auto;bottom:auto;left:var(--panel-x);top:var(--panel-y)}
 @media(max-width:790px){
  .settings-pane{grid-template-columns:minmax(0,1fr)}
 }
@@ -174,6 +174,8 @@ dialog:is(.settings-dialog,.sd-properties) .err{margin:0;padding:8px 17px;backgr
  background:linear-gradient(145deg,#e9b8ff,#9a50b8);color:#281032;box-shadow:inset 0 1px 0 #ffffff66,0 3px 12px #bf7fdf38;
 }
 .sd-panel-mark svg,.settings-tabs svg,.sd-panel-search svg{width:16px;height:16px;flex:none}
+#dialog .sd-panel-mark.sd-app-mark:has(img:not([hidden])){background:none;box-shadow:none}
+.sd-app-mark img{width:100%;height:100%;object-fit:contain}
 .sd-panel-brand strong{display:block;font-size:13px;line-height:1.1}
 .settings-dialog .sd-panel-brand h2{font-size:10px;margin:4px 0 0;letter-spacing:.09em;color:#bc9ecb;text-transform:uppercase}
 .sd-ui-card{margin:0;padding:0;min-width:0;background:var(--ui-card);border:1px solid var(--ui-line);border-radius:14px;overflow:hidden}
@@ -227,9 +229,9 @@ dialog.settings-dialog form{height:min(770px,calc(100dvh - var(--sd-caption-gutt
 .sd-panel-search input{width:100%;min-width:0;padding:1px 0;background:none;border:0;color:var(--ui-text);font-size:12px}
 .sd-panel-search input:focus-visible{outline:none}
 .sd-panel-search input::placeholder{color:#9c88a8}
-.settings-dialog .settings-tabs{display:flex;flex-direction:column;gap:3px;border:0;padding:0}
+.settings-dialog .settings-tabs{display:flex;flex:1;flex-direction:column;gap:3px;border:0;padding:0}
 .settings-dialog .settings-tabs button{
- position:relative;display:flex;align-items:center;gap:9px;min-height:39px;padding:7px 9px;
+ position:relative;display:flex;flex-shrink:0;align-items:center;gap:9px;min-height:39px;padding:7px 9px;
  color:#bcabc7;font-weight:550;border:1px solid transparent;border-radius:9px;text-align:left;
 }
 .settings-dialog .settings-tabs button:hover{background:#ffffff09;color:var(--ui-text)}
@@ -237,7 +239,27 @@ dialog.settings-dialog form{height:min(770px,calc(100dvh - var(--sd-caption-gutt
 .settings-dialog .settings-tabs button[aria-selected=true]::before{
  content:"";position:absolute;left:-12px;top:8px;bottom:8px;width:3px;background:var(--ui-accent);border-radius:0 3px 3px 0;
 }
-.sd-rail-caption{margin:auto 4px 0;padding-top:18px;color:#a995b3;font-size:10px;letter-spacing:.04em}
+.settings-dialog .settings-tabs .sd-about-tab{margin-block-start:auto}
+#dialog .settings-center.sd-about-center{grid-column:2/-1}
+#dialog .settings-center.sd-about-center+.settings-monitor{display:none}
+.sd-about-pane{max-width:670px}
+.sd-about-hero{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;padding:15px 17px}
+.sd-about-hero img{display:block;flex:none;width:54px;height:54px;object-fit:contain}
+.sd-about-copy{flex:1 1 185px;min-width:0}
+.sd-about-copy strong{display:block;font-size:17px}
+.sd-about-copy .note,.sd-about-note{margin:4px 0 0}
+.sd-about-version{display:inline-flex;padding:4px 9px;border:1px solid var(--ui-line);border-radius:999px;color:var(--soft);font-size:11px;font-weight:650;overflow-wrap:anywhere}
+.sd-about-links{display:grid}
+.sd-about-links a{
+ display:flex;align-items:center;justify-content:space-between;gap:12px;color:inherit;
+ padding:11px 15px;text-decoration:none;border-bottom:1px solid var(--ui-rule);
+}
+.sd-about-links a:last-child{border-bottom:0}
+.sd-about-links a:hover{background:var(--ui-selected);color:var(--sd-ui-selected-text,var(--ui-text))}
+.sd-about-links a:focus-visible{outline-offset:-3px}
+.sd-about-links .note{display:block;margin:2px 0 0}
+.sd-about-links svg{width:15px;height:15px;flex:none;color:var(--ui-accent)}
+.sd-about-note{padding:0 3px}
 .settings-center{display:flex;flex-direction:column;min-width:0;min-height:0}
 .settings-page-head{padding:16px 20px 13px;border-bottom:1px solid var(--ui-rule);flex:none}
 .settings-page-head h3{margin:0;font-size:22px;font-weight:650;letter-spacing:-.025em;line-height:1.23}
@@ -304,9 +326,9 @@ dialog.settings-dialog form{height:min(770px,calc(100dvh - var(--sd-caption-gutt
 }
 .settings-dialog .settings-preview::before{content:none}
 .settings-dialog .settings-monitor .note{margin:0;color:var(--ui-muted);font-size:11px}
-.settings-dialog .settings-monitor .sd-folder-colors{padding:10px 0 0;margin:0;border-top:1px solid var(--ui-rule)}
-.settings-dialog .settings-monitor .sd-folder-colors strong{font-size:12px}
-.settings-dialog .settings-monitor .sd-color-swatches{justify-content:flex-start;margin-bottom:7px}
+.settings-dialog .settings-monitor>.sd-folder-picker-card{flex:none}
+#dialog .settings-monitor .sd-folder-colors{padding:6px 10px 11px}
+.settings-dialog .settings-monitor .sd-color-swatches{justify-content:flex-start;gap:5px;margin-bottom:7px}
 .sd-preview-stage{align-items:center;justify-content:center}
 .settings-dialog .settings-monitor .launch-sample{max-width:100%;margin:0}
 .sd-preview-grid{display:grid;align-items:start;justify-items:stretch}
@@ -364,14 +386,10 @@ dialog.sd-properties{width:min(860px,calc(100% - 24px))}
  .sd-panel-search{margin:0 0 5px}
  .settings-dialog .settings-tabs{flex-direction:row;flex-wrap:wrap}
  .settings-dialog .settings-tabs button{flex:1;min-height:29px;justify-content:center;white-space:nowrap}
- .settings-dialog .settings-tabs button[aria-selected=true]::before,.sd-rail-caption{display:none}
+ .settings-dialog .settings-tabs button[aria-selected=true]::before{display:none}
  .settings-dialog .settings-monitor{border-left:0;border-top:1px solid var(--ui-line);padding:6px 11px;gap:6px;max-height:120px}
  .settings-dialog .settings-monitor .settings-preview{min-height:69px;max-height:82px;padding:5px}
  .settings-dialog .settings-monitor>.note{display:none}
- .settings-dialog .settings-monitor:has(.sd-folder-colors){display:grid;grid-template-columns:minmax(0,1fr) minmax(100px,.65fr);align-items:center}
- .settings-dialog .settings-monitor:has(.sd-folder-colors) h3{grid-column:1/-1}
- .settings-dialog .settings-monitor .sd-folder-colors{padding:0;border:0}
- .settings-dialog .settings-monitor .sd-folder-colors .note{display:none}
  .settings-page-head p,.sd-panel-footnote{display:none}
  .settings-page-head h3{font-size:18px}
  .settings-dialog .settings-groups{margin-top:7px}
@@ -379,6 +397,10 @@ dialog.sd-properties{width:min(860px,calc(100% - 24px))}
  .sd-property-shell{grid-template-columns:minmax(0,1fr) 128px}
  .sd-property-editor{padding:10px}
  .sd-property-editor .sd-property-fields{--sd-label-width:min(81px,32%);padding-inline:8px}
+}
+@container sd-settings (width < 630px){
+ #dialog .settings-center.sd-about-center{grid-column:1/-1}
+ #dialog .settings-tabs .sd-about-tab{margin-block-start:0}
 }
 @media(max-width:470px){
  .sd-property-shell{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
@@ -420,7 +442,10 @@ dialog.sd-properties{width:min(860px,calc(100% - 24px))}
 'use strict';
 // Small, built-in defaults. User-supplied icons are stored separately from these.
 let folderGradientId=0;
-const dockFolderIcon=(label,light,dark,folder,accent)=>({label,svg:()=>{
+const plainFolderBadge=(ink,tint)=>`
+ <path d="M17 24c0-2.2 1.8-4 4-4h8l3 3h11c2.2 0 4 1.8 4 4v14c0 2.2-1.8 4-4 4H21c-2.2 0-4-1.8-4-4V24z" fill="${ink}"/>
+ <rect x="21" y="28" width="22" height="3" rx="1.5" fill="${tint}"/>`;
+const dockFolderIcon=(label,light,dark,ink,tint,badge=plainFolderBadge)=>({label,svg:()=>{
  const id='sd-folder-gradient-'+(++folderGradientId);
  return `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
   <defs><linearGradient id="${id}" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -428,16 +453,52 @@ const dockFolderIcon=(label,light,dark,folder,accent)=>({label,svg:()=>{
   </linearGradient></defs>
   <circle cx="32" cy="32" r="30" fill="url(#${id})"/>
   <circle cx="32" cy="32" r="29.25" fill="none" stroke="white" stroke-opacity=".23" stroke-width="1.5"/>
-  <path d="M17 24c0-2.2 1.8-4 4-4h8l3 3h11c2.2 0 4 1.8 4 4v14c0 2.2-1.8 4-4 4H21c-2.2 0-4-1.8-4-4V24z" fill="${folder}"/>
-  <rect x="21" y="28" width="22" height="3" rx="1.5" fill="${accent}"/>
+  ${badge(ink,tint)}
  </svg>`;
 }});
 const FOLDER_ICONS={
  'folder-azure':dockFolderIcon('Blue','#39bdf7','#145599','#092440','#86ddff'),
  'folder-emerald':dockFolderIcon('Emerald','#16c792','#047857','#05271e','#68e7ad'),
- 'folder-violet':dockFolderIcon('Violet','#af83ff','#6236aa','#281540','#d9bcff')
+ 'folder-violet':dockFolderIcon('Violet','#af83ff','#6236aa','#281540','#d9bcff'),
+ 'folder-shortcuts':dockFolderIcon('Shortcuts','#43b7f6','#1a589d','#0a2947','#669bc7',(ink,tint)=>`
+  <path d="M18 41v-7a9 9 0 0 1 9-9h13l-5-5 4-4 11 12-11 12-4-4 5-5H27a3 3 0 0 0-3 3v7z" fill="${ink}" stroke-linejoin="round"/>
+  <path d="M18 46h11" stroke="${tint}" stroke-width="3" stroke-linecap="round"/>`),
+ 'folder-stacked':dockFolderIcon('Stacked','#43b7f6','#1a589d','#0a2947','#153e60',(ink,tint)=>`
+  <g transform="translate(0 -2)" fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+   <path d="m38 35-4-3q-2-1.4-4 0L15 42q-2 1.4 0 3l15 10q2 1.4 4 0l15-10q2-1.4 0-3l-2-1.5" stroke="${tint}"/>
+   <path d="m23 32-8-5.5q-2-1.4 0-2.8l15-10q2-1.4 4 0l15 10q2 1.4 0 2.8L34 37q-2 1.4-4 0l-3-2" stroke="${ink}"/>
+  </g>`),
+ 'folder-games':dockFolderIcon('Games','#af83ff','#6236aa','#281540','#e3caff',(ink,tint)=>`
+  <path d="M31 26v-5a5 5 0 0 1 5-5h5a3 3 0 0 0 3-3v-1" fill="none" stroke="${ink}" stroke-width="4.6" stroke-linecap="round"/>
+  <path d="M24 27h16a13 13 0 0 1 12 13c0 5-4 8-8 8-4 0-6-4-12-4s-8 4-12 4c-4 0-8-3-8-8a13 13 0 0 1 12-13z" fill="${ink}"/>
+  <path d="M19 37h10m-5-5v10" stroke="${tint}" stroke-width="2.9" stroke-linecap="round"/>
+  <path d="M39 34h.01m4 4h.01m-8 0h.01m4 4h.01" stroke="${tint}" stroke-width="2.9" stroke-linecap="round"/>`),
+ 'folder-office':dockFolderIcon('Office','#45c7a2','#087865','#0a342d','#9df2d6',(ink,tint)=>`
+  <path d="M25 24v-3a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v3" fill="none" stroke="${ink}" stroke-width="3.5"/>
+  <rect x="15" y="24" width="34" height="23" rx="4.5" fill="${ink}"/>
+  <path d="M19 32c8 5 18 5 26 0" fill="none" stroke="${tint}" stroke-width="2.2" stroke-linecap="round"/>
+  <rect x="29.5" y="32.5" width="5" height="5" rx="1.5" fill="${tint}"/>`),
+ 'folder-creative':dockFolderIcon('Creative','#f38dbb','#a33877','#431936','#ffd3eb',(ink,tint)=>`
+  <path d="M31 17c12 0 19 7 19 15 0 5-3 8-8 8h-4a3 3 0 0 0-2 5c1 2-1 4-5 4-10 0-17-7-17-16s7-16 17-16z" fill="${ink}"/>
+  <path d="M22 32h.01m4-7h.01m8-2h.01m8 5h.01" stroke="${tint}" stroke-width="5" stroke-linecap="round"/>`),
+ 'folder-media':dockFolderIcon('Media','#fbab83','#b45145','#49241e','#ffd8ba',(ink,tint)=>`
+  <rect x="15" y="19" width="34" height="27" rx="7" fill="${ink}"/>
+  <path d="M28 25.5 39 32.5 28 39.5z" fill="${tint}" stroke="${tint}" stroke-linejoin="round"/>`),
+ 'folder-tools':dockFolderIcon('Tools','#b8c8e0','#5d7799','#233850','#deecff',(ink,tint)=>`
+  <g transform="translate(-3 -1.4)">
+  <path d="M33 23a9 9 0 0 1 13-5l-5 5v4h4l5-5a9 9 0 0 1-10 13L27 49a5 5 0 0 1-7-7l13-13a9 9 0 0 1 0-6z" fill="${ink}"/>
+  <circle cx="24" cy="45" r="1.8" fill="${tint}"/>
+  </g>`),
+ 'folder-web':dockFolderIcon('Web','#7ccce8','#276f8a','#0e3648','#c9f2ff',(ink,tint)=>`
+  <circle cx="32" cy="32" r="16" fill="${ink}"/>
+  <path d="M18 32h28M21 25h22m-22 14h22" fill="none" stroke="${tint}" stroke-width="1.9"/>
+  <ellipse cx="32" cy="32" rx="6.5" ry="14.8" fill="none" stroke="${tint}" stroke-width="1.9"/>`)
 };
-const FOLDER_KEYS=Object.keys(FOLDER_ICONS);
+// FOLDER_PICKER_KEYS controls what appears in Settings. Keep the SVG definitions
+// above when hiding an option so saved layouts can continue to render that icon.
+const FOLDER_KEYS=['folder-azure','folder-emerald','folder-violet'];
+const FOLDER_PICKER_KEYS=[...FOLDER_KEYS,'folder-stacked','folder-shortcuts','folder-games','folder-office',
+ 'folder-creative','folder-media','folder-tools','folder-web'];
 const folderIconKey=index=>FOLDER_KEYS[index % FOLDER_KEYS.length];
 const isSubfolder=entry=>entry?.type==='folder';
 const MAX_FOLDER_DEPTH=12, FOLDER_PALETTE=2;
@@ -467,8 +528,12 @@ function folderDraft(parent=null){
 }
 const APP_ICONS={
  file:{svg:`<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
- <path d="M17 8h20l12 12v31a5 5 0 0 1-5 5H17a5 5 0 0 1-5-5V13a5 5 0 0 1 5-5z" fill="#cbd5e1"/>
- <path d="M37 8v12h12" fill="#7888a3"/><path d="M22 31h17m-17 8h13" stroke="#51627e" stroke-width="3" stroke-linecap="round"/>
+ <rect x="6" y="6" width="52" height="52" rx="13" fill="#2b5680"/>
+ <rect x="7" y="7" width="50" height="50" rx="12" fill="none" stroke="#cfecff" stroke-opacity=".26" stroke-width="1.5"/>
+ <g fill="none" stroke="#d4edff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M28 21h-6a4 4 0 0 0-4 4v17a4 4 0 0 0 4 4h17a4 4 0 0 0 4-4v-6"/>
+  <path d="M35 18h11v11m0-11L30 34"/>
+ </g>
  </svg>`},
  folder:{svg:`<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
  <path d="M7 46V20a5 5 0 0 1 5-5h15l6 6h18a5 5 0 0 1 5 5v20a5 5 0 0 1-5 5H12a5 5 0 0 1-5-5z" fill="#de8a24"/>
@@ -505,20 +570,24 @@ const $=id=>document.getElementById(id), E=(tag,cls='',text='')=>{const x=docume
 const B=(label,cls='',fn)=>{const b=E('button',cls,label);b.type='button';if(fn)b.onclick=fn;return b};
 const cap=s=>s[0].toUpperCase()+s.slice(1), clamp=(x,a,b)=>Math.max(a,Math.min(x,b));
 const uid=()=>Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
-const generalDefaults={hoverNames:true,hoverTargets:true,hoverDelay:1500,collapseOnFocusLoss:true,imageThumbnails:false,sliderDefaults:true};
+const generalDefaults={hoverNames:true,hoverTargets:true,hoverDelay:1500,collapseOnFocusLoss:true,imageThumbnails:true,sliderDefaults:true};
 const showHoverName=(style,prefs,enabled)=>enabled&&!style.labels&&prefs?.hoverNames!==false;
 const iconEffectDefaults={highlightEnabled:true,iconRotation:0,hoverOpacity:40,highlightFill:30,highlightSoft:true,hitExpand:false,hitPadding:8,hoverLabels:true,hoverLabelBackground:true,hoverLabelSize:12,customHoverDelay:false,hoverDetailsDelay:1500,hoverMode:0,hoverScale:125,hoverLift:10,hoverAngle:10,hoverDuration:160,hoverCurve:1,groundShadowOffset:0,gapSplit:false,padSplit:false,highlightArea:0,reflectionIntensity:55,reflectionArea:10,groundShadow:false,groundShadowIntensity:65};
 const dockDefaults={...iconEffectDefaults,folderArrow:false,folderArrowX:84,folderArrowY:16,folderArrowRotation:0,gapX:6,gapY:6,padX:8,padY:8,reflections:false,opacity:76,border:true,shadow:true,radius:26,icon:40,gap:6,pad:8,labels:false,color:'#101019',motion:true,borderColor:'#ffffff',borderOpacity:23,borderWidth:1,roundIcons:true};
-const gsDefaults={...iconEffectDefaults,gapX:7,gapY:7,padX:15,padY:15,opacity:84,border:true,shadow:true,radius:22,icon:52,gap:7,pad:15,labels:true,reflections:true,color:'#0e0e16',borderColor:'#ffffff',borderOpacity:23,borderWidth:1,titleIcon:25,roundIcons:true,settingsGear:false};
+const gsDefaults={...iconEffectDefaults,gapX:7,gapY:7,padX:15,padY:15,opacity:80,border:true,shadow:true,radius:22,icon:52,gap:7,pad:15,labels:true,reflections:true,color:'#0b0b12',borderColor:'#ffffff',borderOpacity:23,borderWidth:1,titleIcon:25,roundIcons:true,settingsGear:false};
 const storageKey='dynamic-island-stack-dock-custom-v1';
 const headingHeight=42,headingIconSize=25;
 const triggerSize=(f,d=state.dock)=>f.triggerSize||d.icon;
 const headingSize=s=>s.titleIcon||headingIconSize;
 const headingSpace=s=>Math.max(headingHeight,headingSize(s)+15);
 function fresh(){
- return {edge:'bottom',align:'center',orientation:'auto',general:{...generalDefaults,folderPalette:FOLDER_PALETTE,nextFolderColor:0},dock:{...dockDefaults},dockShortcuts:[],dockOrder:[],folders:[{
-  id:uid(),name:'Shortcuts',icon:'folder-azure',image:'',cols:5,rows:3,slots:[],style:{...gsDefaults}
- }]};
+ const starter=(name,icon,cols,rows,style)=>({id:uid(),name,icon,image:'',cols,rows,slots:[],style:{...gsDefaults,...style}});
+ return {edge:'bottom',align:'center',orientation:'auto',general:{...generalDefaults,folderPalette:FOLDER_PALETTE,nextFolderColor:0},
+  dock:{...dockDefaults},dockShortcuts:[],dockOrder:[],folders:[
+   starter('Shortcuts','folder-stacked',5,3,{color:'#0c131c',reflections:false}),
+   starter('Games','folder-games',6,3,{color:'#171020',icon:56}),
+   starter('Office','folder-office',4,4,{color:'#0c1816',icon:46,reflections:false})
+  ]};
 }
 let state=fresh();
 try {
@@ -559,11 +628,15 @@ try {
  }
 }catch{}
 const desktop=$('desktop'), island=$('island'), dockView=$('dockView'), gsView=$('gsView'), dockGlass=$('dockGlass'), gsGlass=$('gsGlass'), menu=$('menu'), dialog=$('dialog'), form=$('form');
+let settingsCommitPending=false;
+const liveSettingsOpen=()=>dialog.open&&dialog.classList.contains('sd-live-settings');
+const dockControlsBlocked=()=>dialog.open&&(!liveSettingsOpen()||settingsCommitPending);
+const settingsCoversPoint=(x,y)=>liveSettingsOpen()&&dialog.contains(document.elementFromPoint(x,y));
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
 const nativeAPI=window.__TAURI__?.window;
 const nativeCore=window.__TAURI__?.core;
 let nativeWindow=null,nativeArea=null,nativeHost={x:0,y:0},nativeQueue=Promise.resolve(),nativeBusy=false;
-let fixedHost=false,nativeRegion=null;
+let fixedHost=false,nativeRegion=null,liveDockRegion=null;
 let surfaceWanted=false,surfaceRequest=0;
 let focusLossPending=false,focusLossTimer=0,focusLossTicket=0,externalDropActive=false;
 const nativeMargin=5;
@@ -590,20 +663,38 @@ function nativeCover(...boxes){
  return {x,y,w:right-x,h:bottom-y};
 }
 const sameNativeBox=(a,b)=>a&&['x','y','w','h','radius','clipTop'].every(k=>a[k]===b[k])&&
- ((!a.companion&&!b.companion)||(a.companion&&b.companion&&['x','y','w','h'].every(k=>a.companion[k]===b.companion[k])));
+ ['companion','popup'].every(slot=>{const p=a[slot],q=b[slot];return (!p&&!q)||(p&&q&&['x','y','w','h'].every(k=>p[k]===q[k]));});
+function liveSettingsRegion(dock){
+ // Keep the reserved motion bounds until the animation settles. Moving or
+ // resizing Settings must never replace them with an in-flight DOM rectangle.
+ if(dock)liveDockRegion=dock;
+ const panel=dialog.getBoundingClientRect(),clipTop=nativeArea.gutter||0;
+ const x=panel.left+nativeHost.x,y=panel.top+nativeHost.y;
+ const region={x,y,w:panel.width,h:panel.height,
+  ...(y<clipTop||x<0?{clipTop}:{}),
+  radius:parseFloat(getComputedStyle(dialog).borderTopLeftRadius)||0,
+  companion:liveDockRegion||nativeCover(readBox())};
+ if(!menu.hidden){
+  const r=menu.getBoundingClientRect();
+  region.popup=nativeCover({x:r.left+nativeHost.x,y:r.top+nativeHost.y,w:r.width,h:r.height});
+ }
+ return region;
+}
 async function setNativeRegion(target){
  if(sameNativeBox(nativeRegion,target))return;
  const px=value=>Math.round(value*nativeArea.scale);
- const x=px(target.x),y=px(target.y),other=target.companion;
- const companion=other&&other.w>0&&other.h>0
-  ?[px(other.x),px(other.y),px(other.x+other.w),px(other.y+other.h)]:undefined;
+ const x=px(target.x),y=px(target.y);
+ const rect=box=>box&&box.w>0&&box.h>0?[px(box.x),px(box.y),px(box.x+box.w),px(box.y+box.h)]:undefined;
+ const companion=rect(target.companion),popup=rect(target.popup);
  await nativeCore.invoke('set_dock_region',{x,y,width:px(target.x+target.w)-x,height:px(target.y+target.h)-y,
   ...(target.radius>0?{radius:px(target.radius)}:{}),...(target.clipTop!==undefined?{clipTop:px(target.clipTop)}:{}),
-  ...(companion?{companion}:{})});
+  ...(companion?{companion}:{}),...(popup?{popup}:{})});
  nativeRegion=target;
 }
 function moveHost(target){
  if(!nativeWindow)return Promise.resolve(true);
+ if(fixedHost&&liveSettingsOpen())target=liveSettingsRegion(target);
+ else{liveDockRegion=null;if(!target)return Promise.resolve(true);}
  const job=nativeQueue.then(async()=>{
   // Once the host is pinned, never reposition or resize it for UI transitions.
   if(fixedHost){await setNativeRegion(target);return true}
@@ -679,7 +770,7 @@ function queueFocusLoss(){
  focusLossTimer=setTimeout(check,85);
 }
 function fitNative(grid){
- if(!nativeWindow||nativeBusy||surfaceWanted||!menu.hidden||dialog.open||!['closed','open'].includes(phase))return;
+ if(!nativeWindow||nativeBusy||surfaceWanted||!menu.hidden||dockControlsBlocked()||!['closed','open'].includes(phase))return;
  // Clipping to the newly saved dock size too soon can cut off the departing
  // item when its context menu or confirmation releases the native window.
  if(removalTracks.size){moveHost(nativeCover(readBox()));return}
@@ -1100,7 +1191,7 @@ function finishClose(refocus){
  fitNative();
 }
 function openStack(id,keyboard=false){
- if(phase!=='closed'||nativeBusy||dialog.open||launch.pending)return;
+ if(phase!=='closed'||nativeBusy||dockControlsBlocked()||launch.pending)return;
  const f=state.folders.find(x=>x.id===id);if(!f)return;
  closeMenu();lastId=activeId=id;gsView.style.opacity='0';gsGlass.style.opacity='0';renderGrid(f,false);
  const goal=gridBox(f,currentMetrics);
@@ -1139,7 +1230,7 @@ function revealGridTile(view,button){
 // bounds before animating, as for the dock-to-grid flight.
 async function navigateGrid(next,keyboard=false){
  const current=active();
- if(!current||phase!=='open'||nativeBusy||dialog.open||launch.pending)return false;
+ if(!current||phase!=='open'||nativeBusy||dockControlsBlocked()||launch.pending)return false;
  const down=childrenOf(current).includes(next);
  if(!down&&folderParent(current)!==next)return false;
  closeMenu();clearPointer();clearHover(false);
@@ -1148,7 +1239,7 @@ async function navigateGrid(next,keyboard=false){
   nativeBusy=true;
   try{if(!await moveHost(nativeCover(before,goal)))return false}
   finally{nativeBusy=false}
-  if(phase!=='open'||active()!==current||dialog.open){fitNative();return false}
+  if(phase!=='open'||active()!==current||dockControlsBlocked()){fitNative();return false}
  }
  const other=down?next:current;
  const tile=(view,entry)=>[...view.querySelectorAll('.tile')].find(btn=>btn.dataset.tile===entry.id);
@@ -1220,7 +1311,7 @@ function refresh(){
 }
 async function launch(t) {
   const fromDock=phase==='closed'&&state.dockShortcuts?.includes(t);
-  if ((!fromDock&&phase !== 'open') || launch.pending || nativeBusy) return;
+  if ((!fromDock&&phase !== 'open') || launch.pending || nativeBusy || dockControlsBlocked()) return;
 
   const core = window.__TAURI__?.core;
   const kind = t.kind || guess(t.target);
@@ -1260,7 +1351,8 @@ async function launch(t) {
     focusLossPending=false;
     if(!await showLaunchIndicator(t,start,sourceArt,source,fromDock)&&!fromDock)closeStack(false);
   } catch (error) {
-    dialogBuild('Could not open ' + t.name, String(error), 'OK', () => {}, () => {});
+    if(liveSettingsOpen())dialog.querySelector('.sd-panel-footnote').textContent='Could not open '+t.name+': '+String(error);
+    else dialogBuild('Could not open ' + t.name, String(error), 'OK', () => {}, () => {});
   } finally {
     launch.pending = false;
   }
@@ -1329,10 +1421,12 @@ function changeColumn(f, col, insert) {
 function closeMenu(restore=false){
  if(menu.hidden)return;menu.hidden=true;
  if(restore&&menuFocus?.isConnected)menuFocus.focus({preventScroll:true});menuFocus=null;
+ if(liveSettingsOpen())dialogMoved();
  queueMicrotask(fitNative);
 }
 function showMenu(x,y,build,position=false){
  clearHover(false);
+ if(liveSettingsOpen()&&fixedHost){showMenuHere(x,y,build,position);dialogMoved();return}
  expandForControls((dx,dy)=>showMenuHere(x+dx,y+dy,build,position));
 }
 function showMenuHere(x,y,build,position=false){
@@ -1349,7 +1443,9 @@ function mi(label,fn,options={}){
   const r=b.getBoundingClientRect();
   const anchor=event.detail>0?{x:event.clientX,y:event.clientY}:{x:r.left+r.width/2,y:r.top+r.height/2};
   closeMenu(true);fn(anchor);
- });b.setAttribute('aria-label',label);b.disabled=!!options.disabled;if(options.hint)b.append(E('small','',options.hint));menu.append(b);return b;
+ });b.setAttribute('aria-label',label);b.disabled=!!options.disabled||!!(options.editor&&liveSettingsOpen());
+ if(options.editor&&liveSettingsOpen())b.title='Close Settings to use this command';
+ if(options.hint)b.append(E('small','',options.hint));menu.append(b);return b;
 }
 function showPositions(x,y){
  showMenu(x,y,()=>{
@@ -1370,26 +1466,26 @@ function dockMenu(x,y,entry){
  showMenu(x,y,()=>{
   mt(entry?entry.name:'Dock');
   if(shortcut){
-   mi('Shortcut properties…',()=>editShortcut(null,null,entry));
+   mi('Shortcut properties…',()=>editShortcut(null,null,entry),{editor:true});
    const link=['url','uri'].includes(entry.kind||guess(entry.target));
    mi(link?'Open Link':'Open Destination',()=>link?void launch(entry):void openDestination(entry));
    sep();
   }
-  if(entry&&!shortcut)mi('Folder settings…',()=>editSettings(entry,'folder'));
+  if(entry&&!shortcut)mi('Folder settings…',()=>editSettings(entry,'folder'),{editor:true});
   else{
-   mi('Settings…',()=>editSettings(null,'general'));
-   mi('Dock settings…',()=>editSettings(null,'dock'));
+   mi('Settings…',()=>editSettings(null,'general'),{editor:true});
+   mi('Dock settings…',()=>editSettings(null,'dock'),{editor:true});
   }
   if(entry){
    mi(shortcut?'Move shortcut earlier':'Move folder earlier',()=>reorderDock(entry,i-1),{disabled:i===0});
    mi(shortcut?'Move shortcut later':'Move folder later',()=>reorderDock(entry,i+2),{disabled:i===items.length-1});
    sep();
   }
-  mi('Position',({x,y})=>showPositions(x,y),{hint:'›'});
-  mi('New folder…',()=>editSettings(null,'folder',true));
-  mi('Add shortcut to dock…',()=>editShortcut(null,null),{disabled:(state.dockShortcuts?.length||0)>=MAX_DOCK_SHORTCUTS});
+  mi('Position',({x,y})=>showPositions(x,y),{hint:'›',editor:true});
+  mi('New folder…',()=>editSettings(null,'folder',true),{editor:true});
+  mi('Add shortcut to dock…',()=>editShortcut(null,null),{disabled:(state.dockShortcuts?.length||0)>=MAX_DOCK_SHORTCUTS,editor:true});
   if(shortcut){sep();mi('Remove shortcut',()=>removeDockEntry(entry),{danger:true});}
-  else if(entry&&state.folders.length>1){sep();mi('Remove folder…',()=>confirm('Remove '+entry.name+'?','This removes the folder and its shortcuts from StackDock.',()=>removeDockEntry(entry)),{danger:true})}
+  else if(entry&&state.folders.length>1){sep();mi('Remove folder…',()=>confirm('Remove '+entry.name+'?','This removes the folder and its shortcuts from StackDock.',()=>removeDockEntry(entry)),{danger:true,editor:true})}
  });
 }
 function createSubfolder(parent,where){
@@ -1418,31 +1514,31 @@ function gridMenu(x,y,target,explicit=null){
    mt(t?t.name:f.name+' · Row '+(where.r+1)+', column '+(where.c+1));
    if(isSubfolder(t)){
     mi('Open subfolder',()=>void navigateGrid(t));
-    mi('Folder settings…',()=>editSettings(t,'folder'));
-    mi('Remove subfolder…',()=>confirm('Remove '+t.name+'?','Remove this subfolder and its contents from StackDock. Your original files are not deleted.',()=>erase(f,t)),{danger:true});
+    mi('Folder settings…',()=>editSettings(t,'folder'),{editor:true});
+    mi('Remove subfolder…',()=>confirm('Remove '+t.name+'?','Remove this subfolder and its contents from StackDock. Your original files are not deleted.',()=>erase(f,t)),{danger:true,editor:true});
    }else if(t){
-    mi('Shortcut properties…',()=>editShortcut(f,where,t));
+    mi('Shortcut properties…',()=>editShortcut(f,where,t),{editor:true});
     const link=['url','uri'].includes(t.kind||guess(t.target));
     mi(link?'Open Link':'Open Destination',()=>link?void launch(t):void openDestination(t));
     mi('Remove shortcut',()=>erase(f,t),{danger:true});
    }else{
-    mi('Add shortcut here…',()=>editShortcut(f,where));
-    mi('New subfolder…',()=>createSubfolder(f,where),{disabled:folderPath(f.id).length>=MAX_FOLDER_DEPTH});
+    mi('Add shortcut here…',()=>editShortcut(f,where),{editor:true});
+    mi('New subfolder…',()=>createSubfolder(f,where),{disabled:folderPath(f.id).length>=MAX_FOLDER_DEPTH,editor:true});
    }
    sep();
-   mi('Insert row below',()=>addRow(f,where),{disabled:f.rows>=MAX_ROWS});
-   mi('Insert column right',()=>changeColumn(f,where.c+1,true),{disabled:f.cols>=MAX_COLUMNS});
-   if(f.rows>1&&!f.slots.some(v=>v.r===where.r))mi('Remove empty row',()=>{f.slots=f.slots.filter(v=>v.r!==where.r);f.slots.forEach(v=>{if(v.r>where.r)v.r--});f.rows--;persist();refresh()});
-   if(f.cols>1&&!f.slots.some(v=>v.c===where.c))mi('Remove empty column',()=>changeColumn(f,where.c,false));
+   mi('Insert row below',()=>addRow(f,where),{disabled:f.rows>=MAX_ROWS,editor:true});
+   mi('Insert column right',()=>changeColumn(f,where.c+1,true),{disabled:f.cols>=MAX_COLUMNS,editor:true});
+   if(f.rows>1&&!f.slots.some(v=>v.r===where.r))mi('Remove empty row',()=>{f.slots=f.slots.filter(v=>v.r!==where.r);f.slots.forEach(v=>{if(v.r>where.r)v.r--});f.rows--;persist();refresh()},{editor:true});
+   if(f.cols>1&&!f.slots.some(v=>v.c===where.c))mi('Remove empty column',()=>changeColumn(f,where.c,false),{editor:true});
    sep();
-   mi('Grid Stack settings…',()=>editSettings(f,'gs'));
+   mi('Grid Stack settings…',()=>editSettings(f,'gs'),{editor:true});
    if(parent)mi('Back to parent',()=>void navigateGrid(parent));
    mi('Close grid',()=>closeStack());
  });
 }
 function context(e){
  e.preventDefault();
- if(dialog.open||performance.now()<ignoreNativeMenuUntil||!island.contains(e.target))return;
+ if(dockControlsBlocked()||performance.now()<ignoreNativeMenuUntil||!island.contains(e.target))return;
  if(e.button===2&&!insideIsland(e.clientX,e.clientY))return;
  clearPointer();
  if(phase==='open')gridMenu(e.clientX,e.clientY,e.target);
@@ -1450,7 +1546,14 @@ function context(e){
 }
 document.addEventListener('contextmenu',context);
 document.addEventListener('keydown',e=>{
- if(dialog.open)return;
+ if(e.defaultPrevented||dockControlsBlocked())return;
+ if(liveSettingsOpen()&&dialog.contains(e.target)){
+  if(e.key==='Escape'){
+   e.preventDefault();
+   if(dialog.dispatchEvent(new Event('cancel',{cancelable:true})))dialog.close();
+  }
+  return;
+ }
  if(e.key==='Escape'){if(!menu.hidden){e.preventDefault();closeMenu(true)}else if(['open','opening'].includes(phase)){e.preventDefault();const parent=phase==='open'&&folderParent(active());if(parent)void navigateGrid(parent,true);else closeStack()}return}
  if((e.key==='ContextMenu'||e.shiftKey&&e.key==='F10')&&island.contains(document.activeElement)){
   e.preventDefault();const node=document.activeElement,r=node.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;
@@ -1463,8 +1566,9 @@ document.addEventListener('keydown',e=>{
 });
 gsView.tabIndex=0;
 document.addEventListener('pointerdown',e=>{
- if(dialog.open)return;
+ if(dockControlsBlocked())return;
  if(!menu.hidden&&!menu.contains(e.target))closeMenu();
+ if(liveSettingsOpen()&&dialog.contains(e.target))return;
  if(e.button===0&&['open','opening'].includes(phase)&&!island.contains(e.target)&&!menu.contains(e.target))closeStack(false);
 });
 function mark(p){
@@ -1523,7 +1627,7 @@ function insideIsland(x,y){
 }
 island.addEventListener('pointerdown',e=>{
  if(e.button!==0||!['open','closed'].includes(phase))return;
- if(e.target.closest('.gs-settings')||dialog.open)return;
+ if(e.target.closest('.gs-settings')||dockControlsBlocked())return;
  const tile=e.target.closest('.tile')||expandedIconAt(e)?.closest('.tile'),f=active();
  const item=tile&&f?.slots.find(x=>x.id===tile.dataset.tile);
  const dockButton=phase==='closed'&&(e.target.closest('.folder-btn')||expandedIconAt(e));
@@ -1580,12 +1684,12 @@ function dropEntries(dt){
 }
 desktop.addEventListener('dragover',e=>{e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect='none'});
 gsView.addEventListener('dragover',e=>{
- if(phase!=='open'||dialog.open)return;e.preventDefault();e.stopPropagation();if(e.dataTransfer)e.dataTransfer.dropEffect='copy';mark(locate(e.clientX,e.clientY));
+ if(phase!=='open'||dockControlsBlocked())return;e.preventDefault();e.stopPropagation();if(e.dataTransfer)e.dataTransfer.dropEffect='copy';mark(locate(e.clientX,e.clientY));
 });
 gsView.addEventListener('dragleave',e=>{if(!gsView.contains(e.relatedTarget))mark(null)});
 desktop.addEventListener('drop',e=>{e.preventDefault();mark(null);markDockInsertion(null)});
 dockView.addEventListener('dragover',e=>{
- if(phase!=='closed'||dialog.open)return;
+ if(phase!=='closed'||dockControlsBlocked())return;
  e.preventDefault();e.stopPropagation();
  scrollDropEdges(dockView.querySelector('.folders'),e.clientX,e.clientY);
  const slot=dockDropSlot(e.clientX,e.clientY);
@@ -1594,7 +1698,7 @@ dockView.addEventListener('dragover',e=>{
 });
 dockView.addEventListener('dragleave',e=>{if(!dockView.contains(e.relatedTarget))markDockInsertion(null);});
 dockView.addEventListener('drop',e=>{
- if(phase!=='closed'||dialog.open)return;
+ if(phase!=='closed'||dockControlsBlocked())return;
  e.preventDefault();e.stopPropagation();markDockInsertion(null);
  const slot=dockDropSlot(e.clientX,e.clientY);
  if(slot===null)return;
@@ -1602,7 +1706,7 @@ dockView.addEventListener('drop',e=>{
  if(n){persist();refresh();}
 });
 gsView.addEventListener('drop',e=>{
- e.preventDefault();e.stopPropagation();if(phase!=='open'||dialog.open)return;
+ e.preventDefault();e.stopPropagation();if(phase!=='open'||dockControlsBlocked())return;
  const f=active(),where=locate(e.clientX,e.clientY),entries=dropEntries(e.dataTransfer);
  mark(null);if(!entries.length){notify('Drop a file or an HTTP(S) link.');return}
  if(!f||!where)return;
@@ -1611,6 +1715,7 @@ gsView.addEventListener('drop',e=>{
  notify(n+' shortcut'+(n===1?'':'s')+' added'+(e.dataTransfer.files.length?' · browser stores file names, not full Windows paths':''));
 });
 function dialogBuild(title,desc,submit,build,save,settings=false){
+ if(dialog.open)return;
  expandForControls(()=>dialogBuildHere(title,desc,submit,build,save,settings));
 }
 let dialogMoved=()=>{};
@@ -1641,6 +1746,8 @@ const panelGlyphs={
  dock:'<rect x="3" y="7" width="18" height="10" rx="4"/><path d="M7.5 12h.01m4.5 0h.01m4.5 0h.01"/>',
  folder:'<path d="M3 7a2 2 0 0 1 2-2h4.2l2 2.4H19a2 2 0 0 1 2 2v8.1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
  gs:'<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/>',
+ about:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/>',
+ external:'<path d="M13 5h6v6m0-6-8 8m-1-7H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-3"/>',
  search:'<circle cx="10.5" cy="10.5" r="6.2"/><path d="m15 15 5 5"/>',
  gear:'<circle cx="12" cy="12" r="3"/><path d="M10 2.8h4l.55 2.48 1.66.96 2.42-.75 2 3.46-1.84 1.73v1.96l1.84 1.73-2 3.46-2.42-.75-1.66.96L14 20.5h-4l-.55-2.48-1.66-.96-2.42.75-2-3.46 1.84-1.73v-1.96L3.37 8.93l2-3.46 2.42.75 1.66-.96z"/>',
  properties:'<rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8m-8 4h8m-8 4h5"/>'
@@ -1657,21 +1764,45 @@ function propertyWorkspace(body,hero,extra=null){
  shell.append(editor,monitor);body.append(shell);
  return editor;
 }
+function placeLiveSettings(){
+ // Open with the launcher exposed when there is room, including on small
+ // displays where the centered default panel would cover the dock.
+ const d=dims(),edge=state.edge,dock=readBox();
+ const space={left:10,right:d.w-10,top:d.top+10,bottom:d.top+d.h-10};
+ if(edge==='left')space.left=Math.max(space.left,dock.x+dock.w+10);
+ if(edge==='right')space.right=Math.min(space.right,dock.x-10);
+ if(edge==='top')space.top=Math.max(space.top,dock.y+dock.h+10);
+ if(edge==='bottom')space.bottom=Math.min(space.bottom,dock.y-10);
+ const w=space.right-space.left,h=space.bottom-space.top;
+ if(w<440||h<330)return; // Still draggable when the current grid takes most of the screen.
+ dialog.style.setProperty('--sd-live-width',w+'px');
+ dialog.style.setProperty('--sd-live-height',h+'px');
+ dialog.classList.add('sd-settings-initial-position');
+ const r=dialog.getBoundingClientRect();
+ dialog.style.setProperty('--panel-x',space.left+Math.max(0,(w-r.width)/2)+'px');
+ dialog.style.setProperty('--panel-y',space.top+Math.max(0,(h-r.height)/2)+'px');
+ dialog.classList.add('sd-dialog-placed');
+}
 function dialogBuildHere(title,desc,submit,build,save,settings=false){
  clearHover(false);
- const properties=/^(Shortcut properties|Add shortcut here)$/.test(title),liveSettings=settings&&title==='Settings';
+ const properties=/^(Shortcut properties|Add shortcut here)$/.test(title),liveSettings=settings&&title==='Settings'&&(!nativeWindow||fixedHost);
  dialog.classList.toggle('sd-live-settings',liveSettings);
  savedFocus=document.activeElement;dialog.classList.toggle('settings-dialog',settings);
  dialog.classList.toggle('sd-properties',properties);form.noValidate=settings;
  form.replaceChildren();
  dialog.classList.remove('sd-hide-slider-defaults');
- dialog.classList.remove('sd-dialog-placed','sd-dialog-resized');
+ dialog.classList.remove('sd-dialog-placed','sd-dialog-resized','sd-settings-initial-position');
  const movable=settings||properties;
  dialog.classList.toggle('sd-movable',movable);
  const head=E('div','dialogtop'),text=E('div'),h=E('h2','',title);h.id='dialogTitle';
  if(settings||properties){
   const brand=E('div','sd-panel-brand');
-  const mark=panelGlyph(E('span','sd-panel-mark'),settings?'gear':'properties');
+  const mark=E('span','sd-panel-mark');
+  if(settings){
+   mark.classList.add('sd-app-mark');
+   const logo=E('img');logo.alt='';logo.src='/stackdock-app-icon.png';logo.draggable=false;
+   mark.append(logo);
+  }else panelGlyph(mark,'properties');
   if(settings)text.append(E('strong','','StackDock'),h);
   else text.append(h,E('p','',desc));
   brand.append(mark,text);
@@ -1698,21 +1829,26 @@ function dialogBuildHere(title,desc,submit,build,save,settings=false){
    if(!shouldClose){footnote.textContent='Settings applied.';dialogMoved();}
   };
   try{
+   if(liveSettings&&(nativeBusy||launch.pending||externalDropActive||drag||!['closed','open'].includes(phase)))throw Error('Wait for the dock to finish before applying settings.');
    const after=save();
    if(after&&typeof after.then==='function'){
+    if(liveSettings){settingsCommitPending=true;scheduleDropZone();}
     const locked=[ok,cancel,cancelX,...(apply?[apply]:[])];locked.forEach(button=>button.disabled=true);
     const preventClose=event=>event.preventDefault();
     dialog.addEventListener('cancel',preventClose);
     Promise.resolve(after).then(complete).catch(submitError).finally(()=>{
+     if(liveSettings){settingsCommitPending=false;scheduleDropZone();if(dialog.open)fitNative();}
      locked.forEach(button=>button.disabled=false);dialog.removeEventListener('cancel',preventClose);
     });
    }else complete(after);
   }catch(err){submitError(err);}
  }
  form.onsubmit=e=>{e.preventDefault();submitDialog(true);};
- dialog.setAttribute('aria-labelledby','dialogTitle');dialog.showModal();(body.querySelector(settings?'[role=tab][aria-selected=true]':'input:not([type=file]), select, button')||cancel).focus({preventScroll:true});
+ dialog.setAttribute('aria-labelledby','dialogTitle');
+ if(liveSettings){dialog.show();placeLiveSettings();}else dialog.showModal();
+ (body.querySelector(settings?'[role=tab][aria-selected=true]':'input:not([type=file]), select, button')||cancel).focus({preventScroll:true});
 }
-dialog.addEventListener('close',()=>{if(savedFocus?.isConnected)savedFocus.focus({preventScroll:true});else if(phase==='open')gsView.focus({preventScroll:true});savedFocus=null;fitNative()});
+dialog.addEventListener('close',()=>{if(dialog.open)return;closeMenu();if(savedFocus?.isConnected)savedFocus.focus({preventScroll:true});else if(phase==='open')gsView.focus({preventScroll:true});savedFocus=null;fitNative()});
 function confirm(title,description,fn){dialogBuild(title,description,'Confirm',()=>{},()=>fn)}
 function section(body,title){
  const card=body.matches('.settings-pane,.sd-property-editor'),grid=E('div','fields');
@@ -1793,7 +1929,7 @@ let populateLayoutBackup;
 function addResetSection(general){
  const panel=settingsCard(general,'Reset to defaults','backup');
  panel.parentElement.classList.add('sd-reset-card');
- panel.append(E('p','note sd-reset-warning','This removes all dock folders, shortcuts, custom icons and settings, restores the empty default layout, and turns off Windows sign-in startup. Your files and saved backups are not deleted. Export your layout first if you want to keep it.'));
+ panel.append(E('p','note sd-reset-warning','This removes your dock folders, shortcuts, custom icons and settings, restores the starter folders, and turns off Windows sign-in startup. Your files and saved backups are not deleted. Export your layout first if you want to keep it.'));
  const prompt=B('Reset StackDock…','quiet sd-reset-danger sd-reset-action',()=>{
   confirmation.hidden=false;prompt.hidden=true;status.textContent='';cancel.focus({preventScroll:true});
  });
@@ -1996,24 +2132,75 @@ function iconPicker(body,source,initial,image,size,round,error,onChange=()=>{},p
 }
 let generalLaunchControls=()=>()=>({});
 let stylePreviewIcon=()=>{};
+function placeFolderPicker(card,folderPane,previewSlot){
+ // Follow the preview's actual container-query visibility. Reuse the card
+ // so selection, button listeners and search state survive resizing.
+ const host=previewSlot.clientWidth>0?previewSlot:folderPane;
+ if(card.parentElement!==host)host.append(card);
+}
+const STACKDOCK_GITHUB='https://github.com/TNVR-HSN/stack-dock';
+const STACKDOCK_ABOUT_LINKS=[
+ ['Source code','Browse the StackDock project on GitHub.',STACKDOCK_GITHUB],
+ ['Releases','Find Windows installers and release notes.',STACKDOCK_GITHUB+'/releases'],
+ ['Report an issue','Report a bug or suggest a feature.',STACKDOCK_GITHUB+'/issues'],
+ ['Maintainer','TNVR-HSN on GitHub.','https://github.com/TNVR-HSN'],
+ ['MIT License','Read the MIT license terms.','https://opensource.org/license/mit']
+];
+function buildAboutPane(pane){
+ const hero=E('section','sd-ui-card sd-about-hero'),logo=E('img'),copy=E('div','sd-about-copy');
+ logo.src='/stackdock-app-icon.png';logo.alt='';logo.draggable=false;
+ copy.append(E('strong','','StackDock'),E('p','note','A customizable Windows dock for organizing shortcuts into Grid Stacks.'));
+ const app=window.__TAURI__?.app;
+ const canReadVersion=typeof app?.getVersion==='function';
+ const version=E('span','sd-about-version',canReadVersion?'Reading version…':nativeCore?'Version unavailable':'Browser preview');
+ version.setAttribute('aria-live','polite');
+ hero.append(logo,copy,version);
+ const resources=E('section','sd-ui-card');
+ const title=E('h4','','Project links');title.id='sd-about-links-title';resources.setAttribute('aria-labelledby',title.id);
+ const links=E('div','sd-about-links'),status=E('p','note sd-about-note');
+ status.setAttribute('role','status');status.hidden=true;
+ for(const [label,description,url] of STACKDOCK_ABOUT_LINKS){
+  const link=E('a'),linkCopy=E('span'),icon=panelGlyph(E('span'),'external');
+  link.href=url;
+  linkCopy.append(E('strong','',label),E('span','note',description));
+  link.append(linkCopy,icon);
+  if(nativeCore?.invoke){
+   const open=async event=>{
+    if(event.type==='auxclick'&&event.button!==1)return;
+    event.preventDefault();status.hidden=true;
+    try{await nativeCore.invoke('plugin:opener|open_url',{url});}
+    catch{status.textContent='Could not open '+label+' in your default browser.';status.hidden=false;}
+   };
+   link.addEventListener('click',open);link.addEventListener('auxclick',open);
+  }else{link.target='_blank';link.rel='noopener noreferrer';}
+  links.append(link);
+ }
+ resources.append(title,links);
+ pane.classList.add('sd-about-pane');
+ pane.append(hero,resources,E('p','note sd-about-note','Built with Tauri, Rust and WebView2. Third-party components have their own licenses.'),status);
+ if(canReadVersion)Promise.resolve().then(()=>app.getVersion()).then(value=>{
+  version.textContent=typeof value==='string'&&value.trim()?'Version '+value:'Version unavailable';
+ },()=>{version.textContent='Version unavailable';});
+}
 function editSettings(selected=null,initial='dock',creating=false){
  const newFolder=creating?folderDraft():null;
- const folders=creating?[newFolder]:state.folders;
- let folder=creating?newFolder:selected||active()||folders[0];
+ const folders=()=>creating?[newFolder]:state.folders;
+ let folder=creating?newFolder:selected||active()||folders()[0];
  let rootFolder=folderPath(folder.id)[0]||folder;
  let tab=initial,collectDock,collectGeneral,applyStartup,edge,alignment,orientation,activate,syncSelectors,targetWrap,tablist,scroll;
- const cache=new Map(),previews=new Map(),labels={general:'General',dock:'Dock',folder:'Folder',gs:'Grid Stack'};
+ const cache=new Map(),previews=new Map(),labels={general:'General',dock:'Dock',folder:'Folder',gs:'Grid Stack',about:'About'};
  const groups={general:[['behavior','Behavior'],['launch','Launch indicator'],['themes','Themes'],['backup','Layout Backup']],dock:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects']],
-  folder:[['identity','Folder icon']],gs:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects']]};
+  folder:[['identity','Folder icon']],gs:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects']],about:[]};
  const activeGroups={};
  const pageCopy={
   general:'Startup, motion, hover behavior, themes and backups for StackDock.',
   dock:'Set the dock’s screen position, appearance and icon behavior.',
   folder:'Customize a dock folder or a subfolder in its Grid Stack.',
-  gs:'Set the grid layout, panel appearance and effects for this folder.'
+  gs:'Set the grid layout, panel appearance and effects for this folder.',
+  about:'Version information, source code, and support.'
  };
  let groupBar,previewSlot,previewHint,launchStage,launchSample,layoutInfo,configureLaunchPreview=()=>{};
- if(creating)delete labels.general;
+ if(creating){delete labels.general;delete labels.about;}
  const byTab=new Map();
  function previewBox(){const node=E('div','settings-preview');node.setAttribute('aria-label','Live appearance preview');return node}
  function preview(draw,s,f,type,controls=null){
@@ -2096,7 +2283,7 @@ function editSettings(selected=null,initial='dock',creating=false){
   hull.append(row);draw.replaceChildren(hull);
  }
  function draw(){
-  if(!dialog.open||!collectDock)return;
+  if(!dialog.open||!collectDock||tab==='about')return;
   const controls=cache.get(folder.id),d=collectDock();
   controls?.arrow.refresh();
   controls?.rotation.refresh();
@@ -2123,21 +2310,21 @@ function editSettings(selected=null,initial='dock',creating=false){
   const orientTabs=()=>tablist.setAttribute('aria-orientation',
    getComputedStyle(tablist).flexDirection==='row'?'horizontal':'vertical');
   if(typeof ResizeObserver!=='function')queueMicrotask(orientTabs);
-  rail.append(search,tablist,E('div','sd-rail-caption','STACKDOCK  /  SETTINGS'));
+  rail.append(search,tablist);
   const head=E('header','settings-page-head'),pageTitle=E('h3'),pageDescription=E('p');
   head.append(pageTitle,pageDescription);
   const targetRow=E('div','settings-target');targetWrap=targetRow;
   const chooser=select(targetRow,'Editing folder',[],rootFolder.id);
   const subChooser=select(targetRow,'Editing subfolder',[],folder.id);
   syncSelectors=()=>{
-   setSelectChoices(chooser,folders.map(f=>[f.id,f.name||'New folder']),rootFolder.id);
+   setSelectChoices(chooser,folders().map(f=>[f.id,f.name||'New folder']),rootFolder.id);
    const nested=folderTree([rootFolder]).slice(1);
    subChooser.parentElement.hidden=!nested.length;
    setSelectChoices(subChooser,[[rootFolder.id,'This folder'],...nested.map(({folder:f,path})=>
     [f.id,path.slice(1).map(part=>part.name).join(' › ')])],folder.id);
   };
   syncSelectors();
-  chooser.onchange=()=>{rootFolder=folders.find(f=>f.id===chooser.value);folder=rootFolder;syncSelectors();show(tab)};
+  chooser.onchange=()=>{rootFolder=folders().find(f=>f.id===chooser.value);folder=rootFolder;syncSelectors();show(tab)};
   subChooser.onchange=()=>{folder=folderTree([rootFolder]).find(({folder:f})=>f.id===subChooser.value)?.folder||rootFolder;show(tab)};
   groupBar=E('div','settings-groups');
   groupBar.setAttribute('aria-label','Settings categories');
@@ -2150,7 +2337,7 @@ function editSettings(selected=null,initial='dock',creating=false){
   const launchDisabled=E('p','note','Launch indicator is off.');
   head.append(targetRow,groupBar);center.append(head,scroll);shell.append(rail,center,previewSlot);
   for(const [key,label] of Object.entries(labels)){
-   const b=panelGlyph(B(label,'',()=>show(key)),key);
+   const b=panelGlyph(B(label,key==='about'?'sd-about-tab':'',()=>show(key)),key);
    b.id='settings-tab-'+key;b.setAttribute('role','tab');b.setAttribute('aria-controls','settings-pane-'+key);tablist.append(b);byTab.set(key,b);
   }
   tablist.onkeydown=e=>{
@@ -2162,6 +2349,7 @@ function editSettings(selected=null,initial='dock',creating=false){
   };
   function pane(){const n=E('section','settings-pane');n.setAttribute('role','tabpanel');return n}
   const dock=pane(),general=pane();
+  let about;
   const prefs={...generalDefaults,...state.general};
   const applySliderLabels=visible=>dialog.classList.toggle('sd-hide-slider-defaults',!visible);
   const sliderLabels=check(settingsCard(general,'Settings display','behavior'),'Show default values on sliders',prefs.sliderDefaults);
@@ -2247,7 +2435,7 @@ function editSettings(selected=null,initial='dock',creating=false){
    });
    const palette=E('div','sd-folder-colors');
    const swatches=E('div','sd-color-swatches');
-   swatches.setAttribute('role','group');swatches.setAttribute('aria-label','Built-in folder colors');
+   swatches.setAttribute('role','group');swatches.setAttribute('aria-label','Built-in folder icons');
    const swatchButtons=new Map();
    const syncPalette=({icon,image})=>{
     for(const [key,button] of swatchButtons)button.setAttribute('aria-pressed',String(!image&&icon===key));
@@ -2266,14 +2454,17 @@ function editSettings(selected=null,initial='dock',creating=false){
    const rotation=()=>overrideRotation()??inheritedRotation();
    rotation.refresh=overrideRotation.refresh;
    const rotate=overrideRotation.toggle;
-   for(const key of FOLDER_KEYS){
+   for(const key of FOLDER_PICKER_KEYS){
     const label=FOLDER_ICONS[key].label,button=B('','',()=>icon.chooseDefault(key));
     button.setAttribute('aria-label',label+' folder icon');button.title=label;
     button.append(art(key,FOLDER_ICONS,26));swatchButtons.set(key,button);swatches.append(button);
    }
    syncPalette(f);
-   palette.append(swatches,E('p','note','Choosing a color uses the built-in icon in place of a custom image.'));
-   settingsCard(folderPane,'Folder color','identity').append(palette);
+   palette.append(swatches,E('p','note','Choosing a built-in icon replaces the current custom image.'));
+   const pickerFields=settingsCard(folderPane,'Built-in folder icons','identity');
+   const pickerCard=pickerFields.parentElement;
+   pickerCard.classList.add('sd-folder-picker-card');
+   pickerFields.append(palette);
 
    const gsPreview=previewBox(gs),layout=settingsCard(gs,'Grid layout','layout');
    layout.classList.add('gs-dimensions');
@@ -2283,24 +2474,40 @@ function editSettings(selected=null,initial='dock',creating=false){
    settingsGear.parentElement.classList.add('card-toggle');
    layout.append(E('p','note','Shortcuts stay in their assigned cells. Move a shortcut before shrinking past its cell.'));
    const style=appearance(gs,{...gsDefaults,...f.style},true);
-   const c={f,folderPane,gs,name,folderHoverLabels,useSize,size,ownCorner,dockCorner,icon,arrow,rotation,rotate,cols,rows,settingsGear,style,folderPreview,gsPreview};cache.set(f.id,c);return c;
+   const c={f,folderPane,gs,name,folderHoverLabels,useSize,size,ownCorner,dockCorner,icon,arrow,rotation,rotate,cols,rows,settingsGear,style,folderPreview,gsPreview,pickerCard};
+   c.gridBaseline={cols:f.cols,rows:f.rows};cache.set(f.id,c);return c;
   }
   let currentPane=null;
+  function syncFolderPicker(){
+   const c=tab==='folder'?cache.get(folder.id):null;
+   if(c)placeFolderPicker(c.pickerCard,c.folderPane,previewSlot);
+  }
   function renderPreview(key,c,group){
+   previewSlot.hidden=key==='about';
+   if(previewSlot.hidden){previewSlot.replaceChildren();return;}
    const launch=key==='general'&&group==='launch'&&launchSample;
    const sample=launch?launchStage:key==='dock'||key==='general'?previews.get(key):key==='folder'?c.folderPreview:c.gsPreview;
    previewHint.textContent=launch?'This shows the appearance of the launch indicator.':
     key==='folder'?(folderParent(c.f)?'Preview of this subfolder icon.':'Preview of this folder on the dock.'):'Hover over the preview icons to try effects.';
    previewSlot.replaceChildren(previewTitle,sample,previewHint,...(key==='gs'?[layoutInfo]:[]));
+   syncFolderPicker();
   }
   function filter(){
    if(!currentPane)return;
+   if(tab==='about'){
+    groupBar.hidden=true;empty.hidden=true;
+    if(themeBar)themeBar.hidden=true;
+    return;
+   }
    const words=query.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
    const matches=text=>words.every(word=>text.toLowerCase().includes(word));
    const categories=groups[tab];
    groupBar.hidden=categories.length<2||words.length>0;
    let shown=0;
-   for(const card of currentPane.children){
+   const cards=Array.from(currentPane.children);
+   const picker=tab==='folder'?cache.get(folder.id)?.pickerCard:null;
+   if(picker?.parentElement===previewSlot)cards.push(picker);
+   for(const card of cards){
     const group=card.dataset.group;
     const title=card.querySelector(':scope > h4')?.textContent||'';
     const controls=Array.from(card.querySelectorAll(':scope > .fields > :is(.field,.check)'));
@@ -2317,24 +2524,29 @@ function editSettings(selected=null,initial='dock',creating=false){
   }
   function show(key){
    tab=key;error.hidden=true;
-   const c=key==='dock'||key==='general'?null:ensure(folder);
-   const node=key==='general'?general:key==='dock'?dock:key==='folder'?c.folderPane:c.gs;
+   const isAbout=key==='about';
+   if(isAbout&&!about){about=pane();buildAboutPane(about);}
+   const c=key==='folder'||key==='gs'?ensure(folder):null;
+   const node=isAbout?about:key==='general'?general:key==='dock'?dock:key==='folder'?c.folderPane:c.gs;
+   center.classList.toggle('sd-about-center',isAbout);search.hidden=isAbout;
    for(const [t,b] of byTab){b.setAttribute('aria-selected',String(key===t));b.tabIndex=key===t?0:-1}
-   targetWrap.hidden=key==='dock'||key==='general'||creating;
+   targetWrap.hidden=!c||creating;
    pageTitle.textContent=labels[key];pageDescription.textContent=pageCopy[key];
    node.id='settings-pane-'+key;node.setAttribute('aria-labelledby','settings-tab-'+key);
    const categories=groups[key];
    const choose=group=>{
     activeGroups[key]=group;
     for(const button of groupBar.children)button.setAttribute('aria-pressed',String(button.dataset.group===group));
-    filter();renderPreview(key,c,group);
+    renderPreview(key,c,group);filter();
     scroll.scrollTop=0;draw();
    };
    groupBar.replaceChildren(...categories.map(([value,label])=>{
     const b=B(label,'',()=>choose(value));b.dataset.group=value;return b;
    }));
    currentPane=node;scroll.replaceChildren(empty,node);
-   choose(activeGroups[key]||categories[0][0]);
+   // Informational pages may have no category buttons, but still need to
+   // replace the previous page's preview and reset the scroll position.
+   choose(activeGroups[key]??categories[0]?.[0]);
   }
   activate=(f,key)=>{query.value='';folder=f;rootFolder=folderPath(f.id)[0]||f;syncSelectors();show(key)};
   body.append(shell);
@@ -2347,14 +2559,14 @@ function editSettings(selected=null,initial='dock',creating=false){
    }
   });
   body.addEventListener('keydown',event=>{
-   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='f'){
+   if(tab!=='about'&&(event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='f'){
     event.preventDefault();query.focus();query.select();
    }
   });
   const update=()=>{if(query.value.trim())filter();draw();};
   scroll.addEventListener('input',update);scroll.addEventListener('change',update);
   if(typeof ResizeObserver==='function'){
-   const resize=new ResizeObserver(()=>{orientTabs();draw();});
+   const resize=new ResizeObserver(()=>{orientTabs();syncFolderPicker();draw();});
    resize.observe(shell);resize.observe(previewSlot);
    dialog.addEventListener('close',()=>resize.disconnect(),{once:true});
   }
@@ -2366,7 +2578,8 @@ function editSettings(selected=null,initial='dock',creating=false){
   for(const c of cache.values()){
    const name=c.name.value.trim();if(!name)invalid(c,'folder',c.name,'Enter a folder name.');
    let icon;try{icon=c.icon()}catch(e){invalid(c,'folder',null,e.message)}
-   const cols=+c.cols.value,rows=+c.rows.value;
+   const cols=+c.cols.value===c.gridBaseline.cols?c.f.cols:+c.cols.value;
+   const rows=+c.rows.value===c.gridBaseline.rows?c.f.rows:+c.rows.value;
    if(!Number.isInteger(cols)||cols<1||cols>12)invalid(c,'gs',c.cols,'Enter a column count between 1 and 12.');
    if(!Number.isInteger(rows)||rows<1||rows>MAX_ROWS)invalid(c,'gs',c.rows,'Enter a row count between 1 and '+MAX_ROWS+'.');
    if(c.f.slots.some(t=>t.c>=cols))invalid(c,'gs',c.cols,'Move shortcuts out of the columns you want to remove first.');
@@ -2375,7 +2588,12 @@ function editSettings(selected=null,initial='dock',creating=false){
   }
   const personal=collectGeneral(),dock={...collectDock(),...personal.dock},nextEdge=edge.value,nextAlign=alignment.value,nextOrientation=orientation.value;
   const commit=()=>{
-   for(const [f,v] of changes)Object.assign(f,v);
+   for(const [f,v] of changes){
+    Object.assign(f,v);
+    const c=cache.get(f.id);
+    c.gridBaseline={cols:f.cols,rows:f.rows};
+    c.cols.value=f.cols;c.rows.value=f.rows;
+   }
    state.dock=dock;state.general={...state.general,...personal.general};
    state.edge=nextEdge;state.align=nextAlign;state.orientation=nextOrientation;
    if(creating){saveDockOrder([...dockEntries(),newFolder]);advanceFolderColor();}
@@ -2432,7 +2650,8 @@ async function openDestination(t){
   if(!nativeCore?.invoke)throw Error('Open destinations from the StackDock desktop app.');
   await nativeCore.invoke('open_shortcut_destination',{target:t.target});
  }catch(error){
-  dialogBuild('Could not open destination',String(error),'OK',()=>{},()=>{});
+  if(liveSettingsOpen())dialog.querySelector('.sd-panel-footnote').textContent='Could not open destination: '+String(error);
+  else dialogBuild('Could not open destination',String(error),'OK',()=>{},()=>{});
  }
 }
 let resized=0;

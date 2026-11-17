@@ -239,6 +239,7 @@ function installDialogResize(kind){
   let drag=null;
   function resize(rect,w,h){
     const work=dims(),min=SD_DIALOG_MIN[kind];
+    dialog.classList.remove('sd-settings-initial-position');
     const left=clamp(rect.left,0,Math.max(0,work.w-min.width-8));
     const top=clamp(rect.top,work.top,Math.max(work.top,work.top+work.h-min.height-10));
     const b=dialogResizeBounds(kind,work,left,top);
@@ -249,7 +250,9 @@ function installDialogResize(kind){
     dialogMoved();
   }
   function reset(){
-    sdDialogSizes.delete(kind);dialog.classList.remove('sd-dialog-resized','sd-dialog-placed');dialogMoved();
+    sdDialogSizes.delete(kind);dialog.classList.remove('sd-dialog-resized','sd-dialog-placed','sd-settings-initial-position');
+    if(liveSettingsOpen())placeLiveSettings();
+    dialogMoved();
   }
   grip.addEventListener('pointerdown',e=>{
     if(e.button!==0)return;

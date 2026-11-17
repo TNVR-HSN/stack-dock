@@ -214,7 +214,7 @@
   const HOVER_LABEL_FADE=70;
   const baseFitNative=fitNative;
   fitNative=function(grid){
-    if((!hovered&&!labelFade)||hoverLayer.hidden||!fixedHost||!nativeArea||!hoverLayout||nativeBusy||surfaceWanted||!menu.hidden||dialog.open){
+    if((!hovered&&!labelFade)||hoverLayer.hidden||!fixedHost||!nativeArea||!hoverLayout||nativeBusy||surfaceWanted||!menu.hidden||dockControlsBlocked()){
       return baseFitNative(grid);
     }
     return moveHost(nativeCover(readBox(),hoverLayout));
@@ -269,7 +269,7 @@
   function showIconHover(button){
     const onDock=phase==='closed'&&dockView.contains(button);
     if(!onDock&&!(phase==='open'&&gsView.contains(button)))return;
-    if(dialog.open||!menu.hidden||surfaceWanted||drag||nativeBusy||hovered===button)return;
+    if(dockControlsBlocked()||!menu.hidden||surfaceWanted||drag||nativeBusy||hovered===button)return;
     const entry=onDock?dockEntryAt(button):active()?.slots.find(t=>t.id===button.dataset.tile);
     const s=onDock?state.dock:active()?.style, source=button.querySelector(':scope > .art');
     if(!entry||!s||!source)return;
@@ -424,7 +424,7 @@
   island.addEventListener('pointermove',hoverPointer);
   island.addEventListener('pointerout',e=>{if(!island.contains(e.relatedTarget))clearHover();});
   island.addEventListener('click',e=>{
-    if(!e.detail||e.button!==0||performance.now()<suppressClick||dialog.open||!menu.hidden)return;
+    if(!e.detail||e.button!==0||performance.now()<suppressClick||dockControlsBlocked()||!menu.hidden)return;
     const icon=expandedIconAt(e);
     if(!icon)return;
     e.preventDefault();icon.dispatchEvent(new MouseEvent('click',{bubbles:true,detail:e.detail,clientX:e.clientX,clientY:e.clientY}));
