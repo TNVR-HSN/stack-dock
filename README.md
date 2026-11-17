@@ -16,7 +16,7 @@
    · <a href="https://github.com/TNVR-HSN/stack-dock/releases">Download for Windows</a> ·
 </p>
 
-Keep your favorite shortcuts directly on the dock, or group them into folders that open as expandable grids called **Grid Stacks**.
+Keep your favorite shortcuts directly on the dock, or group them into folders that open as expandable grids inspired by Dynamic Island. 
 
 ## Features
 
@@ -72,6 +72,9 @@ With the default build directory, the installer is in `src-tauri/target/release/
 ## Contributing
 
 Bug reports, feature ideas, and focused pull requests are welcome. For a bug, include your Windows version, the StackDock version from **Settings → About**, and the steps to reproduce it. Open an [issue on GitHub](https://github.com/TNVR-HSN/stack-dock/issues).
+
+# Disclosure
+For code assist, AI was used in the process. 
 
 ## License
 
