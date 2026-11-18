@@ -1,0 +1,308 @@
+/* ==========================================================================
+   Stack Dock — Settings visual skin
+   Pure styling. Delete this file and its <link> in index.html to undo it.
+   Everything derives from your UI theme variables (--ui-accent, --ui-card,
+   --ui-win, --ui-rail ...), so the Themes tab keeps working.
+   Loaded after stack-dock-panels.css so it wins ties.
+   ========================================================================== */
+
+dialog:is(.settings-dialog, .sd-properties) {
+  --sd-a: var(--ui-accent);
+  --sd-a-glow: color-mix(in srgb, var(--ui-accent) 16%, transparent);
+  --sd-a-line: color-mix(in srgb, var(--ui-accent) 40%, transparent);
+  --sd-a-text: color-mix(in srgb, var(--ui-accent) 62%, #fff);
+  --sd-well: color-mix(in srgb, #000 34%, var(--ui-card));
+  --sd-ease: cubic-bezier(.2, .8, .2, 1);
+
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  border-radius: 22px;
+  background:
+    radial-gradient(880px 420px at 6% -10%, var(--sd-a-glow), transparent 62%),
+    radial-gradient(700px 380px at 104% 112%, color-mix(in srgb, var(--ui-accent) 9%, transparent), transparent 64%),
+    var(--ui-win);
+  border: 1px solid color-mix(in srgb, var(--ui-accent) 22%, #ffffff1c);
+  box-shadow:
+    0 0 0 1px #00000066,
+    0 30px 90px #04010acc,
+    0 0 70px color-mix(in srgb, var(--ui-accent) 9%, transparent);
+}
+
+/* ---- Entrance (individual properties, so a dragged dialog's transform is untouched) ---- */
+@keyframes sd-dialog-in { from { opacity: 0; translate: 0 10px; scale: .985; } to { opacity: 1; translate: 0 0; scale: 1; } }
+@keyframes sd-native-dialog-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sd-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sd-card-in { from { translate: 0 3px; } to { translate: 0 0; } }
+dialog:is(.settings-dialog, .sd-properties)[open] { animation: sd-dialog-in .26s var(--sd-ease) backwards; }
+/* The Windows host measures the border box when the panel opens. A scale or
+   translation would give it the animated rectangle instead of the real one. */
+dialog.sd-panel-region:is(.settings-dialog, .sd-properties)[open] {
+  animation: sd-native-dialog-in .20s var(--sd-ease) backwards;
+}
+dialog:is(.settings-dialog, .sd-properties)[open]::backdrop { animation: sd-backdrop-in .3s ease backwards; }
+/* Tabs remount their cards on selection. Keep them visible from frame one. */
+dialog.settings-dialog .settings-pane > .sd-ui-card { animation: sd-card-in .12s var(--sd-ease); }
+
+/* ---- Title bar and footer ---- */
+dialog:is(.settings-dialog, .sd-properties) .dialogtop {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ui-rail) 90%, #fff 5%), var(--ui-rail));
+}
+dialog:is(.settings-dialog, .sd-properties) .dialogfoot {
+  background: linear-gradient(0deg, color-mix(in srgb, var(--ui-rail) 88%, #000), var(--ui-rail));
+  box-shadow: 0 -10px 28px -22px #000;
+}
+.sd-panel-mark { box-shadow: inset 0 1px 0 #ffffff66, 0 4px 18px var(--sd-a-glow); }
+dialog:is(.settings-dialog, .sd-properties) .close { border-radius: 9px; transition: background .16s, color .16s, transform .16s var(--sd-ease); }
+dialog:is(.settings-dialog, .sd-properties) .close:hover { transform: rotate(90deg); }
+
+/* ---- Left rail ---- */
+dialog.settings-dialog .settings-rail {
+  background: linear-gradient(180deg, var(--ui-rail), color-mix(in srgb, var(--ui-rail) 86%, #000));
+}
+dialog.settings-dialog .sd-panel-search {
+  border-radius: 12px;
+  background: color-mix(in srgb, #000 36%, var(--ui-rail));
+  transition: border-color .18s, box-shadow .18s;
+}
+dialog.settings-dialog .sd-panel-search:focus-within {
+  border-color: var(--sd-a-line);
+  box-shadow: 0 0 0 3px var(--sd-a-glow);
+}
+dialog.settings-dialog .settings-tabs button {
+  border-radius: 12px;
+  transition: background .18s var(--sd-ease), color .18s, transform .18s var(--sd-ease), box-shadow .18s;
+}
+dialog.settings-dialog .settings-tabs button:hover { transform: translateX(2px); }
+dialog.settings-dialog .settings-tabs button[aria-selected=true] {
+  background: linear-gradient(90deg, var(--sd-a-glow), color-mix(in srgb, var(--ui-selected) 72%, transparent));
+  border-color: var(--sd-a-line);
+  box-shadow: 0 8px 20px -12px var(--ui-accent);
+}
+dialog.settings-dialog .settings-tabs button[aria-selected=true] svg {
+  color: var(--ui-accent);
+  filter: drop-shadow(0 0 6px var(--sd-a-glow));
+}
+dialog.settings-dialog .settings-tabs button[aria-selected=true]::before { box-shadow: 0 0 12px var(--ui-accent); }
+
+/* ---- Page header and section chips ---- */
+dialog.settings-dialog .settings-page-head {
+  padding: 20px 24px 15px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ui-accent) 6%, transparent), transparent);
+}
+dialog.settings-dialog .settings-page-head h3 {
+  font-family: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  background: linear-gradient(90deg, var(--ui-text), var(--sd-a-text));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+dialog.settings-dialog .settings-page-head p { font-size: 12.5px; }
+dialog.settings-dialog .settings-groups {
+  padding: 4px;
+  gap: 4px;
+  border-radius: 13px;
+  background: color-mix(in srgb, #000 30%, var(--ui-card));
+  box-shadow: inset 0 1px 3px #0006;
+}
+dialog.settings-dialog .settings-groups button {
+  border-radius: 9px;
+  transition: background .18s var(--sd-ease), color .18s, box-shadow .18s;
+}
+dialog.settings-dialog .settings-groups button:hover:not([aria-pressed=true]) { background: #ffffff0d; }
+dialog.settings-dialog .settings-groups button[aria-pressed=true] {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ui-accent) 28%, var(--ui-selected)), var(--ui-selected));
+  border-color: var(--sd-a-line);
+  box-shadow: 0 3px 12px -5px var(--ui-accent), inset 0 1px 0 #ffffff1c;
+}
+dialog.settings-dialog .settings-body {
+  scrollbar-color: color-mix(in srgb, var(--ui-accent) 38%, #2b2133) transparent;
+}
+
+/* ---- Cards ---- */
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card {
+  border-radius: 18px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ui-card) 90%, #fff 5%), var(--ui-card));
+  border-color: color-mix(in srgb, var(--ui-accent) 11%, var(--ui-line));
+  box-shadow: inset 0 1px 0 #ffffff0d, 0 12px 30px -20px #000;
+  transition: border-color .22s, box-shadow .22s;
+}
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card:hover {
+  border-color: color-mix(in srgb, var(--ui-accent) 26%, var(--ui-line));
+  box-shadow: inset 0 1px 0 #ffffff12, 0 14px 34px -18px #000;
+}
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card h4 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 16px 11px;
+  color: var(--sd-a-text);
+  letter-spacing: .11em;
+}
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card h4::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ui-accent);
+  box-shadow: 0 0 10px var(--ui-accent);
+}
+dialog.settings-dialog .sd-ui-card.sd-reset-card h4::before { background: #ff7188; box-shadow: 0 0 10px #ff7188; }
+dialog.settings-dialog .sd-ui-card .field,
+dialog.settings-dialog .sd-ui-card .check { transition: background .16s; }
+dialog.settings-dialog .sd-ui-card .field:hover,
+dialog.settings-dialog .sd-ui-card .check:hover { background: color-mix(in srgb, var(--ui-accent) 5%, transparent); }
+dialog.settings-dialog .sd-ui-card .fields > :last-child { border-bottom: 0; }
+
+/* ---- Inputs and selects ---- */
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card .field :is(input:not([type=range]):not([type=color]), select) {
+  border-radius: 10px;
+  background-color: var(--sd-well);
+  border-color: color-mix(in srgb, #fff 12%, transparent);
+  transition: border-color .16s, box-shadow .16s, background-color .16s;
+}
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card .field :is(input:not([type=range]):not([type=color]), select):hover {
+  border-color: color-mix(in srgb, var(--ui-accent) 32%, transparent);
+}
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card .field :is(input:not([type=range]):not([type=color]), select):focus {
+  border-color: var(--sd-a-line);
+  box-shadow: 0 0 0 3px var(--sd-a-glow);
+  outline: none;
+}
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card .field select {
+  appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23bda9c9' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+}
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card .field input[type=color] {
+  border-radius: 10px;
+  background-color: var(--sd-well);
+}
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card .field input[type=range] { accent-color: var(--ui-accent); }
+dialog.settings-dialog .sd-ui-card .rangeLabel > output {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--sd-a-glow);
+  color: var(--sd-a-text);
+  font-size: 11.5px;
+  font-weight: 650;
+  text-align: center;
+}
+
+/* ---- Toggle switches ---- */
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card .check input[type=checkbox] {
+  width: 40px;
+  height: 22px;
+  border-radius: 22px;
+  background: color-mix(in srgb, #fff 11%, #000 24%);
+  transition: background .2s, border-color .2s, box-shadow .2s;
+}
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card .check input[type=checkbox]::after {
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  box-shadow: 0 1px 4px #0008;
+  transition: transform .24s cubic-bezier(.3, 1.4, .5, 1), background .2s;
+}
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card .check input[type=checkbox]:checked {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ui-accent) 78%, #000), color-mix(in srgb, var(--ui-accent) 52%, #000));
+  border-color: var(--sd-a-line);
+  box-shadow: 0 0 16px -3px var(--ui-accent);
+}
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card .check input[type=checkbox]:checked::after { transform: translateX(18px); }
+
+/* ---- Buttons ---- */
+dialog:is(.settings-dialog, .sd-properties) :is(.primary, .quiet) {
+  border-radius: 10px;
+  transition: transform .12s var(--sd-ease), filter .16s, background .16s, box-shadow .2s;
+}
+dialog:is(.settings-dialog, .sd-properties) .primary:not(.sd-reset-hold) { box-shadow: inset 0 1px 0 #ffffff65, 0 8px 20px -10px var(--ui-accent); }
+dialog:is(.settings-dialog, .sd-properties) :is(.primary, .quiet):active:not(:disabled) { transform: translateY(1px) scale(.985); }
+
+/* ---- Live preview column ---- */
+dialog.settings-dialog .settings-monitor {
+  background:
+    radial-gradient(260px 200px at 50% 0%, var(--sd-a-glow), transparent 70%),
+    var(--ui-preview);
+}
+dialog.settings-dialog .settings-monitor h3 { display: flex; align-items: center; gap: 8px; color: var(--sd-a-text); }
+dialog.settings-dialog .settings-monitor h3::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ui-accent);
+  box-shadow: 0 0 10px var(--ui-accent);
+}
+dialog.settings-dialog .settings-monitor .settings-preview {
+  border-radius: 18px;
+  border-color: color-mix(in srgb, var(--ui-accent) 20%, #ffffff17);
+  box-shadow: inset 0 1px 0 #ffffff12, 0 14px 34px -20px #000;
+}
+
+/* ---- Accessibility fallbacks ---- */
+@media (forced-colors: active) {
+  dialog.settings-dialog .settings-page-head h3 { background: none; color: CanvasText; }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog:is(.settings-dialog, .sd-properties),
+  dialog:is(.settings-dialog, .sd-properties)::backdrop,
+  dialog.settings-dialog .settings-pane > .sd-ui-card { animation: none !important; }
+  dialog.settings-dialog .settings-tabs button:hover,
+  dialog:is(.settings-dialog, .sd-properties) .close:hover { transform: none; }
+}
+
+
+
+/* ================= NO GLOW — each rule names what it removes ================= */
+
+/* WINDOW: removes the colored haze in the top-left and bottom-right corners
+   and the colored halo outside the dialog. */
+dialog:is(.settings-dialog, .sd-properties) {
+  background: var(--ui-win);
+  box-shadow: 0 0 0 1px #00000066, 0 30px 90px #04010acc;
+}
+
+/* TITLE BAR: removes the glow under the app icon at the top-left. */
+/* .sd-panel-mark { box-shadow: inset 0 1px 0 #ffffff66; } */
+
+/* SEARCH BOX: removes the soft ring when you click into it.
+   (The border still changes color, so focus stays visible.) */
+dialog.settings-dialog .sd-panel-search:focus-within { box-shadow: none; }
+
+/* SIDEBAR, selected page: flat highlight instead of the accent gradient + glow. */
+dialog.settings-dialog .settings-tabs button[aria-selected=true] {
+  background: var(--ui-selected);
+  box-shadow: none;
+}
+/* SIDEBAR, selected page: removes the glow on its icon. */
+/* dialog.settings-dialog .settings-tabs button[aria-selected=true] svg { filter: none; } */
+/* SIDEBAR, selected page: removes the glow on the little vertical marker. */
+/* dialog.settings-dialog .settings-tabs button[aria-selected=true]::before { box-shadow: none; } */
+
+/* SECTION CHIPS (Layout / Panel / Hover ...): removes the glow under the active chip. */
+dialog.settings-dialog .settings-groups button[aria-pressed=true] { box-shadow: inset 0 1px 0 #ffffff1c; }
+
+/* CARD HEADINGS: removes the glow on the small dot before each heading. */
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card h4::before { box-shadow: none; }
+/* Same dot on the red "reset" card. */
+dialog.settings-dialog .sd-ui-card.sd-reset-card h4::before { box-shadow: none; }
+
+/* INPUTS AND DROPDOWNS: removes the soft ring around a field while you type in it. */
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card .field :is(input:not([type=range]):not([type=color]), select):focus {
+  box-shadow: none;
+}
+
+/* TOGGLE SWITCHES: removes the glow around a switch that is turned on. */
+dialog:is(.settings-dialog, .sd-properties) .sd-ui-card .check input[type=checkbox]:checked { box-shadow: none; }
+
+/* SAVE BUTTON: removes the colored glow underneath it. */
+dialog:is(.settings-dialog, .sd-properties) .primary:not(.sd-reset-hold) {
+  box-shadow: inset 0 1px 0 #ffffff65;
+}
