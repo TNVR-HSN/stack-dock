@@ -9,7 +9,7 @@
 <p align="center">
   <a href="#get-started"><img src="https://img.shields.io/badge/platform-Windows-0078D4" alt="Platform: Windows"></a>
   <a href="#build-from-source"><img src="https://img.shields.io/badge/built%20with-Tauri%202-24C8DB?logo=tauri" alt="Built with Tauri 2"></a>
-  <a href="https://github.com/TNVR-HSN/stack-dock/releases"><img src="https://img.shields.io/badge/status-0.1.0--beta-F2A900" alt="Status: 0.1.0-beta"></a>
+  <a href="https://github.com/TNVR-HSN/stack-dock/releases"><img src="https://img.shields.io/badge/status-0.2.0--beta-F2A900" alt="Status: 0.1.0-beta"></a>
   <a href="https://github.com/TNVR-HSN/stack-dock/releases"><img src="https://img.shields.io/github/downloads/TNVR-HSN/stack-dock/total" alt="Total downloads"></a>
 </p>
 
