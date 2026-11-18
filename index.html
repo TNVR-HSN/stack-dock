@@ -260,6 +260,10 @@ dialog.settings-dialog form{height:min(770px,calc(100dvh - var(--sd-caption-gutt
 .sd-about-links .note{display:block;margin:2px 0 0}
 .sd-about-links svg{width:15px;height:15px;flex:none;color:var(--ui-accent)}
 .sd-about-note{padding:0 3px}
+.sd-entrance-demo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));place-items:center;gap:9px;width:min(100%,240px);padding:14px 16px;margin:auto;overflow:hidden;border:1px solid var(--ui-line);border-radius:12px;background:var(--ui-preview)}
+.sd-entrance-demo .art{max-width:100%}
+.sd-entrance-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:12px 15px}
+.sd-entrance-controls .note{flex:1 1 180px;margin:0}
 .settings-center{display:flex;flex-direction:column;min-width:0;min-height:0}
 .settings-page-head{padding:16px 20px 13px;border-bottom:1px solid var(--ui-rule);flex:none}
 .settings-page-head h3{margin:0;font-size:22px;font-weight:650;letter-spacing:-.025em;line-height:1.23}
@@ -499,6 +503,19 @@ const FOLDER_ICONS={
 const FOLDER_KEYS=['folder-azure','folder-emerald','folder-violet'];
 const FOLDER_PICKER_KEYS=[...FOLDER_KEYS,'folder-stacked','folder-shortcuts','folder-games','folder-office',
  'folder-creative','folder-media','folder-tools','folder-web'];
+const GRID_ENTRANCES=[
+ ['classic','Classic','Keep the original Grid Stack reveal.'],
+ ['rows','Row Sweep','Bring in whole rows, from top to bottom.'],
+ ['columns','Column Sweep','Bring in whole columns, from left to right.'],
+ ['fly-in','Fly In','Icons glide inward from different directions and settle into their cells.'],
+ ['diagonal','Diagonal Wave','Sweep from the top-left corner in diagonal groups.'],
+ ['center','Center Out','Start near the middle and reveal the outer icons last.'],
+ ['outer','Outer Ring','Reveal the outside icons first, then fill in the middle.'],
+ ['together','All at Once','Fade and scale every icon in together.']
+];
+const normalizeGridEntrance=value=>GRID_ENTRANCES.some(([id])=>id===value)?value:'classic';
+// These styles are performed by the panel itself while it opens, so no icon is ever held hidden.
+const PANEL_ENTRANCES=new Set(['rows','columns','center','together']);
 const folderIconKey=index=>FOLDER_KEYS[index % FOLDER_KEYS.length];
 const isSubfolder=entry=>entry?.type==='folder';
 const MAX_FOLDER_DEPTH=12, FOLDER_PALETTE=2;
@@ -1151,6 +1168,100 @@ function views(open){
  gsGlass.style.opacity=gsView.style.opacity=open?'1':'0';
  island.style.boxShadow=shadow(open?active().style:state.dock);
 }
+function gridEntrancePlan(entries,mode,reach){
+ const scores=entries.map(({r,c,x,y})=>{
+  if(mode==='rows')return r;
+  if(mode==='columns')return c;
+  if(mode==='diagonal')return r+c;
+  if(mode==='center'||mode==='outer'||mode==='fly-in'){
+   const distance=Math.round(Math.hypot(x,y));
+   return mode==='center'?distance:-distance;
+  }
+  return 0;
+ });
+ // Rank occupied groups, not empty cells. Large gaps in a sparse grid
+ // should not silently turn into long pauses.
+ const groups=[...new Set(scores)].sort((a,b)=>a-b),rank=new Map(groups.map((score,i)=>[score,i]));
+ return entries.map(({node,x,y},i)=>{
+  const order=rank.get(scores[i])/Math.max(1,groups.length-1);
+  let dx=0,dy=0,scale=.86;
+  if(mode==='fly-in'){
+   const d=Math.hypot(x,y);
+   if(d>1){dx=reach*x/d;dy=reach*y/d;}
+   scale=.72;
+  }else if(mode==='rows')dy=-Math.min(12,reach*.32);
+  else if(mode==='columns')dx=-Math.min(12,reach*.32);
+  else if(mode==='diagonal')dx=dy=-Math.min(9,reach*.24);
+  else if(mode==='center'||mode==='outer')scale=.77;
+  else if(mode==='classic')scale=1;
+  return {node,order,dx,dy,scale};
+ });
+}
+function playGridEntrance(entries,mode,duration,reach,preview=false){
+ if(!entries.length||!Number.isFinite(duration)||duration<=0)return [];
+ const transform=(x,y,k)=>'translate('+x.toFixed(2)+'px,'+y.toFixed(2)+'px) scale('+k+')';
+ return gridEntrancePlan(entries,mode,reach).filter(({node})=>typeof node.animate==='function').map(({node,order,dx,dy,scale})=>{
+  const live=mode==='fly-in'&&!preview; // while opening for real, icons are visible from the first frame
+  const frames=[{opacity:live?1:0,transform:transform(dx,dy,scale)}];
+  if(mode==='fly-in')frames.push({opacity:1,transform:transform(-dx*.09,-dy*.09,1.045),offset:.82});
+  frames.push({opacity:1,transform:'none'});
+  const together=mode==='together'||mode==='classic';
+  return node.animate(frames,{
+   delay:live?duration*order*.2:duration*((preview ? .04 : .36)+(together ? 0 : order*(preview ? .37 : .23))),
+   duration:live?duration*.7:duration*(preview ? .53 : together ? .55 : .4),fill:'backwards',
+   easing:mode==='fly-in'?'cubic-bezier(.18,.75,.28,1)':'cubic-bezier(.2,.7,.28,1)'
+  });
+ });
+}
+function animateGridEntrance(view,preference,duration,skip=null){
+ const mode=normalizeGridEntrance(preference);
+ if(mode==='classic'||PANEL_ENTRANCES.has(mode)||reduced.matches)return [];
+ const scroll=view.querySelector('.scroll');
+ if(!scroll)return [];
+ // Snapshot the final, visible cells before applying the island's first
+ // (smaller) resize frame. Offscreen tiles don't need animation tracks.
+ const bounds=scroll.getBoundingClientRect(),cx=(bounds.left+bounds.right)/2,cy=(bounds.top+bounds.bottom)/2;
+ const entries=[];
+ for(const node of scroll.querySelectorAll('.cell > .tile')){
+  if(node===skip)continue; // The returning folder icon already has a flight track.
+  const cell=node.parentElement,rect=cell.getBoundingClientRect();
+  if(rect.right<=bounds.left||rect.left>=bounds.right||rect.bottom<=bounds.top||rect.top>=bounds.bottom)continue;
+  entries.push({node,r:+cell.dataset.r,c:+cell.dataset.c,x:(rect.left+rect.right)/2-cx,y:(rect.top+rect.bottom)/2-cy});
+ }
+ return playGridEntrance(entries,mode,duration,clamp(Math.min(bounds.width,bounds.height)*.27,22,62));
+}
+// The panel performs the entrance. Each axis of the island grows on its own schedule
+// (Row Sweep: width first, then height; Column Sweep: the reverse), and the grid
+// content is anchored so the reveal follows from the growth itself.
+function panelGrowth(mode,from,target,duration,shadowFrom,shadowTo){
+ if(!PANEL_ENTRANCES.has(mode))return null;
+ const scroll=gsView.querySelector('.scroll'),grid=scroll?.querySelector('.grid');
+ if(!scroll||!grid||typeof island.animate!=='function')return null;
+ const ease=t=>1-Math.pow(1-t,4),lead=.42,N=28,lerp=(a,b,p)=>a+(b-a)*p;
+ const axes=t=>{const slow=ease(t),fast=ease(Math.min(1,t/lead));return mode==='rows'?[fast,slow]:mode==='columns'?[slow,fast]:[slow,slow]};
+ // Measure the final layout before any animation starts.
+ const gw=grid.offsetWidth,gh=grid.offsetHeight,sw=scroll.clientWidth,sh=scroll.clientHeight;
+ const fitW=Math.max(1,Math.min(gw,sw)),fitH=Math.max(1,Math.min(gh,sh));
+ const hull=[],content=[];
+ for(let i=0;i<=N;i++){
+  const t=i/N,[px,py]=axes(t);
+  const box={x:lerp(from.x,target.x,px),y:lerp(from.y,target.y,py),w:lerp(from.w,target.w,px),h:lerp(from.h,target.h,py),r:lerp(from.r,target.r,Math.max(px,py))};
+  hull.push({...boxFrame(box),...(i===0?{boxShadow:shadowFrom}:i===N?{boxShadow:shadowTo}:{})});
+  const curW=Math.max(1,sw-(target.w-box.w)),curH=Math.max(1,sh-(target.h-box.h)); // visible grid area right now
+  if(mode==='center'){
+   const tx=-(Math.max(0,gw-curW)-Math.max(0,gw-sw))/2,ty=-(Math.max(0,gh-curH)-Math.max(0,gh-sh))/2;
+   content.push({transform:'translate('+tx.toFixed(2)+'px,'+ty.toFixed(2)+'px)'});
+  }else if(mode==='together'){
+   const s=Math.max(.06,Math.min(1,curW/fitW,curH/fitH));
+   const tx=(curW-fitW*s)/2-(sw-fitW)/2*t,ty=(curH-fitH*s)/2-(sh-fitH)/2*t;
+   content.push({transform:'translate('+tx.toFixed(2)+'px,'+ty.toFixed(2)+'px) scale('+s.toFixed(4)+')'});
+  }
+ }
+ const timing={duration,easing:'linear'}; // the easing is already baked into the samples
+ const motions=[];
+ if(content.length){grid.style.transformOrigin='0 0';motions.push(grid.animate(content,timing))}
+ return {hull:island.animate(hull,timing),content:motions};
+}
 function morph(target,opening,finish){
  if(!state.dock.motion||reduced.matches||!island.animate){
   stopMotion();applyBox(target);views(opening);finish();return;
@@ -1174,14 +1285,16 @@ function morph(target,opening,finish){
  const destination=opening?gsView.querySelector('.gs-heading .art'):dockIcon(f?.id);
  const toIcon=destination?.getBoundingClientRect();
  const iconMotion=startFlight(f,fromIcon,toIcon,destination,source,duration,opening?'cubic-bezier(.24,.74,.2,1)':easing,opening,interrupted);
- const hull=island.animate([{...boxFrame(from),boxShadow:previousShadow},{...boxFrame(target),boxShadow:island.style.boxShadow}],{duration,easing});
+ const tileMotions=opening?animateGridEntrance(gsView,f?.entryMotion,duration):[];
+ const growth=opening?panelGrowth(normalizeGridEntrance(f?.entryMotion),from,target,duration,previousShadow,island.style.boxShadow):null;
+ const hull=growth?growth.hull:island.animate([{...boxFrame(from),boxShadow:previousShadow},{...boxFrame(target),boxShadow:island.style.boxShadow}],{duration,easing});
  const a=(node,start,end,{duration,delay})=>node.animate([{opacity:start},{opacity:end}],{fill:'backwards',easing:'ease-out',duration:duration*speed,delay:delay*speed});
  // Surface and content crossfade independently. The GS fill never uses dock opacity.
  const fadeG=a(gsGlass,gg,opening?1:0,{duration:opening?265:235,delay:0});
  const fadeD=a(dockGlass,dg,opening?0:1,{duration:opening?225:200,delay:opening?0:95});
  const fadeV=a(gsView,gv,opening?1:0,{duration:opening?185:140,delay:opening?45:0});
  const fadeDock=a(dockView,dv,opening?0:1,{duration:opening?145:145,delay:opening?0:135});
- tracks=[hull,fadeG,fadeD,fadeV,fadeDock];
+ tracks=[hull,fadeG,fadeD,fadeV,fadeDock,...tileMotions,...(growth?growth.content:[])];
  if(iconMotion)tracks.push(iconMotion);
  Promise.allSettled(tracks.map(x=>x.finished)).then(()=>{if(serial===ticket){clearFlight();tracks=[];finish()}});
 }
@@ -1271,12 +1384,14 @@ async function navigateGrid(next,keyboard=false){
   const toIcon=destination?.getBoundingClientRect();
   const duration=325*100/clamp(state.dock.motionSpeed||100,25,250),easing='cubic-bezier(.22,.76,.26,1)';
   const travel=startFlight(other,fromIcon,toIcon,destination,retiringArtwork,duration,easing,down,null);
+  const tileMotions=animateGridEntrance(gsView,next.entryMotion,duration,returningTile);
   tracks=[
    island.animate([{...boxFrame(before),boxShadow:fromShadow},{...boxFrame(goal),boxShadow:island.style.boxShadow}],{duration,easing}),
    outgoingGrid.animate([{opacity:1},{opacity:0}],{duration:duration*.55,easing:'ease-out',fill:'forwards'}),
    gsView.animate([{opacity:0},{opacity:1}],{duration:duration*.65,delay:duration*.22,easing:'ease-out',fill:'backwards'}),
    gsGlass.animate([{backgroundColor:oldFill,borderColor:oldEdge},
-    {backgroundColor:gsGlass.style.getPropertyValue('--fill'),borderColor:gsGlass.style.getPropertyValue('--edge')}],{duration,easing})
+    {backgroundColor:gsGlass.style.getPropertyValue('--fill'),borderColor:gsGlass.style.getPropertyValue('--edge')}],{duration,easing}),
+   ...tileMotions
   ];
   if(travel)tracks.push(travel);
   await Promise.allSettled(tracks.map(animation=>animation.finished));
@@ -2132,6 +2247,36 @@ function iconPicker(body,source,initial,image,size,round,error,onChange=()=>{},p
 }
 let generalLaunchControls=()=>()=>({});
 let stylePreviewIcon=()=>{};
+function buildGridEntrancePicker(pane,value,canAnimate,readSpeed){
+ const fields=settingsCard(pane,'Icon entrance','entrance');
+ const choice=select(fields,'Entrance style',GRID_ENTRANCES,normalizeGridEntrance(value));
+ const sample=E('div','sd-entrance-demo');sample.setAttribute('aria-hidden','true');
+ const description=E('p','note'),bar=E('div','sd-entrance-controls');
+ const glyphs=['program','web','folder','file','file','folder','program','web','web','file','folder','program'];
+ const entries=glyphs.map((key,i)=>{
+  const node=art(key,APP_ICONS,29),r=Math.floor(i/4),c=i%4;
+  sample.append(node);return {node,r,c,x:(c-1.5)*36,y:(r-1)*36};
+ });
+ const explain=()=>GRID_ENTRANCES.find(([key])=>key===choice.value)?.[2]||GRID_ENTRANCES[0][2];
+ let sampleTracks=[];
+ function cancelPreview(){sampleTracks.forEach(t=>t.cancel());sampleTracks=[];}
+ function replay(){
+  cancelPreview();
+  if(reduced.matches){description.textContent='Motion preview is off because reduced motion is enabled.';return;}
+  if(!canAnimate()){description.textContent='Enable window animations in General to play this preview.';return;}
+  description.textContent=explain();
+  const duration=460*100/clamp(readSpeed(),25,250);
+  const batch=sampleTracks=playGridEntrance(entries,choice.value,duration,25,true);
+  void Promise.allSettled(batch.map(track=>track.finished)).then(()=>{if(sampleTracks===batch)sampleTracks=[];});
+ }
+ const replayButton=B('Replay preview','quiet',replay);
+ description.textContent=explain();
+ bar.append(description,replayButton);
+ fields.append(E('p','note','This plays when you enter this Grid Stack. Each folder and subfolder can use a different style.'),sample,bar);
+ choice.addEventListener('change',replay);
+ dialog.addEventListener('close',cancelPreview,{once:true});
+ return ()=>normalizeGridEntrance(choice.value);
+}
 function placeFolderPicker(card,folderPane,previewSlot){
  // Follow the preview's actual container-query visibility. Reuse the card
  // so selection, button listeners and search state survive resizing.
@@ -2190,7 +2335,7 @@ function editSettings(selected=null,initial='dock',creating=false){
  let tab=initial,collectDock,collectGeneral,applyStartup,edge,alignment,orientation,activate,syncSelectors,targetWrap,tablist,scroll;
  const cache=new Map(),previews=new Map(),labels={general:'General',dock:'Dock',folder:'Folder',gs:'Grid Stack',about:'About'};
  const groups={general:[['behavior','Behavior'],['launch','Launch indicator'],['themes','Themes'],['backup','Layout Backup']],dock:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects']],
-  folder:[['identity','Folder icon']],gs:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects']],about:[]};
+  folder:[['identity','Folder icon']],gs:[['layout','Layout'],['surface','Panel'],['hover','Hover'],['effects','Effects'],['entrance','Entrance']],about:[]};
  const activeGroups={};
  const pageCopy={
   general:'Startup, motion, hover behavior, themes and backups for StackDock.',
@@ -2474,7 +2619,8 @@ function editSettings(selected=null,initial='dock',creating=false){
    settingsGear.parentElement.classList.add('card-toggle');
    layout.append(E('p','note','Shortcuts stay in their assigned cells. Move a shortcut before shrinking past its cell.'));
    const style=appearance(gs,{...gsDefaults,...f.style},true);
-   const c={f,folderPane,gs,name,folderHoverLabels,useSize,size,ownCorner,dockCorner,icon,arrow,rotation,rotate,cols,rows,settingsGear,style,folderPreview,gsPreview,pickerCard};
+   const readEntrance=buildGridEntrancePicker(gs,f.entryMotion,()=>anim.checked,()=>+speed.value);
+   const c={f,folderPane,gs,name,folderHoverLabels,useSize,size,ownCorner,dockCorner,icon,arrow,rotation,rotate,cols,rows,settingsGear,style,folderPreview,gsPreview,pickerCard,readEntrance};
    c.gridBaseline={cols:f.cols,rows:f.rows};cache.set(f.id,c);return c;
   }
   let currentPane=null;
@@ -2584,7 +2730,7 @@ function editSettings(selected=null,initial='dock',creating=false){
    if(!Number.isInteger(rows)||rows<1||rows>MAX_ROWS)invalid(c,'gs',c.rows,'Enter a row count between 1 and '+MAX_ROWS+'.');
    if(c.f.slots.some(t=>t.c>=cols))invalid(c,'gs',c.cols,'Move shortcuts out of the columns you want to remove first.');
    if(c.f.slots.some(t=>t.r>=rows))invalid(c,'gs',c.rows,'Move shortcuts out of the rows you want to remove first.');
-   changes.push([c.f,{name,...icon,folderHoverLabels:c.folderHoverLabels.checked,dockIconShape:undefined,dockIconCorner:c.ownCorner.checked?+c.dockCorner.value:undefined,triggerSize:c.useSize.checked?+c.size.value:0,arrowOverride:c.arrow(),iconRotation:c.rotate.checked?c.rotation():undefined,cols,rows,style:{...c.style(),settingsGear:c.settingsGear.checked}}]);
+   changes.push([c.f,{name,...icon,folderHoverLabels:c.folderHoverLabels.checked,dockIconShape:undefined,dockIconCorner:c.ownCorner.checked?+c.dockCorner.value:undefined,triggerSize:c.useSize.checked?+c.size.value:0,arrowOverride:c.arrow(),iconRotation:c.rotate.checked?c.rotation():undefined,cols,rows,entryMotion:c.readEntrance(),style:{...c.style(),settingsGear:c.settingsGear.checked}}]);
   }
   const personal=collectGeneral(),dock={...collectDock(),...personal.dock},nextEdge=edge.value,nextAlign=alignment.value,nextOrientation=orientation.value;
   const commit=()=>{

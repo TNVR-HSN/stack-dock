@@ -703,6 +703,7 @@ dialog.sd-panel-region{box-shadow:none}
         return readShortcut(t,slot);
       });
       return { ...location,id:f.id, name:f.name, cols:f.cols, rows:f.rows, slots,
+        entryMotion:normalizeGridEntrance(f.entryMotion),
         folderHoverLabels:f.folderHoverLabels!==false,
         style:appearanceCopy(f.style, gsDefaults),
         dockIconShape:['default','rounded','raw'].includes(f.dockIconShape) ? f.dockIconShape : 'default',

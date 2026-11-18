@@ -74,7 +74,7 @@ With the default build directory, the installer is in `src-tauri/target/release/
 Bug reports, feature ideas, and focused pull requests are welcome. For a bug, include your Windows version, the StackDock version from **Settings → About**, and the steps to reproduce it. Open an [issue on GitHub](https://github.com/TNVR-HSN/stack-dock/issues).
 
 ### Disclosure
-For code assist, AI was used in the process. 
+For coding assistance, AI was used in the process. 
 
 ## License
 
