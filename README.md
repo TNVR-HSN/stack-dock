@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/stackdock-app-icon.png" width="112" alt="StackDock SD icon">
+  <img src="D:\Other\Projects\DOCK\stack-dock\public\assets\StackDock.png" width="212" alt="StackDock SD icon">
 </p>
 
 <h1 align="center">StackDock</h1>
@@ -18,18 +18,23 @@
 
 Keep your favorite shortcuts directly on the dock, or group them into folders that open as expandable grids inspired by Dynamic Island. 
 
+<p align="center">
+  <img src="D:\Other\Projects\DOCK\stack-dock\public\assets\Stackdock_folders.gif" alt="StackDock Preview">
+</p>
+
 ## Features
 
 ### Dock and Grid Stacks
 
 - **Put the dock where you want it.** Choose any screen edge, align it along that edge, and make it horizontal or vertical.
-- **Organize shortcuts your way.** Add shortcuts directly to the dock, group them in independent Grid Stacks, and create subfolders inside a stack. Fresh installs start with three empty folders named **Shortcuts**, **Games**, and **Office**.
+- **Organize shortcuts your way.** Add shortcuts directly to the dock, group them in independent Grid Stacks, and create subfolders inside a stack.
 - **Drag and drop.** Drop files from Windows Explorer onto the dock or an open grid. Drag dock items to reorder them and move grid items to specific cells. Add rows and columns, remove empty ones, or drag an item to a grid edge and hold to expand it.
 - **Open different kinds of shortcuts.** Launch programs with optional arguments and a working folder, open files and folders, and launch web links or app links such as `steam://` when Windows has a handler for them.
 - **Find and edit shortcuts.** Press **Ctrl+F** while StackDock has focus to search by name, folder, or target. Right-click an item or press **Shift+F10** on a focused item to edit its properties or open its location in Explorer. For links, use **Open Link** instead.
 
-### Appearance and effects
+### Customize Everything
 
+- **Make your own**. Change just about anything you want to your liking.
 - **Style the dock and each grid separately.** Adjust background color and opacity, borders, corner radius, shadows, icon size and rotation, and label size. Set horizontal and vertical spacing and padding independently.
 - **Choose your icons.** Use a built-in folder icon or pick an image, ICO file, or an icon embedded in an EXE. StackDock can pick up icons from Windows shortcuts, and image thumbnails are on by default. Override the thumbnail setting or reset the icon on an individual shortcut.
 - **Customize what happens on hover.** Choose motion such as lift, scale, or tilt. Adjust the hover highlight and click area, show names and delayed paths or URLs, or add reflections and ground shadows. Folder arrows and the in-grid Settings button are optional.
@@ -38,14 +43,14 @@ Keep your favorite shortcuts directly on the dock, or group them into folders th
 
 ### Startup and backups
 
-- **Start with Windows.** Enable **Start StackDock when I sign in** in an installed release.
+- **Start with Windows.** Enable "Start StackDock when I sign in".
 - **Keep a copy of your layout.** Export a timestamped JSON backup, import a saved layout, or reset to the starter layout after a hold-to-confirm prompt.
 - **Keep layouts local.** No account is needed. Backups include shortcut paths and settings, not the original files, so paths may need updating on a different PC.
 - **Find your version and support links.** Open **Settings → About** for the running version, source code, releases, issue tracker, and license information.
 
 ## Get started
 
-1. Download a Windows installer from [Releases](https://github.com/TNVR-HSN/stack-dock/releases). Choose the installer asset, not the **Source code** ZIP.
+1. Download a Windows installer or Portable version from [Releases](https://github.com/TNVR-HSN/stack-dock/releases).
 2. Open **StackDock** from the Start menu. Click a folder on the dock to open its Grid Stack.
 3. Drop a file into the grid or right-click an empty cell and choose **Add shortcut here…**. To create another grid, right-click the closed dock and choose **New folder…**.
 4. Right-click the dock to open **Settings** or change its **Screen Position**. Use **Esc** to go back from a subfolder or close an open grid. To quit, right-click the closed dock and choose **StackDock → Exit**.
@@ -73,7 +78,7 @@ With the default build directory, the installer is in `src-tauri/target/release/
 
 Bug reports, feature ideas, and focused pull requests are welcome. For a bug, include your Windows version, the StackDock version from **Settings → About**, and the steps to reproduce it. Open an [issue on GitHub](https://github.com/TNVR-HSN/stack-dock/issues).
 
-### Disclosure
+#### Disclosure
 For coding assistance, AI was used in the process. 
 
 ## License
