@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="D:\Other\Projects\DOCK\stack-dock\public\assets\StackDock.png" width="212" alt="StackDock SD icon">
+  <img src="public\assets\StackDock.png" width="212" alt="StackDock SD icon">
 </p>
 
 <h1 align="center">StackDock</h1>
@@ -19,7 +19,7 @@
 Keep your favorite shortcuts directly on the dock, or group them into folders that open as expandable grids inspired by Dynamic Island. 
 
 <p align="center">
-  <img src="D:\Other\Projects\DOCK\stack-dock\public\assets\Stackdock_folders.gif" alt="StackDock Preview">
+  <img src="public\assets\Stackdock_folders.gif" alt="StackDock Preview">
 </p>
 
 ## Features
