@@ -686,6 +686,7 @@ impl App {
         self.layout.envelope(self.progress, self.motion.is_some())
     }
     fn draw(&mut self) -> io::Result<()> {
+        let frame_started = Instant::now();
         let bounds = self.bounds();
         let (w, h) = (bounds.w as usize, bounds.h as usize);
         if self
@@ -711,7 +712,17 @@ impl App {
                 hover_levels: &self.hover_levels,
             },
         );
-        surface.present(self.hwnd, bounds)
+        let paint_ms = frame_started.elapsed().as_secs_f64() * 1000.0;
+        let result = surface.present(self.hwnd, bounds);
+        let total_ms = frame_started.elapsed().as_secs_f64() * 1000.0;
+
+        if total_ms >= 20.0 {
+            eprintln!(
+                "[slow frame] total={total_ms:.1} ms  before_present={paint_ms:.1} ms  present={:.1} ms",
+                total_ms - paint_ms
+            );
+        }
+        result
     }
     fn stop(&mut self) {
         self.motion = None;

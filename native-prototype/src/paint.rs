@@ -466,6 +466,7 @@ impl Assets {
         if self.images.len() >= 96 {
             self.images.clear()
         }
+        let load_started = std::time::Instant::now();
         let value = custom
             .then(|| {
                 if entry.image.len() > 530_000 {
@@ -512,6 +513,10 @@ impl Assets {
                     .and_then(|(_, data)| Self::decode(data))
             })
             .map(Rc::new);
+        let load_ms = load_started.elapsed().as_secs_f64() * 1000.0;
+        if load_ms >= 2.0 {
+            eprintln!("[icon load] {:7.1} ms  {}", load_ms, entry.name);
+        }
         self.images.insert(key, value.clone());
         value
     }
