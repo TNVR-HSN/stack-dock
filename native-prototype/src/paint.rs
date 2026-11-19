@@ -27,6 +27,7 @@ impl<'a> Canvas<'a> {
             clip: origin,
         }
     }
+
     fn put(&mut self, x: i32, y: i32, src: u32) {
         let sx = x as f32 + 0.5;
         let sy = y as f32 + 0.5;
@@ -336,12 +337,14 @@ pub struct Assets {
     font: Option<Font>,
     bold: Option<Font>,
     images: HashMap<String, Option<Rc<RgbaImage>>>,
+    painted_icons: HashMap<(usize, [u32; 6]), (Rc<RgbaImage>, Vec<u32>)>,
     glyphs: HashMap<(char, u16, bool), Rc<Glyph>>,
 }
 static BUILTIN: &[(&str, &[u8])] = include!("../assets/icons.rs");
 impl Assets {
     pub fn clear_layout_images(&mut self) {
         self.images.clear();
+        self.painted_icons.clear();
     }
 
     pub fn new(font_dir: &Path) -> Self {
@@ -356,6 +359,7 @@ impl Assets {
             font: font(&["seguisb.ttf", "segoeui.ttf", "DejaVuSans.ttf"]),
             bold: font(&["segoeuib.ttf", "DejaVuSans-Bold.ttf"]),
             images: HashMap::new(),
+            painted_icons: HashMap::new(),
             glyphs: HashMap::new(),
         }
     }
@@ -585,6 +589,66 @@ fn corner(e: &Entry, skin: Skin, dock: bool) -> f32 {
     }
     skin.corner
 }
+fn paint_stationary_icon(
+    canvas: &mut Canvas,
+    assets: &mut Assets,
+    image: &Rc<RgbaImage>,
+    rect: Rect,
+    corner: f32,
+    angle: f32,
+) {
+    let left = rect.x.floor() as i32;
+    let top = rect.y.floor() as i32;
+    let width = (rect.right().ceil() as i32 - left).max(0) as usize;
+    let height = (rect.bottom().ceil() as i32 - top).max(0) as usize;
+
+    if width == 0 || height == 0 {
+        return;
+    }
+
+    // Bound memory use for unusually large icons or display scales.
+    if width > 192 || height > 192 {
+        canvas.art(image, rect, corner, angle, 1., false);
+        return;
+    }
+
+    let local_x = rect.x - left as f32;
+    let local_y = rect.y - top as f32;
+    let key = (
+        Rc::as_ptr(image) as usize,
+        [
+            local_x.to_bits(),
+            local_y.to_bits(),
+            rect.w.to_bits(),
+            rect.h.to_bits(),
+            corner.to_bits(),
+            angle.to_bits(),
+        ],
+    );
+
+    if assets.painted_icons.len() >= 128 && !assets.painted_icons.contains_key(&key) {
+        assets.painted_icons.clear();
+    }
+
+    let (_, pixels) = assets.painted_icons.entry(key).or_insert_with(|| {
+        let mut pixels = vec![0u32; width * height];
+        let bounds = Rect::new(0., 0., width as f32, height as f32);
+        let local_rect = Rect::new(local_x, local_y, rect.w, rect.h);
+        Canvas::new(&mut pixels, width, height, bounds)
+            .art(image, local_rect, corner, angle, 1., false);
+
+        // Retain the source image while its address is used as a cache key.
+        (Rc::clone(image), pixels)
+    });
+
+    for (y, row) in pixels.chunks_exact(width).enumerate() {
+        for (x, &pixel) in row.iter().enumerate() {
+            if pixel != 0 {
+                canvas.put(left + x as i32, top + y as i32, pixel);
+            }
+        }
+    }
+}
 fn tile(
     c: &mut Canvas,
     a: &mut Assets,
@@ -595,6 +659,7 @@ fn tile(
     p: f32,
     dock: bool,
     hover: bool,
+    hover_amount: f32,
     thumb: bool,
     skip_icon: bool,
     caption_bottom: f32,
@@ -611,8 +676,31 @@ fn tile(
     }
     if !skip_icon {
         if let Some(image) = a.get(e, thumb) {
-            let angle = e.icon_rotation.unwrap_or(s.rotation);
-            c.art(&image, t.icon, corner(e, s, dock), angle, p, false);
+            let mut artwork = t.icon;
+            let mut angle = e.icon_rotation.unwrap_or(s.rotation);
+
+            if matches!(s.hover_mode, 1 | 3 | 5) {
+                artwork = t.icon.square(t.icon.w * mix(1., s.hover_scale, hover_amount));
+            }
+            if matches!(s.hover_mode, 2 | 3 | 5) {
+                artwork.y -= s.hover_lift * hover_amount;
+            }
+            if matches!(s.hover_mode, 4 | 5) {
+                angle += s.hover_angle * hover_amount;
+            }
+
+            let icon_corner = corner(e, s, dock);
+            let at_rest = artwork.x == t.icon.x
+                && artwork.y == t.icon.y
+                && artwork.w == t.icon.w
+                && artwork.h == t.icon.h
+                && angle == e.icon_rotation.unwrap_or(s.rotation);
+
+            if p == 1. && at_rest {
+                paint_stationary_icon(c, a, &image, artwork, icon_corner, angle);
+            } else {
+                c.art(&image, artwork, icon_corner, angle, p, false);
+            }
             if s.reflect > 0. {
                 let old = c.clip;
                 c.clip = old.intersect(Rect::new(t.icon.x, t.icon.bottom(), t.icon.w, s.reflect));
@@ -645,6 +733,7 @@ pub struct View<'a> {
     pub p: f32,
     pub a: f32,
     pub hover: Option<Hit>,
+    pub hover_levels: &'a [(Hit, f32)],
 }
 pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
     let View {
@@ -655,7 +744,14 @@ pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
         p,
         a: flight,
         hover,
+        hover_levels,
     } = v;
+    let hover_amount = |hit: Hit| {
+        hover_levels
+            .iter()
+            .find(|entry| entry.0 == hit)
+            .map_or(0., |entry| entry.1)
+    };
     let s = l.s;
     let thumb = saved.general.image_thumbnails.unwrap_or(true);
     let root_clip = c.clip;
@@ -690,6 +786,7 @@ pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
             dock_alpha,
             true,
             hover == Some(Hit::Dock(t.item)),
+            hover_amount(Hit::Dock(t.item)),
             thumb,
             current.is_some() && dock_index == Some(t.item),
             t.icon.bottom(),
@@ -733,9 +830,28 @@ pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
             false,
         );
     }
-    c.clip = root_clip.intersect(panel).intersect(l.grid_clip);
+    let panel_clip = root_clip.intersect(panel);
+    let grid_clip = panel_clip.intersect(l.grid_clip);
     let max_distance = l.grid_clip.w.hypot(l.grid_clip.h) / 2.;
-    for &t in &l.grid_tiles {
+
+    let hovered_grid_item = match hover {
+        Some(Hit::Grid(index)) => Some(index),
+        _ => None,
+    };
+
+    let regular_tiles = l.grid_tiles.iter().filter(|t| {
+        Some(t.item) != hovered_grid_item
+    });
+    let front_tile = l.grid_tiles.iter().find(|t| {
+        Some(t.item) == hovered_grid_item
+    });
+
+    for &t in regular_tiles.chain(front_tile) {
+        c.clip = if Some(t.item) == hovered_grid_item || hover_amount(Hit::Grid(t.item)) != 0. {
+            panel_clip
+        } else {
+            grid_clip
+        };
         let item = &folder.slots[t.item];
         let d = (t.icon.cx() - l.grid_clip.cx()).hypot(t.icon.cy() - l.grid_clip.cy());
         let mut t = t;
@@ -782,6 +898,7 @@ pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
             alpha,
             false,
             hover == Some(Hit::Grid(t.item)),
+            hover_amount(Hit::Grid(t.item)),
             thumb,
             false,
             caption_bottom,
@@ -853,6 +970,7 @@ mod tests {
                         p,
                         a: p,
                         hover: None,
+                        hover_levels: &[],
                     },
                 );
                 buffer

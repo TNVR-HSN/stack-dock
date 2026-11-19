@@ -236,7 +236,7 @@
       motion.finished.then(finish,finish);
     }else clear();
   };
-  const hoverEasings=['linear','ease-out','ease-in-out','cubic-bezier(.2,1.27,.34,1)'];
+  const hoverEasings=['linear','ease-out','ease-in-out','cubic-bezier(.2,1.8,.35,1)'];
   function hoverMotion(s,k=1){
     if(reduced.matches)return {scale:1,y:0,angle:0,time:0,easing:'linear'};
     const mode=s.hoverMode??0;

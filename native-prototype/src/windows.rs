@@ -249,6 +249,35 @@ const WM_MOUSELEAVE: u32 = 0x02A3;
 const WM_DPICHANGED: u32 = 0x02E0;
 const WM_SETTINGS_CLOSED: u32 = 0x8001; // WM_APP + 1
 const ANIMATION_TIMER: usize = 1;
+const HOVER_TIMER: usize = 2;
+const SETTINGS_TIMER: usize = 3;
+
+struct HoverTransition {
+    hit: Hit,
+    from: f32,
+    to: f32,
+    start: Instant,
+    duration_ms: f32,
+    curve: u8,
+}
+
+impl HoverTransition {
+    fn sample(&self, now: Instant) -> (f32, bool) {
+        let elapsed_ms = now.duration_since(self.start).as_secs_f32() * 1000.;
+        if self.duration_ms <= 0. || elapsed_ms >= self.duration_ms {
+            return (self.to, true);
+        }
+
+        let t = elapsed_ms / self.duration_ms;
+        let progress = match self.curve {
+            0 => t,
+            2 => ease(t, 0.42, 0., 0.58, 1.),
+            3 => ease(t, 0.2, 1.8, 0.35, 1.),
+            _ => ease(t, 0., 0., 0.58, 1.),
+        };
+        (mix(self.from, self.to, progress), false)
+    }
+}
 
 // Read/write access to the bitmap is exclusively from this Win32 UI thread.
 struct Surface {
@@ -516,9 +545,12 @@ struct App {
     surface: Option<Surface>,
     motion: Option<Motion>,
     hover: Option<Hit>,
+    hover_transitions: Vec<HoverTransition>,
+    hover_levels: Vec<(Hit, f32)>,
     tracking: bool,
     settings: Option<SettingsLink>,
     settings_open: bool,
+    settings_stamp: Option<(std::time::SystemTime, u64)>,
 }
 impl App {
     fn new(hwnd: Handle, saved: Saved, settings: Option<SettingsLink>) -> io::Result<Self> {
@@ -542,9 +574,12 @@ impl App {
             surface: None,
             motion: None,
             hover: None,
+            hover_transitions: Vec::new(),
+            hover_levels: Vec::new(),
             tracking: false,
             settings,
             settings_open: false,
+            settings_stamp: None,
         })
     }
 
@@ -556,6 +591,9 @@ impl App {
             return Ok(());
         }
 
+        let initial_stamp = std::fs::metadata(&settings.layout_path)
+            .ok()
+            .and_then(|m| Some((m.modified().ok()?, m.len())));
         let mut child = Command::new(&settings.executable)
             .arg("--settings-only")
             .spawn()
@@ -569,11 +607,51 @@ impl App {
             }
         });
         self.settings_open = true;
+        self.settings_stamp = initial_stamp;
+        if unsafe { SetTimer(self.hwnd, SETTINGS_TIMER, 250, null_mut()) } == 0 {
+            return Err("Settings opened, but live Apply could not start its timer.".into());
+        }
+        Ok(())
+    }
+
+    fn poll_settings(&mut self) -> io::Result<()> {
+        if !self.settings_open {
+            return Ok(());
+        }
+
+        let Some(link) = &self.settings else {
+            return Ok(());
+        };
+        let Ok(metadata) = std::fs::metadata(&link.layout_path) else {
+            return Ok(());
+        };
+        let Ok(modified) = metadata.modified() else {
+            return Ok(());
+        };
+
+        let stamp = (modified, metadata.len());
+        if self.settings_stamp == Some(stamp) {
+            return Ok(());
+        }
+
+        // Only replace the active layout after the new file loads successfully.
+        let Ok(saved) = Saved::load(&link.layout_path) else {
+            return Ok(());
+        };
+
+        self.saved = saved;
+        self.clear_hover();
+        self.assets.clear_layout_images();
+        self.dock_scroll = 0.;
+        self.settle(0.)?;
+        self.settings_stamp = Some(stamp);
         Ok(())
     }
 
     fn settings_closed(&mut self, success: bool) -> Result<(), String> {
+        unsafe { KillTimer(self.hwnd, SETTINGS_TIMER) };
         self.settings_open = false;
+        self.settings_stamp = None;
         if !success {
             return Err(
                 "StackDock Settings exited with an error. The dock kept its previous layout."
@@ -586,7 +664,7 @@ impl App {
         let saved = Saved::load(&link.layout_path)?;
         self.saved = saved;
         self.assets.clear_layout_images();
-        self.hover = None;
+        self.clear_hover();
         self.dock_scroll = 0.;
         self.settle(0.).map_err(|error| error.to_string())
     }
@@ -630,6 +708,7 @@ impl App {
                 p: self.progress,
                 a: self.icon_progress,
                 hover: self.hover,
+                hover_levels: &self.hover_levels,
             },
         );
         surface.present(self.hwnd, bounds)
@@ -658,7 +737,7 @@ impl App {
         {
             return Ok(());
         }
-        self.hover = None;
+        self.clear_hover();
         let speed = 100.
             / self
                 .saved
@@ -727,11 +806,86 @@ impl App {
             .find(|t| t.box_.contains(x, y))
             .map(|t| Hit::Grid(t.item))
     }
+    fn clear_hover(&mut self) {
+        self.hover = None;
+        self.hover_levels.clear();
+        self.hover_transitions.clear();
+        unsafe { KillTimer(self.hwnd, HOVER_TIMER) };
+    }
+
+    fn sample_hover(&mut self, now: Instant) {
+        let levels = &mut self.hover_levels;
+        self.hover_transitions.retain(|transition| {
+            let (value, done) = transition.sample(now);
+            if let Some(entry) = levels.iter_mut().find(|e| e.0 == transition.hit) {
+                entry.1 = value;
+            }
+            !done
+        });
+        levels.retain(|e| e.1 != 0. || Some(e.0) == self.hover);
+    }
+
     fn hover(&mut self, to: Option<Hit>) -> io::Result<()> {
         if self.hover == to {
             return Ok(());
         }
+
+        let now = Instant::now();
+        self.sample_hover(now);
+        let previous = self.hover;
         self.hover = to;
+        let animations = motion_enabled();
+
+        for (hit, target) in [(previous, 0.), (to, 1.)] {
+            let Some(hit) = hit else { continue };
+            let skin = match hit {
+                Hit::Dock(_) => self.layout.ds,
+                Hit::Grid(_) => self.layout.gs,
+                Hit::Back => continue,
+            };
+
+            self.hover_transitions.retain(|entry| entry.hit != hit);
+            let index = match self.hover_levels.iter().position(|e| e.0 == hit) {
+                Some(index) => index,
+                None => {
+                    self.hover_levels.push((hit, 0.));
+                    self.hover_levels.len() - 1
+                }
+            };
+            let from = self.hover_levels[index].1;
+            if animations && skin.hover_mode != 0 && skin.hover_duration > 0.
+                && from != target
+            {
+                self.hover_transitions.push(HoverTransition {
+                    hit,
+                    from,
+                    to: target,
+                    start: now,
+                    duration_ms: skin.hover_duration * (target - from).abs().min(1.),
+                    curve: skin.hover_curve,
+                });
+            } else {
+                self.hover_levels[index].1 = target;
+            }
+        }
+
+        if !self.hover_transitions.is_empty()
+            && unsafe { SetTimer(self.hwnd, HOVER_TIMER, 15, null_mut()) } == 0
+        {
+            for transition in self.hover_transitions.drain(..) {
+                if let Some(e) = self.hover_levels.iter_mut().find(|e| e.0 == transition.hit) {
+                    e.1 = transition.to;
+                }
+            }
+        }
+        self.tick_hover()
+    }
+
+    fn tick_hover(&mut self) -> io::Result<()> {
+        self.sample_hover(Instant::now());
+        if self.hover_transitions.is_empty() {
+            unsafe { KillTimer(self.hwnd, HOVER_TIMER) };
+        }
         self.draw()
     }
     fn click(&mut self, hit: Hit) -> io::Result<Option<Target>> {
@@ -768,7 +922,7 @@ impl App {
                 }
                 self.path.push(i);
                 self.scroll = (0., 0.);
-                self.hover = None;
+                self.clear_hover();
                 self.relayout()?;
                 self.draw()?;
             }
@@ -782,7 +936,7 @@ impl App {
         if self.path.len() > 1 && self.motion.is_none() {
             self.path.pop();
             self.scroll = (0., 0.);
-            self.hover = None;
+            self.clear_hover();
             self.relayout()?;
             self.draw()
         } else {
@@ -801,7 +955,7 @@ impl App {
         } else {
             self.scroll.1 -= n * (self.layout.gs.icon + self.layout.gs.gy) * 2.
         }
-        self.hover = None;
+        self.clear_hover();
         self.relayout()?;
         self.draw()
     }
@@ -922,6 +1076,8 @@ unsafe extern "system" fn window_proc(hwnd: Handle, msg: u32, w: usize, l: isize
                 Some(a.click(Hit::Dock(w - 49)).map(|v| target = v))
             }
             WM_TIMER if w == ANIMATION_TIMER => Some(a.tick()),
+            WM_TIMER if w == HOVER_TIMER => Some(a.tick_hover()),
+            WM_TIMER if w == SETTINGS_TIMER => Some(a.poll_settings()),
             WM_ACTIVATE
                 if w & 0xffff == 0
                     && a.saved.general.collapse_on_focus_loss.unwrap_or(true)

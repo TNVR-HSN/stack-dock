@@ -141,6 +141,7 @@ fn render(saved: Saved, out: PathBuf) -> Result<(), Box<dyn std::error::Error>> 
                 p: progress,
                 a: progress,
                 hover: None,
+                hover_levels: &[],
             },
         );
         let mut rgba = Vec::with_capacity(w * h * 4);

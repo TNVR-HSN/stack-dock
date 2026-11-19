@@ -140,6 +140,45 @@ html.sd-settings-only #desktop {
   visibility: hidden;
   pointer-events: none;
 }
+/* Standalone Settings uses the Windows title bar and resize border. */
+html.sd-settings-only #dialog.settings-dialog[open] {
+ position:fixed;
+ inset:0;
+ box-sizing:border-box;
+ width:100%;
+ height:100%;
+ max-width:none;
+ max-height:none;
+ margin:0;
+ padding:0;
+ border:0;
+ border-radius:0;
+ box-shadow:none;
+ transform:none;
+ resize:none;
+ overflow:hidden;
+ animation:none;
+}
+html.sd-settings-only #dialog.settings-dialog>form {
+ display:flex;
+ flex-direction:column;
+ box-sizing:border-box;
+ width:100%;
+ height:100%;
+ max-height:none;
+ min-height:0;
+}
+html.sd-settings-only #dialog.settings-dialog .dialogtop,
+html.sd-settings-only #dialog.settings-dialog .sd-dialog-resize {
+ display:none;
+}
+html.sd-settings-only #dialog.settings-dialog .dialogbody {
+ flex:1 1 auto;
+ min-height:0;
+}
+html.sd-settings-only #dialog.settings-dialog .dialogfoot {
+ flex-shrink:0;
+}
 </style>
 <style>
 /* Settings and shortcut properties share a panel theme without styling the dock. */

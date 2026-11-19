@@ -111,6 +111,12 @@ pub struct Style {
     icon_rotation: Option<f32>,
     pub motion: Option<bool>,
     pub motion_speed: Option<f32>,
+    hover_mode: Option<u8>,
+    hover_scale: Option<f32>,
+    hover_lift: Option<f32>,
+    hover_angle: Option<f32>,
+    hover_duration: Option<f32>,
+    hover_curve: Option<u8>,
     reflections: Option<bool>,
     reflection_area: Option<f32>,
     reflection_intensity: Option<f32>,
@@ -132,6 +138,12 @@ pub struct Skin {
     pub title: f32,
     pub corner: f32,
     pub rotation: f32,
+    pub hover_mode: u8,
+    pub hover_scale: f32,
+    pub hover_lift: f32,
+    pub hover_angle: f32,
+    pub hover_duration: f32,
+    pub hover_curve: u8,
     pub reflect: f32,
     pub reflect_alpha: f32,
 }
@@ -159,6 +171,12 @@ impl Style {
         let icon = self.icon.unwrap_or(pick(52., 40.)).clamp(24., 88.) * scale;
         Skin {
             icon,
+            hover_mode: self.hover_mode.unwrap_or(0),
+            hover_scale: self.hover_scale.unwrap_or(125.).clamp(100., 200.) / 100.,
+            hover_lift: self.hover_lift.unwrap_or(10.).clamp(0., 48.) * scale,
+            hover_angle: self.hover_angle.unwrap_or(10.).clamp(-30., 30.),
+            hover_duration: self.hover_duration.unwrap_or(160.).clamp(0., 900.),
+            hover_curve: self.hover_curve.unwrap_or(1),
             fill: rgba(
                 hex(
                     self.color.as_deref(),
