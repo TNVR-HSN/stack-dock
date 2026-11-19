@@ -142,28 +142,33 @@ impl<'a> Canvas<'a> {
         width: f32,
         opacity: f32,
     ) {
+        let bold = true;
         let mut split = 0;
         let mut space = None;
         let mut w = 0.;
+
         for (i, ch) in name.char_indices().take(128) {
             let advance = assets
-                .glyph(ch, font, false)
+                .glyph(ch, font, bold)
                 .map_or(0., |g| g.0.advance_width);
+
             if w + advance > width {
                 break;
             }
+
             w += advance;
             if ch.is_whitespace() && i > 0 {
                 space = Some(i);
             }
             split = i + ch.len_utf8();
         }
+
         if split == 0 || split == name.len() {
-            self.text(assets, name, x, y, font, width, opacity, false);
+            self.text(assets, name, x, y, font, width, opacity, bold);
         } else {
-            let (first, second) =
-                name.split_at(space.filter(|offset| *offset > split / 2).unwrap_or(split));
-            self.text(assets, first, x, y, font, width, opacity, false);
+            let (first, second) = name.split_at(space.unwrap_or(split));
+
+            self.text(assets, first, x, y, font, width, opacity, bold);
             self.text(
                 assets,
                 second.trim_start(),
@@ -172,11 +177,10 @@ impl<'a> Canvas<'a> {
                 font,
                 width,
                 opacity,
-                false,
+                bold,
             );
         }
-    }
-    fn art(
+    }    fn art(
         &mut self,
         image: &RgbaImage,
         r: Rect,
@@ -197,47 +201,57 @@ impl<'a> Canvas<'a> {
         let normal = iw.max(ih).max(1) as f32;
         let (wr, hr) = (iw as f32 / normal, ih as f32 / normal);
         let (sin, cos) = (-rotation.to_radians()).sin_cos();
+        // Sample a 4 × 4 grid across each output pixel.
+        const OFFSETS: [f32; 4] = [0.125, 0.375, 0.625, 0.875];
+            
         for y in bound.y.floor() as i32..bound.bottom().ceil() as i32 {
-            let py = (y as f32 + 0.5 - picture.cy()) / s;
+            let opacity = if flip {
+                alpha * (1. - bounded((y as f32 - r.y) / (s * 0.24)))
+            } else {
+                alpha
+            };
+        
             for x in bound.x.floor() as i32..bound.right().ceil() as i32 {
-                let px = (x as f32 + 0.5 - picture.cx()) / s;
-                if radius > 0. {
-                    let dx = (px.abs() * s - (s / 2. - radius)).max(0.);
-                    let dy = (py.abs() * s - (s / 2. - radius)).max(0.);
-                    if dx * dx + dy * dy > radius * radius {
-                        continue;
+                let mut channels = [0u32; 4];
+            
+                for oy in OFFSETS {
+                    let py = (y as f32 + oy - picture.cy()) / s;
+                
+                    for ox in OFFSETS {
+                        let px = (x as f32 + ox - picture.cx()) / s;
+                    
+                        if radius > 0. {
+                            let dx = (px.abs() * s - (s * 0.5 - radius)).max(0.);
+                            let dy = (py.abs() * s - (s * 0.5 - radius)).max(0.);
+                            if dx * dx + dy * dy > radius * radius {
+                                continue;
+                            }
+                        }
+                    
+                        let u = (px * cos - py * sin) / wr + 0.5;
+                        let source_y = if flip { -py } else { px * sin + py * cos };
+                        let v = source_y / hr + 0.5;
+                    
+                        if !(0.0..1.0).contains(&u) || !(0.0..1.0).contains(&v) {
+                            continue;
+                        }
+                    
+                        let pixel = sample_icon(image, u, v, opacity);
+                        channels[0] += pixel >> 24;
+                        channels[1] += (pixel >> 16) & 255;
+                        channels[2] += (pixel >> 8) & 255;
+                        channels[3] += pixel & 255;
                     }
                 }
-                let u = (px * cos - py * sin) / wr + 0.5;
-                let v = if flip {
-                    0.5 - py
-                } else {
-                    px * sin + py * cos + 0.5
-                };
-                let v = (v - 0.5) / hr + 0.5;
-                if !(0.0..1.0).contains(&u) || !(0.0..1.0).contains(&v) {
-                    continue;
+
+        // Samples outside the artwork contribute transparent black.
+                let [a, red, green, blue] = channels.map(|sum| (sum + 8) / 16);
+                if a > 0 {
+                    self.put(x, y, pack(a, red, green, blue));
                 }
-                let p = image.get_pixel((u * iw as f32) as u32, (v * ih as f32) as u32);
-                let opacity = if flip {
-                    alpha * (1. - bounded((y as f32 - r.y) / (s * 0.24)))
-                } else {
-                    alpha
-                };
-                let a = (p[3] as f32 * opacity).round() as u32;
-                self.put(
-                    x,
-                    y,
-                    pack(
-                        a,
-                        mul255(p[0] as u32, a),
-                        mul255(p[1] as u32, a),
-                        mul255(p[2] as u32, a),
-                    ),
-                );
-            }
-        }
-    }
+            } // ends for x
+        } // ends for y
+    } // ends fn art
     fn text(
         &mut self,
         assets: &mut Assets,
@@ -276,25 +290,44 @@ impl<'a> Canvas<'a> {
             occupied += advance;
             remaining.push(ch);
         }
-        for ch in remaining.chars() {
-            let Some(g) = assets.glyph(ch, size, strong) else {
-                continue;
-            };
-            let (m, bits) = (&g.0, &g.1);
-            let top = dy as i32 - m.ymin - m.height as i32;
-            for y in 0..m.height {
-                for x in 0..m.width {
-                    let a = (bits[y * m.width + x] as f32 * alpha).round() as u32;
-                    if a > 0 {
-                        self.put(
-                            ox.round() as i32 + m.xmin + x as i32,
-                            top + y as i32,
-                            pack(a, mul255(242, a), mul255(234, a), mul255(246, a)),
-                        );
+                let start_x = ox;
+        for shadow in [true, false] {
+            ox = start_x;
+
+            for ch in remaining.chars() {
+                let Some(g) = assets.glyph(ch, size, strong) else {
+                    continue;
+                };
+
+                let (m, bits) = (&g.0, &g.1);
+                let left = ox.round() as i32 + m.xmin;
+                let top = dy as i32 - m.ymin - m.height as i32;
+
+                for y in 0..m.height {
+                    for x in 0..m.width {
+                        let coverage = bits[y * m.width + x] as f32 * alpha;
+                        let px = left + x as i32;
+                        let py = top + y as i32;
+
+                        if shadow {
+                            let a = (coverage * 0.8).round() as u32;
+                            if a > 0 {
+                                self.put(px, py + 1, pack(a, 0, 0, 0));
+                            }
+                        } else {
+                            let a = coverage.round() as u32;
+                            if a > 0 {
+                                self.put(
+                                    px,
+                                    py,
+                                    pack(a, mul255(242, a), mul255(234, a), mul255(246, a)),
+                                );
+                            }
+                        }
                     }
                 }
+                ox += m.advance_width;
             }
-            ox += m.advance_width;
         }
     }
 }
@@ -320,7 +353,7 @@ impl Assets {
             })
         };
         Self {
-            font: font(&["segoeui.ttf", "DejaVuSans.ttf"]),
+            font: font(&["seguisb.ttf", "segoeui.ttf", "DejaVuSans.ttf"]),
             bold: font(&["segoeuib.ttf", "DejaVuSans-Bold.ttf"]),
             images: HashMap::new(),
             glyphs: HashMap::new(),
@@ -408,8 +441,18 @@ impl Assets {
             && entry.image_thumbnail.unwrap_or(thumbnails);
         let exe_fallback =
             entry.kind == "program" && (entry.icon_mode.is_empty() || entry.icon_mode == "shell");
+        let text_document = entry.kind == "local"
+            && entry.local_type != "folder"
+            && entry.icon_key() == "file"
+            && Path::new(&entry.target)
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("txt"));
+
         let key = if custom || thumbnail || exe_fallback || !entry.icon_path.is_empty() {
             format!("entry:{}", entry.id)
+        } else if text_document {
+            String::from("built-in:text-document")
         } else {
             format!("built-in:{}", entry.icon_key())
         };
@@ -447,12 +490,17 @@ impl Assets {
                     .flatten()
             })
             .or_else(|| {
+                if text_document {
+                    return Self::decode(include_bytes!("../assets/text-document.png"));
+                }
+
                 let key = entry.icon_key();
                 let fallback = if entry.folder() {
                     "folder-azure"
                 } else {
                     "file"
                 };
+
                 BUILTIN
                     .iter()
                     .find(|(name, _)| *name == key)
@@ -463,6 +511,44 @@ impl Assets {
         self.images.insert(key, value.clone());
         value
     }
+}
+fn sample_icon(image: &RgbaImage, u: f32, v: f32, opacity: f32) -> u32 {
+    let (width, height) = image.dimensions();
+    if width == 0 || height == 0 {
+        return 0;
+    }
+
+    let x = (u * width as f32 - 0.5).clamp(0.0, (width - 1) as f32);
+    let y = (v * height as f32 - 0.5).clamp(0.0, (height - 1) as f32);
+    let x0 = x.floor() as u32;
+    let y0 = y.floor() as u32;
+    let x1 = (x0 + 1).min(width - 1);
+    let y1 = (y0 + 1).min(height - 1);
+    let fx = x - x0 as f32;
+    let fy = y - y0 as f32;
+
+    let samples = [
+        (x0, y0, (1.0 - fx) * (1.0 - fy)),
+        (x1, y0, fx * (1.0 - fy)),
+        (x0, y1, (1.0 - fx) * fy),
+        (x1, y1, fx * fy),
+    ];
+
+    let mut a = 0.0;
+    let mut rgb = [0.0_f32; 3];
+    for (sx, sy, weight) in samples {
+        let pixel = image.get_pixel(sx, sy);
+        let weighted_alpha = pixel[3] as f32 * weight;
+        a += weighted_alpha;
+        for channel in 0..3 {
+            rgb[channel] += pixel[channel] as f32 * weighted_alpha / 255.0;
+        }
+    }
+
+    let opacity = opacity.clamp(0.0, 1.0);
+    let a = (a * opacity).round() as u32;
+    let channel = |i: usize| ((rgb[i] * opacity).round() as u32).min(a);
+    pack(a, channel(0), channel(1), channel(2))
 }
 fn mul255(a: u32, b: u32) -> u32 {
     (a * b + 127) / 255
@@ -511,6 +597,7 @@ fn tile(
     hover: bool,
     thumb: bool,
     skip_icon: bool,
+    caption_bottom: f32,
 ) {
     if p <= 0. {
         return;
@@ -536,7 +623,7 @@ fn tile(
         }
     }
     if s.labels {
-        let y = t.icon.bottom() + s.reflect + s.font + scale;
+        let y = caption_bottom + s.reflect + s.font + scale;
         if dock {
             c.text(a, &e.name, t.box_.cx(), y, s.font, t.box_.w, p, false);
         } else {
@@ -605,6 +692,7 @@ pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
             hover == Some(Hit::Dock(t.item)),
             thumb,
             current.is_some() && dock_index == Some(t.item),
+            t.icon.bottom(),
         );
     }
     let Some(folder) = current else {
@@ -651,6 +739,7 @@ pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
         let item = &folder.slots[t.item];
         let d = (t.icon.cx() - l.grid_clip.cx()).hypot(t.icon.cy() - l.grid_clip.cy());
         let mut t = t;
+        let mut caption_bottom = t.icon.bottom();
         let alpha = match mode {
             "diagonal" | "outer" => {
                 let order = if mode == "outer" {
@@ -671,6 +760,14 @@ pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
                 t.icon.y += dy;
                 t.box_.x += dx;
                 t.box_.y += dy;
+                caption_bottom += dy;
+                header_alpha
+            }
+            "classic" | "" => {
+                let progress = bounded((p - 0.23) / 0.77);
+                let eased = 1.0 - (1.0 - progress) * (1.0 - progress);
+                let size = t.icon.w * mix(0.80, 1.0, eased);
+                t.icon = t.icon.square(size);
                 header_alpha
             }
             _ => header_alpha,
@@ -687,6 +784,7 @@ pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
             hover == Some(Hit::Grid(t.item)),
             thumb,
             false,
+            caption_bottom,
         );
     }
     c.clip = root_clip;
