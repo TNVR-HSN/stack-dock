@@ -166,7 +166,7 @@ function buildUiThemeSettings(general,onPreview=()=>{}){
     // Only Apply Theme writes this setting. Avoid persisting any unsaved
     // controls from the rest of the Settings form.
     const savedState={...state,uiTheme:next};
-    try{localStorage.setItem(storageKey,JSON.stringify(savedState));}
+    try{storeLayoutSnapshot(savedState);}
     catch{message.textContent='Could not save the theme. The current colors are only a preview.';return;}
     state.uiTheme=next;
     update(false);message.textContent='Theme applied.';

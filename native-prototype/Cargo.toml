@@ -1,0 +1,16 @@
+[package]
+name = "stack-dock-native"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[profile.release]
+strip = true
+lto = "thin"
+
+[dependencies]
+base64 = "0.22.1"
+fontdue = "0.9.3"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "ico"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

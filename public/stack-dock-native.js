@@ -745,13 +745,40 @@ dialog.sd-panel-region{box-shadow:none}
     return { edge:s.edge, align:s.align, orientation:['horizontal','vertical'].includes(s.orientation)?s.orientation:'auto', general, uiTheme:normalizeUiTheme(s.uiTheme), dock:appearanceCopy(s.dock, dockDefaults), folders,
       dockShortcuts:restoredShortcuts,dockOrder };
   }
+loadStartupLayout = async () => {
+  try {
+    const text = await call("load_shared_layout");
 
+    if (text === null) {
+      // No shared file yet. Seed it from the layout we already loaded.
+      queueSharedLayoutSave(JSON.stringify(state));
+      await sharedLayoutSave;
+      return;
+    }
+
+    // Reuse the checks StackDock already uses for Import Layout.
+    const next = validLayout(JSON.parse(text));
+    applyUiTheme(next.uiTheme);
+    state = next;
+  } catch (error) {
+    sharedLayoutWriteEnabled = false;
+    console.warn("Using the old layout. Could not load layout.json:", error);
+    return;
+  }
+
+  // Keep the old storage available as a fallback.
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(state));
+  } catch (error) {
+    console.warn("Loaded the shared layout but could not update the fallback:", error);
+  }
+};
   const notice = message => {
     if (!dialog.open) dialogBuild('StackDock', message, 'OK', () => {}, () => {});
   };
   function replaceLayout(next) {
     // Commit to storage first. A quota error must not overwrite the visible layout.
-    try { localStorage.setItem(storageKey, JSON.stringify(next)); }
+    try { storeLayoutSnapshot(next); }
     catch { throw Error('This layout does not fit in local storage. Your current layout was not changed.'); }
     state = next;
     applyUiTheme(next.uiTheme);

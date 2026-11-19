@@ -136,6 +136,10 @@ dialog.sd-movable.sd-dialog-placed:is(:modal,.sd-live-settings){margin:0;right:a
  .settings-monitor>.note{display:none}
 }
 .field select.sd-target-type{width:min(100%,215px);justify-self:start}
+html.sd-settings-only #desktop {
+  visibility: hidden;
+  pointer-events: none;
+}
 </style>
 <style>
 /* Settings and shortcut properties share a panel theme without styling the dock. */
@@ -651,6 +655,8 @@ const liveSettingsOpen=()=>dialog.open&&dialog.classList.contains('sd-live-setti
 const dockControlsBlocked=()=>dialog.open&&(!liveSettingsOpen()||settingsCommitPending);
 const settingsCoversPoint=(x,y)=>liveSettingsOpen()&&dialog.contains(document.elementFromPoint(x,y));
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+const settingsOnly = window.__STACKDOCK_SETTINGS_ONLY__ === true;
+document.documentElement.classList.toggle("sd-settings-only", settingsOnly);
 const nativeAPI=window.__TAURI__?.window;
 const nativeCore=window.__TAURI__?.core;
 let nativeWindow=null,nativeArea=null,nativeHost={x:0,y:0},nativeQueue=Promise.resolve(),nativeBusy=false;
@@ -889,10 +895,11 @@ function shortcutEditorDesc(f,where){
  return f?'Row '+(where.r+1)+', column '+(where.c+1):'Direct shortcut on the dock';
 }
 let sharedLayoutSave = Promise.resolve();
+let sharedLayoutWriteEnabled = true;
 
 function queueSharedLayoutSave(snapshot) {
   const core = window.__TAURI__?.core;
-  if (!core?.invoke) return;
+  if (!sharedLayoutWriteEnabled || !core?.invoke) return;
 
   const data =
     '{"format":"stack-dock-layout","version":1,"layout":' + snapshot + '}';
@@ -902,11 +909,15 @@ function queueSharedLayoutSave(snapshot) {
     .catch(error => console.warn("Could not save the shared layout:", error));
 }
 
+function storeLayoutSnapshot(layout) {
+  const snapshot = JSON.stringify(layout);
+  localStorage.setItem(storageKey, snapshot);
+  queueSharedLayoutSave(snapshot);
+}
+
 function persist() {
   try {
-    const snapshot = JSON.stringify(state);
-    localStorage.setItem(storageKey, snapshot);
-    queueSharedLayoutSave(snapshot);
+    storeLayoutSnapshot(state);
     return true;
   } catch {
     notify("Saved for this session only. Browser storage is unavailable or full.");
@@ -1985,7 +1996,12 @@ function dialogBuildHere(title,desc,submit,build,save,settings=false){
  }
  form.onsubmit=e=>{e.preventDefault();submitDialog(true);};
  dialog.setAttribute('aria-labelledby','dialogTitle');
- if(liveSettings){dialog.show();placeLiveSettings();}else dialog.showModal();
+ if (liveSettings) {
+  dialog.show();
+  if (!settingsOnly) placeLiveSettings();
+} else {
+  dialog.showModal();
+}
  (body.querySelector(settings?'[role=tab][aria-selected=true]':'input:not([type=file]), select, button')||cancel).focus({preventScroll:true});
 }
 dialog.addEventListener('close',()=>{if(dialog.open)return;closeMenu();if(savedFocus?.isConnected)savedFocus.focus({preventScroll:true});else if(phase==='open')gsView.focus({preventScroll:true});savedFocus=null;fitNative()});
@@ -2110,7 +2126,7 @@ function addResetSection(general){
      await nativeCore.invoke('stack_dock_startup',{enabled:false});startupOff=true;
    }
    }
-   localStorage.setItem(storageKey,JSON.stringify(next));
+   storeLayoutSnapshot(next);
    state=next;lastId=null;applyUiTheme(next.uiTheme);
    dialog.close();
    if(phase==='open')finishClose(false);else refresh();
@@ -2888,7 +2904,36 @@ async function startNative(){
    }).catch(error=>console.warn('Native focus listener unavailable:',error));
  }catch(error){nativeFailure(error)}
 }
-const nativeReady=startNative();
+let loadStartupLayout = async () => {};
+
+const nativeReady = new Promise(resolve => {
+  document.addEventListener("DOMContentLoaded", resolve, { once: true });
+}).then(async () => {
+  await loadStartupLayout();
+    if (settingsOnly) {
+    let closing = false;
+
+    window.closeStackDockSettings = async () => {
+      if (closing || settingsCommitPending) return;
+      closing = true;
+      await sharedLayoutSave;
+      await nativeCore.invoke("exit_stack_dock");
+    };
+
+    dialog.addEventListener("close", () => {
+      if (!dialog.open) void window.closeStackDockSettings();
+    });
+
+    editSettings(null, "general");
+
+    const windowHandle = nativeAPI.getCurrentWindow();
+    await windowHandle.show();
+    await windowHandle.setFocus();
+    return;
+  }
+  refresh();
+  await startNative();
+});
 </script>
 <script src="/stack-dock-panels.js"></script>
 <script src="/stack-dock-native.js"></script>

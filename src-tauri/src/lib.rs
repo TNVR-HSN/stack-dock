@@ -288,6 +288,19 @@ fn stack_dock_startup(app: tauri::AppHandle, enabled: Option<bool>) -> Result<St
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+        use tauri::Manager as _;
+
+    let settings_only = std::env::args_os()
+        .any(|arg| arg.as_os_str() == std::ffi::OsStr::new("--settings-only"))
+        || std::env::var("STACKDOCK_SETTINGS_ONLY").as_deref() == Ok("1");
+
+    let mut context = tauri::generate_context!();
+
+    if settings_only {
+        for window in &mut context.config_mut().app.windows {
+            window.create = false;
+        }
+    }
     let builder = tauri::Builder::default();
     #[cfg(windows)]
     let builder = builder.plugin(tauri_plugin_autostart::init(
@@ -296,6 +309,34 @@ pub fn run() {
     ));
     builder.plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+                .setup(move |app| {
+            if !settings_only {
+                return Ok(());
+            }
+
+            let mut config = app
+                .config()
+                .app
+                .windows
+                .iter()
+                .find(|window| window.label == "main")
+                .cloned()
+                .ok_or_else(|| std::io::Error::other("Missing main window configuration"))?;
+
+            config.title = "StackDock Settings".into();
+            config.width = 1000.0;
+            config.height = 700.0;
+            config.decorations = true;
+            config.transparent = false;
+            config.skip_taskbar = false;
+            config.visible = false;
+
+            tauri::WebviewWindowBuilder::from_config(app, &config)?
+                .initialization_script("window.__STACKDOCK_SETTINGS_ONLY__ = true;")
+                .build()?;
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             set_dock_bounds,
             set_dock_region,
@@ -316,13 +357,26 @@ pub fn run() {
             layout_store::load_shared_layout,
             layout_store::save_shared_layout,
         ])
-        .on_window_event(|window, event| {
+                .on_window_event(move |window, event| {
+            if settings_only {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    if let Some(webview) = window.get_webview_window("main") {
+                        if webview
+                            .eval("void window.closeStackDockSettings?.()")
+                            .is_ok()
+                        {
+                            api.prevent_close();
+                        }
+                    }
+                }
+                return;
+            }
             if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
                 file_drop::unregister_all();
             }
             native_shortcuts::keep_dock_open(window, event);
         })
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building tauri application")
         .run(|_, event| {
             if matches!(event, tauri::RunEvent::Exit) {

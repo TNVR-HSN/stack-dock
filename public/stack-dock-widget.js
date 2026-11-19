@@ -681,7 +681,7 @@
   const originalClearPointer = clearPointer;
   clearPointer = function (...args) {resetStrip(true);return originalClearPointer(...args);};
 
-  if(!invoke || !nativeAPI) return;
+  if(!invoke || !nativeAPI || settingsOnly) return;
   let updating = false;
   let candidate = null;
   let lastPhaseChange = performance.now();
