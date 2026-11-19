@@ -888,7 +888,31 @@ function addShortcut(destination,entry){
 function shortcutEditorDesc(f,where){
  return f?'Row '+(where.r+1)+', column '+(where.c+1):'Direct shortcut on the dock';
 }
-function persist(){try{localStorage.setItem(storageKey,JSON.stringify(state));return true}catch{notify('Saved for this session only. Browser storage is unavailable or full.');return false}}
+let sharedLayoutSave = Promise.resolve();
+
+function queueSharedLayoutSave(snapshot) {
+  const core = window.__TAURI__?.core;
+  if (!core?.invoke) return;
+
+  const data =
+    '{"format":"stack-dock-layout","version":1,"layout":' + snapshot + '}';
+
+  sharedLayoutSave = sharedLayoutSave
+    .then(() => core.invoke("save_shared_layout", { data }))
+    .catch(error => console.warn("Could not save the shared layout:", error));
+}
+
+function persist() {
+  try {
+    const snapshot = JSON.stringify(state);
+    localStorage.setItem(storageKey, snapshot);
+    queueSharedLayoutSave(snapshot);
+    return true;
+  } catch {
+    notify("Saved for this session only. Browser storage is unavailable or full.");
+    return false;
+  }
+}
 function notify(message){const t=$('toast');t.textContent=message;t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.hidden=true,3100)}
 const iconAngle=value=>Number.isFinite(value)?clamp(value,0,360):0;
 const iconRotationOf=(entry,appearance)=>iconAngle(entry?.iconRotation??appearance?.iconRotation);

@@ -2,6 +2,7 @@
 mod native_shortcuts;
 mod desktop_widget;
 mod file_drop;
+mod layout_store;
 
 #[tauri::command]
 fn set_dock_bounds(
@@ -311,7 +312,9 @@ pub fn run() {
             desktop_widget::dock_taskbar_rects,
             desktop_widget::dock_drag_button_held,
             file_drop::sync_dock_file_drop,
-            desktop_widget::start_desktop_widget
+            desktop_widget::start_desktop_widget,
+            layout_store::load_shared_layout,
+            layout_store::save_shared_layout,
         ])
         .on_window_event(|window, event| {
             if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
