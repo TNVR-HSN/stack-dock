@@ -957,6 +957,7 @@ pub enum Hit {
     Dock(usize),
     Grid(usize),
     Back,
+    SettingsGear,
 }
 // Rasterize the complete cell once per entrance, then transform the cached
 // premultiplied pixels, including captions and reflections, as a single layer.
@@ -1210,7 +1211,8 @@ fn scene(c: &mut Canvas, a: &mut Assets, v: View, outgoing: bool, hull:bool) {
         else if opening {fade(t,45./420.,fade_ms/420.)}
         else {1.-fade(t,0.,140./325.)};
     let font = 13. * s;
-    let max = (l.grid.w - 2. * l.gs.px - l.gs.title - 30. * s).max(font);
+    let header_controls = if l.settings_gear.is_some() { 64. } else { 30. };
+    let max = (l.grid.w - 2. * l.gs.px - l.gs.title - header_controls * s).max(font);
     let title_w = a.measure(&folder.name, font, true, max);
     let title_group_width = l.gs.title + 8. * s + title_w;
     let title_y = l.grid.y + l.gs.py;
@@ -1241,6 +1243,34 @@ fn scene(c: &mut Canvas, a: &mut Assets, v: View, outgoing: bool, hull:bool) {
             header_alpha,
             false,
         );
+    }
+    if let Some(mut gear) = l.settings_gear {
+        if classic_slide {
+            gear.x += panel.right() - l.grid.right();
+            gear.y += slide_y;
+        }
+        let old_clip = c.clip;
+        c.clip = root_clip.intersect(panel);
+        if hover == Some(Hit::SettingsGear) {
+            c.rounded(gear, 6. * s, ((38. * header_alpha).round() as u32) << 24 | 0xffffff);
+        }
+        let radius = 8. * s;
+        let center_x = gear.cx();
+        let center_y = gear.cy();
+        let alpha = (255. * header_alpha).round() as u32;
+        let ink = pack(alpha, mul255(242, alpha), mul255(234, alpha), mul255(246, alpha));
+        for y in (center_y - radius).floor() as i32..(center_y + radius).ceil() as i32 {
+            for x in (center_x - radius).floor() as i32..(center_x + radius).ceil() as i32 {
+                let dx = x as f32 + 0.5 - center_x;
+                let dy = y as f32 + 0.5 - center_y;
+                let distance = dx.hypot(dy) / radius;
+                let tooth = (dx.atan2(dy) * 8.).cos() > 0.2;
+                if (0.35..=0.75).contains(&distance) || (tooth && (0.75..=1.).contains(&distance)) {
+                    c.put(x, y, ink);
+                }
+            }
+        }
+        c.clip = old_clip;
     }
     let panel_clip = root_clip.intersect(panel);
     let viewport = if classic_slide {

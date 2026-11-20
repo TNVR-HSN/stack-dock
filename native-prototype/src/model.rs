@@ -86,6 +86,7 @@ pub fn ease(p: f32, a: f32, b: f32, c: f32, d: f32) -> f32 {
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Style {
+    settings_gear: Option<bool>,
     icon: Option<f32>,
     color: Option<String>,
     opacity: Option<f32>,
@@ -457,6 +458,7 @@ pub struct Layout {
     pub dock_tiles: Vec<Tile>,
     pub grid_tiles: Vec<Tile>,
     pub back: Rect,
+    pub settings_gear: Option<Rect>,
     pub grid_clip: Rect,
     pub s: f32,
     pub scroll: (f32, f32),
@@ -605,6 +607,9 @@ impl Layout {
             dock_tiles,
             grid_tiles,
             back,
+            settings_gear: folder.filter(|f| f.style.settings_gear.unwrap_or(false)).map(|_| {
+                Rect::new(grid.right() - gs.px - 28. * s, grid.y + gs.py, 28. * s, 28. * s)
+            }),
             grid_clip,
             s,
             scroll: (ox, oy),

@@ -199,9 +199,12 @@ mod native_drop;
 #[link(name="user32")]
 unsafe extern "system" {fn SetCapture(hwnd:Handle)->Handle;fn ReleaseCapture()->i32;}
 
-fn context_menu(hwnd:Handle) {
+fn context_menu(hwnd:Handle, keyboard:bool) {
     let mut pt=Point{x:0,y:0};
-    if unsafe{GetCursorPos(&mut pt)}==0{return;}
+    if keyboard {
+        let rect=APP.with(|c|c.borrow().as_ref().and_then(App::focus_rect));
+        let Some(r)=rect else{return};pt=Point{x:r.cx() as i32,y:r.cy() as i32};
+    }else if unsafe{GetCursorPos(&mut pt)}==0{return;}
     let Some((mut ctx,editable,nested,can_row,can_col,empty_row,empty_col))=APP.with(|cell|{
         let state=cell.try_borrow().ok()?;let a=state.as_ref()?;
         if a.motion.is_some()||a.indicator.is_some(){return None;}
@@ -629,6 +632,7 @@ struct App {
     tip_fade:Instant,
     tip_leaving:bool,
     dwell:Option<(&'static str,Instant)>,
+    key_focus: Option<Hit>,
     menu_hit: Option<Hit>,
     settings_open: bool,
     settings_stamp: Option<(std::time::SystemTime, u64)>,
@@ -663,6 +667,7 @@ impl App {
             settings,
             indicator:None,drag_base:Vec::new(),ghost:Vec::new(),ghost_size:0,
             press:None,dragging:false,drag_at:None,dwell:None,strip:None,tip:None,tip_fade:Instant::now(),tip_leaving:false,
+            key_focus: None,
             menu_hit: None,
             settings_open: false,
             settings_stamp: None,
@@ -724,8 +729,8 @@ impl App {
             let s=g.gs;
             let cw=if s.labels{s.icon.max(s.label_w)}else{s.icon};
             let ch=s.icon+s.reflect+if s.labels{s.font*2.36+4.*g.s}else{0.};
-            let col=(((pos.x as f32-g.grid_clip.x+g.scroll.0+s.gx/2.)/(cw+s.gx)).floor() as usize);
-            let row=(((pos.y as f32-g.grid_clip.y+g.scroll.1+s.gy/2.)/(ch+s.gy)).floor() as usize);
+            let col=((pos.x as f32-g.grid_clip.x+g.scroll.0+s.gx/2.)/(cw+s.gx)).floor() as usize;
+            let row=((pos.y as f32-g.grid_clip.y+g.scroll.1+s.gy/2.)/(ch+s.gy)).floor() as usize;
             ctx["r"]=row.min(f.rows.saturating_sub(1)).into();ctx["c"]=col.min(f.cols.saturating_sub(1)).into();
             ctx["valid"]=g.grid_clip.contains(pos.x as f32,pos.y as f32).into();
             if let Some(preview)=&self.strip{
@@ -784,9 +789,6 @@ impl App {
     fn command(&mut self,ctx:serde_json::Value)->Result<(),String>{
         if self.settings_open || self.settings.is_none(){return Err("Close the editor and start the dock with --settings-exe before editing.".into());}
         self.start_helper(&[("SD_MENU_X",ctx["x"].to_string()),("SD_MENU_Y",ctx["y"].to_string()),("SD_COMMAND",ctx.to_string())])
-    }
-    fn open_settings(&mut self) -> Result<(), String> {
-        self.start_helper(&[])
     }
     fn start_helper(&mut self, env:&[(&str,String)]) -> Result<(),String> {
         let Some(settings) = &self.settings else {
@@ -950,6 +952,7 @@ impl App {
         {
             self.surface = Some(Surface::new(w, h)?);
         }
+        let focus=self.focus_rect();
         let destination=self.drag_at.map(|(x,y)|self.context(&Point{x,y}));
         let surface = self.surface.as_mut().expect("surface allocated");
         let pixels = unsafe { slice::from_raw_parts_mut(surface.bits, w * h) };
@@ -1027,6 +1030,14 @@ impl App {
             let phase=if motion_enabled(){(self.tip_fade.elapsed().as_secs_f32()/0.070).min(1.)}else{1.};
             let alpha=if self.tip_leaving{1.-phase}else{phase};
             tip.paint(&mut Canvas::overlay(pixels,w,h,bounds),&mut self.assets,alpha);
+        }
+        if let Some(r)=focus{
+            let mut overlay=Canvas::overlay(pixels,w,h,bounds);
+            let stroke=(2.*self.layout.s).round().max(1.);
+            for edge in [Rect::new(r.x,r.y,r.w,stroke),Rect::new(r.x,r.bottom()-stroke,r.w,stroke),
+                Rect::new(r.x,r.y,stroke,r.h),Rect::new(r.right()-stroke,r.y,stroke,r.h)]{
+                overlay.rounded(edge,1.,0xffe4b5ff);
+            }
         }
         let paint_ms = frame_started.elapsed().as_secs_f64() * 1000.0;
         let result = surface.present(self.hwnd, bounds);
@@ -1119,6 +1130,9 @@ impl App {
         let b = self.bounds();
         let (x, y) = (b.x + x as f32, b.y + y as f32);
         let grid=self.progress>0.;
+        if grid && self.layout.settings_gear.is_some_and(|gear| gear.contains(x, y)) {
+            return Some(Hit::SettingsGear);
+        }
         if grid && self.path.len()>1 && self.layout.back.contains(x,y){return Some(Hit::Back);}
         let (tiles,clip,style)=if grid{
             (&self.layout.grid_tiles,self.layout.grid_clip,&self.saved.folder_at(&self.path)?.style)
@@ -1147,7 +1161,7 @@ impl App {
                 let Some(f)=self.saved.folder_at(&self.path)else{return Ok(())};let Some(e)=f.slots.get(i)else{return Ok(())};
                 (e,self.layout.grid_tiles.iter().find(|t|t.item==i),&f.style,self.layout.gs.labels)
             }
-            Hit::Back=>return Ok(())
+            Hit::Back | Hit::SettingsGear=>return Ok(())
         };
         let Some(tile)=tile else{return Ok(())};
         if !style.hover_labels.unwrap_or(true)||((!grid||entry.folder())&&!entry.folder_hover_labels.unwrap_or(true)){return Ok(());}
@@ -1205,7 +1219,7 @@ impl App {
             let skin = match hit {
                 Hit::Dock(_) => self.layout.ds,
                 Hit::Grid(_) => self.layout.gs,
-                Hit::Back => continue,
+                Hit::Back | Hit::SettingsGear => continue,
             };
 
             self.hover_transitions.retain(|entry| entry.hit != hit);
@@ -1252,7 +1266,45 @@ impl App {
         }
         self.draw()
     }
+    fn focus_rect(&self)->Option<Rect>{
+        let (tiles,index,clip)=match self.key_focus?{
+            Hit::Dock(i) if self.path.is_empty()=>(&self.layout.dock_tiles,i,self.layout.dock),
+            Hit::Grid(i) if !self.path.is_empty()=>(&self.layout.grid_tiles,i,self.layout.grid_clip),
+            _=>return None,
+        };
+        tiles.iter().find(|t|t.item==index).map(|t|t.box_.intersect(clip))
+    }
+    fn arrow(&mut self,key:usize)->io::Result<()>{
+        self.clear_hover();
+        if let Some(f)=self.saved.folder_at(&self.path){
+            let current=match self.key_focus{Some(Hit::Grid(i))=>f.slots.get(i),_=>None};
+            let next=if let Some(e)=current{
+                f.slots.iter().enumerate().filter_map(|(i,n)|{
+                    let dx=n.c as i32-e.c as i32;let dy=n.r as i32-e.r as i32;
+                    let (forward,side)=match key{37=>(-dx,dy),38=>(-dy,dx),39=>(dx,dy),_=>(dy,dx)};
+                    (forward>0).then_some(((side.abs(),forward),i))
+                }).min().map(|(_,i)|i)
+            }else{f.slots.iter().enumerate().min_by_key(|(_,e)|(e.r,e.c)).map(|(i,_)|i)};
+            if let Some(i)=next{
+                self.key_focus=Some(Hit::Grid(i));
+                let e=&f.slots[i];let g=&self.layout;let s=g.gs;
+                let w=if s.labels{s.icon.max(s.label_w)}else{s.icon};
+                let h=s.icon+s.reflect+if s.labels{s.font*2.36+4.*g.s}else{0.};
+                let x=e.c as f32*(w+s.gx);let y=e.r as f32*(h+s.gy);
+                self.scroll=((x+w-g.grid_clip.w).max(self.scroll.0.min(x)),(y+h-g.grid_clip.h).max(self.scroll.1.min(y)));
+                self.relayout()?;
+            }
+        }else{
+            let count=self.saved.ordered().len();if count==0{return Ok(());}
+            let i=match self.key_focus{Some(Hit::Dock(i)) if key==37||key==38=>i.saturating_sub(1),Some(Hit::Dock(i))=>(i+1).min(count-1),_=>0};
+            self.key_focus=Some(Hit::Dock(i));
+            if self.focus_rect().is_none(){let step=self.layout.ds.icon+self.layout.ds.gx;
+                self.dock_scroll=if key==37||key==38{(self.dock_scroll-step).max(0.)}else{self.dock_scroll+step};self.relayout()?;}
+        }
+        self.draw()
+    }
     fn click(&mut self, hit: Hit) -> io::Result<Option<Target>> {
+        self.key_focus=None;
         match hit {
             Hit::Dock(i) => {
                 let order = self.saved.ordered();
@@ -1288,6 +1340,23 @@ impl App {
             Hit::Back => {
                 self.back()?;
             }
+            Hit::SettingsGear => {
+                if let (Some(gear), Some(folder)) = (self.layout.settings_gear, self.saved.folder_at(&self.path)) {
+                    let context = serde_json::json!({
+                        "action": "Grid Stack settings…",
+                        "folder": folder.id,
+                        "x": gear.cx() as i32,
+                        "y": gear.cy() as i32,
+                        "r": 0,
+                        "c": 0
+                    });
+                    if !self.settings_open {
+                        if let Err(error) = self.command(context) {
+                            message(self.hwnd, &error);
+                        }
+                    }
+                }
+            }
         }
         Ok(None)
     }
@@ -1307,6 +1376,7 @@ impl App {
         self.draw()
     }
     fn back(&mut self) -> io::Result<()> {
+        self.key_focus=None;
         if self.path.len() > 1 && self.motion.is_none() {
             let slot=*self.path.last().unwrap();
             self.navigate(slot,false)
@@ -1397,7 +1467,7 @@ unsafe extern "system" fn window_proc(hwnd: Handle, msg: u32, w: usize, l: isize
     }
     if msg == WM_CONTEXTMENU {
         APP.with(|c|{if let Ok(mut state)=c.try_borrow_mut(){if let Some(a)=state.as_mut(){a.clear_hover();let _=a.draw();}}});
-        context_menu(hwnd);
+        context_menu(hwnd,l == -1);
         return 0;
     }
     if msg == WM_SETTINGS_CLOSED && (20..=24).contains(&w) {
@@ -1454,13 +1524,14 @@ unsafe extern "system" fn window_proc(hwnd: Handle, msg: u32, w: usize, l: isize
             WM_KEYDOWN if w==27 && a.indicator.is_some()=>{unsafe{KillTimer(hwnd,7)};a.indicator=None;Some(a.draw())}
             0x0201|WM_LBUTTONUP|WM_KEYDOWN|WM_MOUSEMOVE|WM_MOUSEWHEEL|WM_MOUSEHWHEEL if a.indicator.is_some()=>Some(Ok(())),
             0x0201 => {
+                a.key_focus=None;
                 let (x,y)=(coord(l,0),coord(l,16));let b=a.bounds();
                 if let Some(h)=a.hit(x,y){a.clear_hover();a.press=Some((h,x+b.x as i32,y+b.y as i32));unsafe{SetCapture(hwnd)};return Some(a.draw());}
                 Some(Ok(()))
             }
             WM_MOUSEMOVE if a.press.is_some() && w&1!=0 =>{
                 let b=a.bounds();let (x,y)=(coord(l,0)+b.x as i32,coord(l,16)+b.y as i32);let (_,sx,sy)=a.press.unwrap();
-                if !a.settings_open && !a.dragging && ((x-sx) as f32).hypot((y-sy) as f32)>7.*a.layout.s{
+                if matches!(a.press, Some((Hit::Grid(_) | Hit::Dock(_), _, _))) && !a.settings_open && !a.dragging && ((x-sx) as f32).hypot((y-sy) as f32)>7.*a.layout.s{
                     a.dragging=true;a.clear_hover();unsafe{SetTimer(hwnd,4,45,null_mut());}
                 }
                 if a.dragging{a.drag_at=Some((x,y));Some(a.draw())}else{Some(Ok(()))}
@@ -1504,6 +1575,16 @@ unsafe extern "system" fn window_proc(hwnd: Handle, msg: u32, w: usize, l: isize
             })}
             WM_MOUSEWHEEL | WM_MOUSEHWHEEL => {
                 Some(a.wheel(coord(w as isize, 16), msg == WM_MOUSEHWHEEL))
+            }
+            WM_KEYDOWN if a.motion.is_none() && !a.dragging && !a.settings_open && (37..=40).contains(&w)=>Some(a.arrow(w)),
+            WM_KEYDOWN if w==13 && a.motion.is_none() && !a.dragging && !a.settings_open=>{
+                Some(if let Some(hit)=a.key_focus{a.click(hit).map(|v|target=v)}else{Ok(())})
+            }
+            WM_KEYDOWN if w==70 && !a.settings_open && !a.dragging && a.motion.is_none() &&
+                unsafe{windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState(17)}<0=>{
+                let r=a.focus_rect().unwrap_or_else(||a.bounds());
+                let ctx=serde_json::json!({"action":"Find shortcut…","x":r.cx() as i32,"y":r.cy() as i32});
+                if let Err(error)=a.command(ctx){message(hwnd,&error);}Some(Ok(()))
             }
             WM_KEYDOWN if w == 27 || w == 8 => Some(a.back()),
             WM_KEYDOWN if (49..=57).contains(&w) && a.path.is_empty() => {
