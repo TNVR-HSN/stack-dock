@@ -286,6 +286,31 @@ fn stack_dock_startup(app: tauri::AppHandle, enabled: Option<bool>) -> Result<St
     }
 }
 
+#[tauri::command]
+fn native_menu_window(window: tauri::WebviewWindow, editor: bool, title:String, width:f64, height:f64) -> Result<(),String> {
+    if std::env::var_os("SD_MENU_X").is_none(){return Err("No active shortcut menu".into());}
+    let x=std::env::var("SD_MENU_X").ok().and_then(|s|s.parse::<i32>().ok()).unwrap_or(0);
+    let y=std::env::var("SD_MENU_Y").ok().and_then(|s|s.parse::<i32>().ok()).unwrap_or(0);
+    let monitors=window.available_monitors().map_err(|e|e.to_string())?;
+    let m=monitors.iter().find(|m|{let p=m.position();let s=m.size();
+        x>=p.x && y>=p.y && x<p.x+s.width as i32 && y<p.y+s.height as i32});
+    let scale=m.map_or(1.,|m|m.scale_factor());
+    let mut w=(width.clamp(100.,1100.)*scale).ceil() as u32;
+    let mut h=(height.clamp(40.,850.)*scale).ceil() as u32;
+    let(mut px,mut py)=(x,y);
+    if let Some(m)=m {let a=m.work_area();w=w.min(a.size.width);h=h.min(a.size.height);
+        px=x.clamp(a.position.x,a.position.x+(a.size.width-w) as i32);
+        py=y.clamp(a.position.y,a.position.y+(a.size.height-h) as i32);}
+    window.set_title(&title).map_err(|e|e.to_string())?;
+    window.set_decorations(editor).map_err(|e|e.to_string())?;
+    window.set_position(tauri::PhysicalPosition::new(px,py)).map_err(|e|e.to_string())?;
+    window.set_size(tauri::PhysicalSize::new(w,h)).map_err(|e|e.to_string())
+}
+#[tauri::command]
+fn finish_native_menu(app:tauri::AppHandle, action:u8) {
+    if std::env::var_os("SD_MENU_X").is_some(){app.exit(match action {1..=4=>20+i32::from(action),_=>0});}
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
         use tauri::Manager as _;
@@ -331,8 +356,16 @@ pub fn run() {
             config.skip_taskbar = false;
             config.visible = false;
 
+            let mut init=String::from("window.__STACKDOCK_SETTINGS_ONLY__ = true;");
+            if std::env::var_os("SD_MENU_X").is_some() {
+                use std::io::Read;
+                let mut payload=String::new();
+                std::io::stdin().take(16*1024*1024).read_to_string(&mut payload)?;
+                let data:serde_json::Value=serde_json::from_str(&payload)?;
+                init.push_str(&format!("window.__SD_NATIVE_MENU__={data};"));
+            }
             tauri::WebviewWindowBuilder::from_config(app, &config)?
-                .initialization_script("window.__STACKDOCK_SETTINGS_ONLY__ = true;")
+                .initialization_script(&init)
                 .build()?;
 
             Ok(())
@@ -348,6 +381,7 @@ pub fn run() {
             native_shortcuts::read_shortcut_icon,
             native_shortcuts::list_shortcut_icons,
             native_shortcuts::inspect_shortcut_drops,
+            native_menu_window, finish_native_menu,
             native_shortcuts::exit_stack_dock,
             native_shortcuts::stack_dock_layout_backup,
             desktop_widget::dock_taskbar_rects,

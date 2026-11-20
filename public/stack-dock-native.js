@@ -1045,6 +1045,11 @@ loadStartupLayout = async () => {
   });
 
   // Add the app submenu after the existing dock menu items, never to the expanded grid.
+  window.sdBackupLayout=backupLayout;
+  window.sdFindShortcut=showShortcutSearch;
+  window.sdInspectDrop=async paths=>(await call('inspect_shortcut_drops',{paths,includeIconSource:true})).map(({iconSource,...item})=>({
+    ...item,id:uid(),type:'item',args:'',cwd:'',icon:shortcutIconKey(item),...iconSourceFields(iconSource)
+  }));
   const baseDockMenu = dockMenu;
   dockMenu = function (x, y, folder) {
     if (phase !== 'closed') return;

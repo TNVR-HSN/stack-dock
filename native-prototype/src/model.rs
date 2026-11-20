@@ -109,6 +109,16 @@ pub struct Style {
     round_icons: Option<bool>,
     icon_corner: Option<f32>,
     icon_rotation: Option<f32>,
+    shadow: Option<bool>,
+    #[serde(flatten)]
+    pub launch: LaunchStyle,
+    pub hit_expand:Option<bool>,
+    pub hit_padding:Option<f32>,
+    pub hover_labels:Option<bool>,
+    pub hover_label_background:Option<bool>,
+    pub hover_label_size:Option<f32>,
+    pub custom_hover_delay:Option<bool>,
+    pub hover_details_delay:Option<u64>,
     pub motion: Option<bool>,
     pub motion_speed: Option<f32>,
     hover_mode: Option<u8>,
@@ -124,6 +134,7 @@ pub struct Style {
 #[derive(Clone, Copy, Debug)]
 pub struct Skin {
     pub icon: f32,
+    pub inset_shadow: f32,
     pub fill: u32,
     pub border: u32,
     pub stroke: f32,
@@ -156,6 +167,41 @@ fn hex(s: Option<&str>, fallback: u32) -> u32 {
 fn rgba(rgb: u32, pct: f32) -> u32 {
     ((pct.clamp(0., 100.) * 2.55).round() as u32) << 24 | rgb
 }
+#[derive(Clone,Debug,Default,Deserialize)]
+#[serde(default,rename_all="camelCase")]
+pub struct LaunchStyle {
+    launch_width:Option<f32>,
+    launch_height:Option<f32>,
+    launch_hold:Option<f32>,
+    launch_travel:Option<f32>,
+    launch_return:Option<f32>,
+    launch_icon:Option<f32>,
+    launch_font:Option<f32>,
+    launch_radius:Option<f32>,
+    launch_opacity:Option<f32>,
+    launch_gap:Option<f32>,
+    launch_pad:Option<f32>,
+    pub launch_enabled:Option<bool>,
+    pub launch_label:Option<bool>,
+    pub launch_follow_dock:Option<bool>,
+    pub launch_color:Option<String>,
+    pub launch_text:Option<String>,
+}
+impl LaunchStyle {
+    pub fn width(&self)->f32{ self.launch_width.unwrap_or(300.).clamp(140.,680.) }
+    pub fn height(&self)->f32{ self.launch_height.unwrap_or(64.).clamp(42.,120.) }
+    pub fn hold(&self)->f32{ self.launch_hold.unwrap_or(1250.).clamp(0.,8000.) }
+    pub fn travel(&self)->f32{ self.launch_travel.unwrap_or(300.).clamp(0.,1000.) }
+    pub fn return_time(&self)->f32{ self.launch_return.unwrap_or(210.).clamp(0.,700.) }
+    pub fn icon(&self)->f32{ self.launch_icon.unwrap_or(42.).clamp(16.,84.) }
+    pub fn font(&self)->f32{ self.launch_font.unwrap_or(19.).clamp(11.,34.) }
+    pub fn radius(&self)->f32{ self.launch_radius.unwrap_or(32.).clamp(0.,60.) }
+    pub fn opacity(&self)->f32{ self.launch_opacity.unwrap_or(65.).clamp(0.,100.) }
+    pub fn gap(&self)->f32{ self.launch_gap.unwrap_or(12.).clamp(0.,28.) }
+    pub fn pad(&self)->f32{ self.launch_pad.unwrap_or(16.).clamp(4.,28.) }
+    pub fn fill(&self,dock:u32)->u32{if self.launch_follow_dock.unwrap_or(false){dock}else{rgba(hex(self.launch_color.as_deref(),0x111a2c),self.opacity())}}
+    pub fn ink(&self)->u32{hex(self.launch_text.as_deref(),0xffffff)}
+}
 impl Style {
     pub fn skin(&self, grid: bool, scale: f32) -> Skin {
         let pick = |g, d| if grid { g } else { d };
@@ -177,6 +223,7 @@ impl Style {
             hover_angle: self.hover_angle.unwrap_or(10.).clamp(-30., 30.),
             hover_duration: self.hover_duration.unwrap_or(160.).clamp(0., 900.),
             hover_curve: self.hover_curve.unwrap_or(1),
+            inset_shadow: if self.shadow.unwrap_or(true) {0.33*self.opacity.unwrap_or(pick(80.,76.)).clamp(0.,100.)/100.} else {0.},
             fill: rgba(
                 hex(
                     self.color.as_deref(),
@@ -251,6 +298,7 @@ pub struct Entry {
     pub entry_motion: String,
     pub trigger_size: f32,
     pub dock_icon_corner: Option<f32>,
+    pub folder_hover_labels:Option<bool>,
     pub dock_icon_shape: String,
 }
 impl Entry {
@@ -279,6 +327,9 @@ impl Entry {
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct General {
+    pub hover_names:Option<bool>,
+    pub hover_targets:Option<bool>,
+    pub hover_delay:Option<u64>,
     pub collapse_on_focus_loss: Option<bool>,
     pub image_thumbnails: Option<bool>,
 }
@@ -397,6 +448,7 @@ pub struct Tile {
     pub box_: Rect,
     pub icon: Rect,
 }
+#[derive(Clone)]
 pub struct Layout {
     pub dock: Rect,
     pub grid: Rect,
@@ -411,6 +463,26 @@ pub struct Layout {
     pub dock_scroll: f32,
 }
 impl Layout {
+    pub fn panel_rect(saved:&Saved,work:Rect,p:f32,width:f32,height:f32)->Rect{
+            let w = width.clamp(1., (work.w - p * 2.).max(1.)).round();
+            let h = height.clamp(1., (work.h - p * 2.).max(1.)).round();
+            let a = match saved.align.as_str() {
+                "start" => 0.,
+                "end" => 1.,
+                _ => 0.5,
+            };
+            let (x, y) = match saved.edge.as_str() {
+                "top" => (work.x + p + (work.w - p * 2. - w) * a, work.y + p),
+                "left" => (work.x + p, work.y + p + (work.h - p * 2. - h) * a),
+                "right" => (work.right() - p - w, work.y + p + (work.h - p * 2. - h) * a),
+                _ => (
+                    work.x + p + (work.w - p * 2. - w) * a,
+                    work.bottom() - p - h,
+                ),
+            };
+            Rect::new(x.round(), y.round(), w, h)
+            }
+
     pub fn new(
         saved: &Saved,
         work: Rect,
@@ -454,25 +526,7 @@ impl Layout {
             dims.iter().map(|t| t.1).fold(0., f32::max)
         };
         let p = 14. * s;
-        let place = |width: f32, height: f32| {
-            let w = width.clamp(1., (work.w - p * 2.).max(1.)).round();
-            let h = height.clamp(1., (work.h - p * 2.).max(1.)).round();
-            let a = match saved.align.as_str() {
-                "start" => 0.,
-                "end" => 1.,
-                _ => 0.5,
-            };
-            let (x, y) = match saved.edge.as_str() {
-                "top" => (work.x + p + (work.w - p * 2. - w) * a, work.y + p),
-                "left" => (work.x + p, work.y + p + (work.h - p * 2. - h) * a),
-                "right" => (work.right() - p - w, work.y + p + (work.h - p * 2. - h) * a),
-                _ => (
-                    work.x + p + (work.w - p * 2. - w) * a,
-                    work.bottom() - p - h,
-                ),
-            };
-            Rect::new(x.round(), y.round(), w, h)
-        };
+        let place=|width,height| Self::panel_rect(saved,work,p,width,height);
         let dock = place(total_w + ds.px * 2., total_h + ds.py * 2.);
         let excess = if vertical {
             (total_h + ds.py * 2. - dock.h).max(0.)

@@ -28,6 +28,92 @@ impl<'a> Canvas<'a> {
         }
     }
 
+    pub fn overlay(pixels:&'a mut [u32],width:usize,height:usize,origin:Rect)->Self{
+        Self{pixels,width,height,origin,clip:origin}
+    }
+    pub fn ghost(&mut self,assets:&mut Assets,entry:&Entry,x:f32,y:f32,scale:f32){
+        if let Some(img)=assets.get(entry,true){
+            let size=36.*scale;
+            self.art(&img,Rect::new(x-size/2.,y-size/2.,size,size),0.,0.,0.8,false);
+        }
+    }
+    pub fn fade_snapshot(&mut self,src:&[u32],r:Rect,opacity:f32){
+        if opacity<=0. || src.is_empty(){return;}
+        let fade=(bounded(opacity)*255.).round() as u32;
+        let stride=r.w as usize;
+        if fade==0 || stride==0{return;}
+        let visible=r.intersect(self.clip).intersect(self.origin);
+        if visible.w<=0. || visible.h<=0.{return;}
+        let left=(visible.x-0.5).ceil() as i32;
+        let right=(visible.right()-0.5).ceil() as i32;
+        for y in (visible.y-0.5).ceil() as i32..(visible.bottom()-0.5).ceil() as i32{
+            let sy=y-r.y as i32;let sx=left-r.x as i32;
+            let dx=left-self.origin.x as i32;let dy=y-self.origin.y as i32;
+            if sx<0||sy<0||dx<0||dy<0||right<=left{continue;}
+            let count=((right-left) as usize).min(stride.saturating_sub(sx as usize)).min(self.width.saturating_sub(dx as usize));
+            let start=sy as usize*stride+sx as usize;let out=dy as usize*self.width+dx as usize;
+            if let (Some(line),Some(dst))=(src.get(start..start+count),self.pixels.get_mut(out..out+count)){
+                for (&v,d) in line.iter().zip(dst){if v!=0{
+                    let ch=|n:u32|mul255((v>>n)&255,fade);
+                    *d=over(if fade==255{v}else{pack(ch(24),ch(16),ch(8),ch(0))},*d);
+                }}
+            }
+        }
+    }
+    pub fn launch_card(&mut self,assets:&mut Assets,saved:&Saved,layout:&Layout,item:&Entry,source:Rect,
+        from:Rect,card:Rect,enter:f32,exit:f32,sprite:Option<&TileSprite>,source_skin:Skin,previous:&[u32]){
+        let style=&saved.dock.launch;let s=layout.s;let alpha=enter*(1.-exit);
+        let panel=from.lerp(card,enter,enter).lerp(layout.dock,exit,exit);
+        let color=style.fill(layout.ds.fill);
+        let dock=layout.ds;let radius=(style.radius()*s).min(card.h/2.);
+        self.panel(panel,mix(mix(source_skin.radius,radius,enter),dock.radius,exit),
+            mix(mix(source_skin.stroke,dock.stroke,enter),dock.stroke,exit),
+            mix_color(mix_color(source_skin.fill,color,enter),dock.fill,exit),
+            mix_color(source_skin.border,dock.border,enter),
+            mix(mix(source_skin.inset_shadow,0.,enter),dock.inset_shadow,exit),s);
+        let old_clip=self.clip;
+        self.clip=self.clip.intersect(panel);
+        self.fade_snapshot(previous,from,(1.-enter/0.65).max(0.));
+        let size=(style.icon()*s).min(card.h-10.*s).max(1.);
+        let icon=Rect::new(card.x+style.pad()*s,card.cy()-size/2.,size,size);
+        let returning=Rect::new(panel.x+icon.x-card.x,panel.cy()-size/2.,size,size);
+        let flying=source.lerp(icon,enter,enter).lerp(returning,exit,exit);
+        if let Some(sprite)=sprite{scaled_sprite(self,sprite,flying,sprite.width as f32,sprite.height as f32,1.-exit);}
+        let x=icon.right()+style.gap()*s+(panel.x-card.x)*exit;let width=(card.right()-style.pad()*s-x).max(0.);
+        let font=style.font()*s;let caption=style.launch_label.unwrap_or(true);
+        let baseline=mix(card.cy(),panel.cy(),exit)+font*0.35-if caption{7.*s}else{0.};
+        let measured=assets.measure(&item.name,font,true,width);
+        self.colored_text(assets,&item.name,x+measured/2.,baseline,font,width,alpha,true,style.ink());
+        if caption{let size=11.*s;let measured=assets.measure("Launched",size,false,width);
+            self.colored_text(assets,"Launched",x+measured/2.,baseline+14.*s,size,width,alpha*0.76,false,style.ink());}
+        if exit>0.{
+            let order=saved.ordered();
+            for &tile_rect in &layout.dock_tiles{
+                let moved=dock_motion(tile_rect,layout.dock,card,exit,&saved.edge);
+                tile(self,assets,order[moved.item],moved,dock,s,exit,true,false,0.,
+                    saved.general.image_thumbnails.unwrap_or(true),false,moved.icon.bottom());
+            }
+        }
+        self.clip=old_clip;
+    }
+    pub fn sprite(&mut self,pixels:&[u32],side:usize,x:i32,y:i32){
+        let left=x-side as i32/2;let top=y-side as i32/2;
+        for (row,line) in pixels.chunks_exact(side).enumerate(){
+            for (col,&pixel) in line.iter().enumerate(){if pixel!=0{self.put(left+col as i32,top+row as i32,pixel);}}
+        }
+    }
+    pub fn drop_cell(&mut self,r:Rect,scale:f32){
+        let px=scale.round().max(1.) as i32;
+        for y in r.y.ceil() as i32..r.bottom() as i32{
+            for x in r.x.ceil() as i32..r.right() as i32{
+                let dx=x-r.x.ceil() as i32;let dy=y-r.y.ceil() as i32;
+                let ex=dx.min(r.right() as i32-1-x);let ey=dy.min(r.bottom() as i32-1-y);let edge=ex.min(ey);
+                self.put(x,y,0x312b1e2e);
+                if edge<2*px{self.put(x,y,0x8c34193f);}
+                if edge<px && (if ex<ey{dy}else{dx})/(3*px)%2==0{self.put(x,y,0xffefb3ff);}
+            }
+        }
+    }
     fn put(&mut self, x: i32, y: i32, src: u32) {
         let sx = x as f32 + 0.5;
         let sy = y as f32 + 0.5;
@@ -96,7 +182,7 @@ impl<'a> Canvas<'a> {
         }
     }
 
-    fn panel(&mut self, rect: Rect, radius: f32, stroke: f32, fill: u32, rim: u32) {
+    fn panel(&mut self, rect: Rect, radius: f32, stroke: f32, fill: u32, rim: u32, shadow:f32, dpi:f32) {
         let clip = rect.intersect(self.clip);
         let r = radius.max(0.).min(rect.w.min(rect.h) / 2.);
         let (hw, hh) = (rect.w / 2. - r, rect.h / 2. - r);
@@ -109,9 +195,23 @@ impl<'a> Canvas<'a> {
                 mul255(c & 255, a),
             )
         };
+        let flat=shade(fill,1.);
+        let margin=(r+stroke.max(0.)+20.*dpi+2.).ceil();
         for y in clip.y.floor() as i32..clip.bottom().ceil() as i32 {
             let dy = (y as f32 + 0.5 - rect.cy()).abs() - hh;
-            for x in clip.x.floor() as i32..clip.right().ceil() as i32 {
+            let x0=clip.x.floor() as i32;
+            let x1=clip.right().ceil() as i32;
+            let middle=y as f32>=rect.y+margin && (y as f32)<rect.bottom()-margin;
+            let left=if middle{((rect.x+margin).ceil() as i32).clamp(x0,x1)}else{x1};
+            let right=if middle{((rect.right()-margin).floor() as i32).clamp(left,x1)}else{x1};
+            if right>left{
+                let row=y-self.origin.y as i32;let col=left-self.origin.x as i32;
+                if row>=0 && row<self.height as i32 && col>=0 && col+right-left<=self.width as i32{
+                    let start=row as usize*self.width+col as usize;
+                    for d in &mut self.pixels[start..start+(right-left) as usize]{*d=over(flat,*d);}
+                }
+            }
+            for x in (x0..left).chain(right..x1) {
                 let dx = (x as f32 + 0.5 - rect.cx()).abs() - hw;
                 let a = dx.max(0.);
                 let b = dy.max(0.);
@@ -129,7 +229,9 @@ impl<'a> Canvas<'a> {
                 } else {
                     0
                 };
-                self.put(x, y, over(ink, shade(fill, edge)));
+                let inset = bounded(1. + (distance + 5.*dpi*(y as f32-rect.cy())/(rect.h*0.5).max(1.))/(14.*dpi).max(1.));
+                let black = ((255.*shadow*inset*inset*edge).round() as u32)<<24;
+                self.put(x, y, over(ink, over(black, shade(fill, edge))));
             }
         }
     }
@@ -253,7 +355,10 @@ impl<'a> Canvas<'a> {
             } // ends for x
         } // ends for y
     } // ends fn art
-    fn text(
+    fn text(&mut self,assets:&mut Assets,value:&str,dx:f32,dy:f32,size:f32,max:f32,alpha:f32,strong:bool){
+        self.colored_text(assets,value,dx,dy,size,max,alpha,strong,0xf2eaf6);
+    }
+    fn colored_text(
         &mut self,
         assets: &mut Assets,
         value: &str,
@@ -263,6 +368,7 @@ impl<'a> Canvas<'a> {
         max: f32,
         alpha: f32,
         strong: bool,
+        color:u32,
     ) {
         if alpha <= 0.0 || max < size || assets.font.is_none() {
             return;
@@ -321,7 +427,7 @@ impl<'a> Canvas<'a> {
                                 self.put(
                                     px,
                                     py,
-                                    pack(a, mul255(242, a), mul255(234, a), mul255(246, a)),
+                                    pack(a,mul255((color>>16)&255,a),mul255((color>>8)&255,a),mul255(color&255,a)),
                                 );
                             }
                         }
@@ -333,18 +439,69 @@ impl<'a> Canvas<'a> {
     }
 }
 type Glyph = (Metrics, Vec<u8>);
+pub(crate) struct TileSprite {
+    pixels: Vec<u32>,
+    width: usize,
+    height: usize,
+}
+
+pub(crate) struct HoverTip{
+    pub rect:Rect, lines:Vec<(String,f32,bool,f32)>,background:bool,scale:f32,
+}
+impl HoverTip{
+    pub fn new(assets:&mut Assets,icon:Rect,bottom:f32,work:Rect,scale:f32,font:f32,bg:bool,name:&str,target:&str)->Option<Self>{
+        let limit=(540.*scale).min(work.w-12.*scale)-16.*scale;
+        if limit<font{return None;}
+        let mut lines=Vec::new();let mut width=0_f32;let mut height=6.*scale;
+        for (value,size,bold) in [(name,font,true),(target,(font-scale).max(9.*scale),false)]{
+            if value.is_empty(){continue;}
+            if !lines.is_empty(){height+=4.*scale;}
+            let mut line=String::new();let mut used=0.;let mut n=0;let mut block=0.;
+            for ch in value.chars().chain(std::iter::once('\n')){
+                let advance=assets.glyph(ch,size,bold).map_or(0.,|g|g.0.advance_width);
+                if ch=='\n'||used+advance>limit||n>=128{
+                    if !line.is_empty(){let baseline=height-3.*scale+size;
+                        lines.push((std::mem::take(&mut line),size,bold,baseline));width=width.max(used);
+                        height+=size*1.25;block+=size*1.25;used=0.;n=0;}
+                    if block+size*1.25>work.h*0.4||height+size*1.25>work.h-8.*scale{break;}
+                    if ch=='\n'{continue;}
+                }
+                if !ch.is_control(){line.push(ch);used+=advance;n+=1;}
+            }
+        }
+        if lines.is_empty(){return None;}
+        width=(width+16.*scale).ceil();height=height.ceil();
+        let x=(icon.cx()-width/2.).clamp(work.x+6.*scale,(work.right()-width-6.*scale).max(work.x+6.*scale));
+        let below=bottom+5.*scale;
+        let y=if below+height+4.*scale<=work.bottom(){below}else{(icon.y-5.*scale-height).max(work.y+4.*scale)};
+        Some(Self{rect:Rect::new(x.round(),y.round(),width,height),lines,background:bg,scale})
+    }
+    pub fn paint(&self,c:&mut Canvas,a:&mut Assets,opacity:f32){
+        if self.background{c.rounded(self.rect,5.*self.scale,(((237.*opacity).round() as u32)<<24)|0x130f19);}
+        for (line,size,bold,offset) in &self.lines{
+            c.colored_text(a,line,self.rect.cx(),self.rect.y+offset,*size,self.rect.w,opacity,*bold,if *bold{0xffffff}else{0xeee1f4});
+        }
+    }
+}
 pub struct Assets {
+    warm:Option<std::sync::mpsc::Receiver<(String,Option<RgbaImage>)>>,
+    entrance_tiles: HashMap<(String,usize,bool), Rc<TileSprite>>,
     font: Option<Font>,
     bold: Option<Font>,
     images: HashMap<String, Option<Rc<RgbaImage>>>,
+    reflections: HashMap<(usize,[u32;5]),(Rc<RgbaImage>,Vec<u32>)>,
     painted_icons: HashMap<(usize, [u32; 6]), (Rc<RgbaImage>, Vec<u32>)>,
     glyphs: HashMap<(char, u16, bool), Rc<Glyph>>,
 }
 static BUILTIN: &[(&str, &[u8])] = include!("../assets/icons.rs");
 impl Assets {
+    pub fn clear_entrance(&mut self) { self.entrance_tiles.clear(); }
+
     pub fn clear_layout_images(&mut self) {
-        self.images.clear();
+        self.warm=None;self.images.clear();
+        self.entrance_tiles.clear();
         self.painted_icons.clear();
+        self.reflections.clear();
     }
 
     pub fn new(font_dir: &Path) -> Self {
@@ -356,10 +513,13 @@ impl Assets {
             })
         };
         Self {
+            warm:None,
             font: font(&["seguisb.ttf", "segoeui.ttf", "DejaVuSans.ttf"]),
             bold: font(&["segoeuib.ttf", "DejaVuSans-Bold.ttf"]),
+            entrance_tiles: HashMap::new(),
             images: HashMap::new(),
             painted_icons: HashMap::new(),
+            reflections: HashMap::new(),
             glyphs: HashMap::new(),
         }
     }
@@ -436,38 +596,33 @@ impl Assets {
         }
         Self::decode(&v)
     }
-    fn get(&mut self, entry: &Entry, thumbnails: bool) -> Option<Rc<RgbaImage>> {
-        let custom = !entry.image.is_empty()
-            && !["source", "target", "default"].contains(&entry.icon_mode.as_str());
-        let thumbnail = !entry.folder()
-            && entry.kind == "local"
-            && entry.local_type != "folder"
-            && entry.image_thumbnail.unwrap_or(thumbnails);
-        let exe_fallback =
-            entry.kind == "program" && (entry.icon_mode.is_empty() || entry.icon_mode == "shell");
-        let text_document = entry.kind == "local"
-            && entry.local_type != "folder"
-            && entry.icon_key() == "file"
-            && Path::new(&entry.target)
-                .extension()
-                .and_then(|extension| extension.to_str())
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("txt"));
-
-        let key = if custom || thumbnail || exe_fallback || !entry.icon_path.is_empty() {
-            format!("entry:{}", entry.id)
-        } else if text_document {
-            String::from("built-in:text-document")
-        } else {
-            format!("built-in:{}", entry.icon_key())
-        };
-        if let Some(v) = self.images.get(&key) {
-            return v.clone();
+    pub fn prefetch(&mut self,saved:&Saved){
+        let thumbnails=saved.general.image_thumbnails.unwrap_or(true);
+        let mut jobs=Vec::new();
+        fn collect(entries:&[Entry],jobs:&mut Vec<Entry>,thumbnails:bool){
+            for e in entries{
+                if jobs.len()>=96{return;}
+                if !e.folder() && (!e.image.is_empty() || !e.icon_path.is_empty() || e.kind=="program" ||
+                    (e.kind=="local" && e.image_thumbnail.unwrap_or(thumbnails))){jobs.push(e.clone());}
+                if e.folder(){collect(&e.slots,jobs,thumbnails);}
+            }
         }
-        if self.images.len() >= 96 {
-            self.images.clear()
-        }
-        let load_started = std::time::Instant::now();
-        let value = custom
+        collect(&saved.folders,&mut jobs,thumbnails);
+        let (tx,rx)=std::sync::mpsc::sync_channel(96);self.warm=Some(rx);
+        std::thread::spawn(move||{
+            for e in jobs{
+                let custom=!e.image.is_empty() && !["source","target","default"].contains(&e.icon_mode.as_str());
+                let thumb=e.kind=="local" && e.local_type!="folder" && e.image_thumbnail.unwrap_or(thumbnails);
+                let exe=e.kind=="program" && (e.icon_mode.is_empty()||e.icon_mode=="shell");
+                if !(custom||thumb||exe||!e.icon_path.is_empty()){continue;}
+                let txt=e.kind=="local" && e.local_type!="folder" && e.icon_key()=="file" && Path::new(&e.target).extension().and_then(|x|x.to_str()).is_some_and(|x|x.eq_ignore_ascii_case("txt"));
+                let image=Self::load_entry(&e,custom,thumb,exe,txt);
+                if tx.send((format!("entry:{}",e.id),image)).is_err(){break;}
+            }
+        });
+    }
+    fn load_entry(entry:&Entry,custom:bool,thumbnail:bool,exe_fallback:bool,text_document:bool)->Option<RgbaImage>{
+        custom
             .then(|| {
                 if entry.image.len() > 530_000 {
                     return None;
@@ -512,11 +667,38 @@ impl Assets {
                     .or_else(|| BUILTIN.iter().find(|(name, _)| *name == fallback))
                     .and_then(|(_, data)| Self::decode(data))
             })
-            .map(Rc::new);
-        let load_ms = load_started.elapsed().as_secs_f64() * 1000.0;
-        if load_ms >= 2.0 {
-            eprintln!("[icon load] {:7.1} ms  {}", load_ms, entry.name);
+
+    }
+    fn get(&mut self, entry: &Entry, thumbnails: bool) -> Option<Rc<RgbaImage>> {
+        let custom = !entry.image.is_empty()
+            && !["source", "target", "default"].contains(&entry.icon_mode.as_str());
+        let thumbnail = !entry.folder()
+            && entry.kind == "local"
+            && entry.local_type != "folder"
+            && entry.image_thumbnail.unwrap_or(thumbnails);
+        let exe_fallback =
+            entry.kind == "program" && (entry.icon_mode.is_empty() || entry.icon_mode == "shell");
+        let text_document = entry.kind == "local"
+            && entry.local_type != "folder"
+            && entry.icon_key() == "file"
+            && Path::new(&entry.target)
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("txt"));
+
+        let key = if custom || thumbnail || exe_fallback || !entry.icon_path.is_empty() {
+            format!("entry:{}", entry.id)
+        } else if text_document {
+            String::from("built-in:text-document")
+        } else {
+            format!("built-in:{}", entry.icon_key())
+        };
+        if let Some(rx)=&self.warm{
+            for (k,image) in rx.try_iter(){if self.images.len()<192{self.images.entry(k).or_insert_with(||image.map(Rc::new));}}
         }
+        if let Some(v)=self.images.get(&key){return v.clone();}
+        if self.images.len()>=192{self.images.clear();}
+        let value=Self::load_entry(entry,custom,thumbnail,exe_fallback,text_document).map(Rc::new);
         self.images.insert(key, value.clone());
         value
     }
@@ -594,6 +776,32 @@ fn corner(e: &Entry, skin: Skin, dock: bool) -> f32 {
     }
     skin.corner
 }
+// A reflection stays at the resting icon position during hover motion.
+fn paint_reflection(c:&mut Canvas,a:&mut Assets,img:&Rc<RgbaImage>,r:Rect,depth:f32,opacity:f32){
+    let strip=Rect::new(r.x,r.y,r.w,depth.min(r.h));
+    let visible=c.clip.intersect(strip);
+    if opacity<=0. || visible.w<=0. || visible.h<=0.{return;}
+    let x=r.x.floor();let y=r.y.floor();
+    let width=(strip.right().ceil()-x) as usize;
+    let height=(strip.bottom().ceil()-y) as usize;
+    let old=c.clip;c.clip=visible;
+    if width>256 || height>128{
+        c.art(img,r,0.,0.,opacity,true);
+    }else{
+        let local=Rect::new(r.x-x,r.y-y,r.w,r.h);
+        let key=(Rc::as_ptr(img) as usize,[local.x.to_bits(),local.y.to_bits(),r.w.to_bits(),r.h.to_bits(),depth.to_bits()]);
+        if a.reflections.len()>=192 && !a.reflections.contains_key(&key){a.reflections.clear();}
+        let (_,pixels)=a.reflections.entry(key).or_insert_with(||{
+            let mut pixels=vec![0;width*height];
+            let mut layer=Canvas::new(&mut pixels,width,height,Rect::new(0.,0.,width as f32,height as f32));
+            layer.clip=Rect::new(local.x,local.y,r.w,strip.h);
+            layer.art(img,local,0.,0.,1.,true);
+            (Rc::clone(img),pixels)
+        });
+        c.fade_snapshot(pixels,Rect::new(x,y,width as f32,height as f32),opacity);
+    }
+    c.clip=old;
+}
 fn paint_stationary_icon(
     canvas: &mut Canvas,
     assets: &mut Assets,
@@ -601,6 +809,7 @@ fn paint_stationary_icon(
     rect: Rect,
     corner: f32,
     angle: f32,
+    opacity: f32,
 ) {
     let left = rect.x.floor() as i32;
     let top = rect.y.floor() as i32;
@@ -613,7 +822,7 @@ fn paint_stationary_icon(
 
     // Bound memory use for unusually large icons or display scales.
     if width > 192 || height > 192 {
-        canvas.art(image, rect, corner, angle, 1., false);
+        canvas.art(image, rect, corner, angle, opacity, false);
         return;
     }
 
@@ -646,11 +855,33 @@ fn paint_stationary_icon(
         (Rc::clone(image), pixels)
     });
 
-    for (y, row) in pixels.chunks_exact(width).enumerate() {
-        for (x, &pixel) in row.iter().enumerate() {
-            if pixel != 0 {
-                canvas.put(left + x as i32, top + y as i32, pixel);
+    let fade = (opacity.clamp(0., 1.) * 255.).round() as u32;
+
+    // Skip pixels outside the currently visible part of the growing panel.
+    let x0 = ((canvas.clip.x.floor() as i32 - left).clamp(0, width as i32)) as usize;
+    let x1 = ((canvas.clip.right().ceil() as i32 - left).clamp(0, width as i32)) as usize;
+    let y0 = ((canvas.clip.y.floor() as i32 - top).clamp(0, height as i32)) as usize;
+    let y1 = ((canvas.clip.bottom().ceil() as i32 - top).clamp(0, height as i32)) as usize;
+
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let pixel = pixels[y * width + x];
+            if pixel == 0 {
+                continue;
             }
+
+            let faded = if fade == 255 {
+                pixel
+            } else {
+                pack(
+                    mul255(pixel >> 24, fade),
+                    mul255((pixel >> 16) & 255, fade),
+                    mul255((pixel >> 8) & 255, fade),
+                    mul255(pixel & 255, fade),
+                )
+            };
+
+            canvas.put(left + x as i32, top + y as i32, faded);
         }
     }
 }
@@ -701,17 +932,14 @@ fn tile(
                 && artwork.h == t.icon.h
                 && angle == e.icon_rotation.unwrap_or(s.rotation);
 
-            if p == 1. && at_rest {
-                paint_stationary_icon(c, a, &image, artwork, icon_corner, angle);
+            if at_rest {
+                paint_stationary_icon(c, a, &image, artwork, icon_corner, angle, p);
             } else {
                 c.art(&image, artwork, icon_corner, angle, p, false);
             }
             if s.reflect > 0. {
-                let old = c.clip;
-                c.clip = old.intersect(Rect::new(t.icon.x, t.icon.bottom(), t.icon.w, s.reflect));
-                let reflection = Rect::new(t.icon.x, t.icon.bottom(), t.icon.w, t.icon.h);
-                c.art(&image, reflection, 0., 0., p * s.reflect_alpha, true);
-                c.clip = old;
+                let reflection=Rect::new(t.icon.x,t.icon.bottom(),t.icon.w,t.icon.h);
+                paint_reflection(c,a,&image,reflection,s.reflect,p*s.reflect_alpha);
             }
         }
     }
@@ -730,7 +958,139 @@ pub enum Hit {
     Grid(usize),
     Back,
 }
+// Rasterize the complete cell once per entrance, then transform the cached
+// premultiplied pixels, including captions and reflections, as a single layer.
+fn entrance_tile(c: &mut Canvas, a: &mut Assets, item: &Entry, folder: &Entry,
+    original: Tile, dest: Rect, skin: Skin, dpi: f32, alpha: f32, thumb: bool, skip: bool) {
+    let visible = dest.intersect(c.clip);
+    if alpha <= 0. || visible.w <= 0. || visible.h <= 0. { return; }
+    let k=dest.w/original.box_.w.max(1.);
+    let top=original.icon.y-original.box_.y;
+    let artwork=Rect::new(dest.x+(original.icon.x-original.box_.x)*k,dest.y+top*k,original.icon.w*k,(original.icon.h+skin.reflect)*k);
+    if skin.labels{
+        let baseline=(artwork.bottom()+skin.font+dpi).round();
+        c.caption(a,&item.name,dest.cx().round(),baseline,skin.font,original.box_.w,alpha);
+    }
+    let dest=artwork;
+    let visible=dest.intersect(c.clip);
+    if skip || visible.w<=0. || visible.h<=0.{return;}
+    let key=(folder.id.clone(),original.item,skip);
+    let sprite=if let Some(sprite)=a.entrance_tiles.get(&key) {Rc::clone(sprite)} else {
+        let width=original.icon.w.ceil().max(1.) as usize;
+        let height=(original.icon.h+skin.reflect).ceil().max(1.) as usize;
+        let mut pixels=vec![0; width*height];
+        let origin=Rect::new(0.,0.,width as f32,height as f32);
+        let mut local=original;
+        local.icon.x=0.;
+        local.icon.y=0.;
+        local.box_=origin;
+        let mut skin=skin;skin.labels=false;
+        tile(&mut Canvas::new(&mut pixels,width,height,origin),a,item,local,skin,dpi,1.,
+            false,false,0.,thumb,skip,local.icon.bottom());
+        let sprite=Rc::new(TileSprite {pixels,width,height});
+        if a.entrance_tiles.len() >= 256 {a.entrance_tiles.clear();}
+        a.entrance_tiles.insert(key,Rc::clone(&sprite));
+        sprite
+    };
+    let opacity=bounded(alpha);
+    // Fasade has a fixed cell rectangle. Copy its cached premultiplied pixels directly.
+    if (k-1.).abs()<0.0001 {
+        let fade=(opacity*255.).round() as u32;
+        let left=dest.x.round() as i32; let top=dest.y.round() as i32;
+        for y in visible.y.floor() as i32..visible.bottom().ceil() as i32 {
+            let sy=y-top;
+            if sy<0 || sy>=sprite.height as i32 {continue;}
+            for x in visible.x.floor() as i32..visible.right().ceil() as i32 {
+                let sx=x-left;
+                if sx<0 || sx>=sprite.width as i32 {continue;}
+                let px=sprite.pixels[sy as usize*sprite.width+sx as usize];
+                if px==0 {continue;}
+                let ch=|n:u32|mul255((px>>n)&255,fade);
+                c.put(x,y,if fade==255 {px} else {pack(ch(24),ch(16),ch(8),ch(0))});
+            }
+        }
+        return;
+    }
+    scaled_sprite(c,&sprite,dest,original.icon.w,original.icon.h+skin.reflect,opacity);
+}
+pub(crate) fn launch_sprite(assets:&mut Assets,item:&Entry,thumb:bool,side:f32)->Option<TileSprite>{
+    let image=assets.get(item,thumb)?;
+    let side=side.ceil().clamp(1.,512.) as usize;
+    let rect=Rect::new(0.,0.,side as f32,side as f32);
+    let mut pixels=vec![0;side*side];
+    Canvas::new(&mut pixels,side,side,rect).art(&image,rect,0.,item.icon_rotation.unwrap_or(0.),1.,false);
+    Some(TileSprite{width:side,height:side,pixels})
+}
+fn scaled_sprite(c:&mut Canvas,sprite:&TileSprite,dest:Rect,width:f32,height:f32,opacity:f32){
+    let visible=dest.intersect(c.clip);
+    if visible.w<=0. || visible.h<=0. || opacity<=0.{return;}
+    for y in visible.y.floor() as i32..visible.bottom().ceil() as i32 {
+        let sy=((y as f32+0.5-dest.y)*height/dest.h-0.5).clamp(0.,(sprite.height-1) as f32);
+        let row=sy as usize;let next=(row+1).min(sprite.height-1);
+        for x in visible.x.floor() as i32..visible.right().ceil() as i32 {
+            let sx=((x as f32+0.5-dest.x)*width/dest.w-0.5).clamp(0.,(sprite.width-1) as f32);
+            let col=sx as usize;let right=(col+1).min(sprite.width-1);
+            let get=|cx:usize,cy:usize|sprite.pixels[cy*sprite.width+cx];
+            let (tl,tr,bl,br)=(get(col,row),get(right,row),get(col,next),get(right,next));
+            if (tl|tr|bl|br)==0 {continue;}
+            let channel=|shift:u32|{
+                let byte=|pixel:u32|((pixel>>shift)&255) as f32;
+                (opacity*mix(mix(byte(tl),byte(tr),sx.fract()),mix(byte(bl),byte(br),sx.fract()),sy.fract())).round() as u32
+            };
+            c.put(x,y,pack(channel(24),channel(16),channel(8),channel(0)));
+        }
+    }
+}
+
+// Progress on the animation clock, before panel easing.
+#[derive(Clone, Copy)]
+pub struct Clock {
+    pub t: f32,
+    pub opening: bool,
+}
+
+fn fade(t: f32, delay: f32, span: f32) -> f32 {
+    ease(bounded((t-delay)/span), 0., 0., 0.58, 1.)
+}
+
+pub struct Navigation {
+    pub old: Layout,
+    pub path: Vec<usize>,
+    pub down: bool,
+    pub slot: usize,
+}
+
+fn flight_rect(from:Rect,to:Rect,t:f32,dpi:f32)->Rect {
+    let mut r=from.lerp(to,t,t);
+    let dx=to.cx()-from.cx(); let dy=to.cy()-from.cy();
+    if dx!=0. && dy!=0. {
+        let bend=(12.*dpi).min(dx.hypot(dy)*0.04);
+        let weight=if t<0.54 {t/0.54} else {(1.-t)/0.46};
+        r.x+=dx.signum()*bend*weight;
+    }
+    r
+}
+
+// Style colors have straight RGB. Composite both independently fading glass
+// layers in premultiplied space, then return the panel painter's straight RGB.
+fn glass_color(base:u32, grid:u32, dock_alpha:f32, grid_alpha:f32)->u32 {
+    let bottom=((base>>24) as f32/255.)*dock_alpha;
+    let top=((grid>>24) as f32/255.)*grid_alpha;
+    let total=top+bottom*(1.-top);
+    if total<=0. {return 0;}
+    let ch=|n:u32| ((((grid>>n)&255) as f32*top+((base>>n)&255) as f32*bottom*(1.-top))/total).round() as u32;
+    pack((total*255.).round() as u32,ch(16),ch(8),ch(0))
+}
+
+fn header_rect(a: &mut Assets, folder: &Entry, l: &Layout) -> Rect {
+    let max = (l.grid.w - 2.*l.gs.px - l.gs.title - 30.*l.s).max(13.*l.s);
+    let width = a.measure(&folder.name, 13.*l.s, true, max);
+    Rect::new(l.grid.cx()-(l.gs.title+8.*l.s+width)/2., l.grid.y+l.gs.py, l.gs.title,l.gs.title)
+}
+
 pub struct View<'a> {
+    pub clock: Clock,
+    pub nav: Option<&'a Navigation>,
     pub saved: &'a Saved,
     pub layout: &'a Layout,
     pub path: &'a [usize],
@@ -741,7 +1101,24 @@ pub struct View<'a> {
     pub hover_levels: &'a [(Hit, f32)],
 }
 pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
+    scene(c,a,v,false,true);
+}
+
+pub fn content_frame(c:&mut Canvas,a:&mut Assets,v:View){scene(c,a,v,false,false);}
+
+// Move the whole tile so its label and reflection travel with the icon.
+fn dock_motion(mut tile:Tile,dock:Rect,expanded:Rect,settled:f32,edge:&str)->Tile{
+    let rest=1.-bounded(settled);
+    let distance=tile.icon.w*0.22;
+    let (lift_x,lift_y)=match edge{"left"=>(distance,0.),"right"=>(-distance,0.),"top"=>(0.,distance),_=>(0.,-distance)};
+    let dx=((lift_x+expanded.cx()-dock.cx()+(tile.icon.cx()-dock.cx())*0.30)*rest).round();
+    let dy=((lift_y+expanded.cy()-dock.cy()+(tile.icon.cy()-dock.cy())*0.30)*rest).round();
+    tile.box_.x+=dx;tile.box_.y+=dy;tile.icon.x+=dx;tile.icon.y+=dy;tile
+}
+
+fn scene(c: &mut Canvas, a: &mut Assets, v: View, outgoing: bool, hull:bool) {
     let View {
+        clock, nav,
         saved,
         layout: l,
         path,
@@ -764,23 +1141,45 @@ pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
     let mode = current
         .map(|f| f.entry_motion.as_str())
         .unwrap_or("classic");
-    let (x, y) = match mode {
-        "rows" => (bounded(p * 1.65), bounded((p - 0.32) / 0.68)),
-        "columns" => (bounded((p - 0.32) / 0.68), bounded(p * 1.65)),
-        _ => (p, p),
-    };
-    let panel = l.dock.lerp(l.grid, x, y);
-    let r = mix(l.ds.radius, l.gs.radius, p);
-    // Keep the saved opacity. The rim is a border, not a second translucent
-    // layer painted behind the interior.
-    let stroke = mix(l.ds.stroke, l.gs.stroke, p);
-    let fill = mix_color(l.ds.fill, l.gs.fill, p);
-    let rim = mix_color(l.ds.border, l.gs.border, p);
-    c.panel(panel, r, stroke, fill, rim);
+    let t = clock.t;
+    let opening = clock.opening;
+    let nav_p = ease(t,0.22,0.76,0.26,1.);
+    let panel_mode = opening && nav.is_none() && matches!(mode,"rows"|"columns"|"center"|"together");
+    let slow = 1. - (1.-t).powi(4);
+    let fast = 1. - (1.-bounded(t/0.42)).powi(4);
+    let (x,y) = if panel_mode {
+        match mode { "rows" => (fast,slow), "columns" => (slow,fast), _ => (slow,slow) }
+    } else { (p,p) };
+    let panel = if outgoing {root_clip} else {nav.map_or_else(|| l.dock.lerp(l.grid,x,y), |n| n.old.grid.lerp(l.grid,nav_p,nav_p))};
+    let base = nav.map_or(l.ds, |n| n.old.gs);
+    let blend = if nav.is_some() { nav_p } else { x.max(y) };
+    if !outgoing && hull {
+        let layer_color=|base,grid| {
+            if nav.is_some() {return mix_color(base,grid,blend);}
+            let (d,g)=if opening {(1.-fade(t,0.,225./420.),fade(t,0.,265./420.))}
+                else {(fade(t,95./325.,200./325.),1.-fade(t,0.,235./325.))};
+            glass_color(base,grid,d,g)
+        };
+        c.panel(panel,mix(base.radius,l.gs.radius,blend),mix(base.stroke,l.gs.stroke,blend),
+            layer_color(base.fill,l.gs.fill),layer_color(base.border,l.gs.border),mix(base.inset_shadow,l.gs.inset_shadow,blend),s);
+    }
+    if let Some(n) = nav {
+        if !outgoing {
+            c.clip = root_clip.intersect(panel);
+            scene(c,a,View {saved, layout:&n.old,path:&n.path,dock_index,p:1.,a:1.,
+                clock,nav:Some(n),hover:None,hover_levels:&[]},true,false);
+            c.clip = root_clip;
+        }
+    }
     let order = saved.ordered();
-    let dock_alpha = bounded(1. - p * 1.65);
+    let dock_alpha = if nav.is_some() {0.} else if opening {
+        1.-fade(t,0.,145./420.)
+    } else {fade(t,135./325.,145./325.)};
     c.clip = root_clip.intersect(panel);
-    for &t in &l.dock_tiles {
+    for &original in &l.dock_tiles {
+        let t=if current.is_some() && dock_index!=Some(original.item){
+            dock_motion(original,l.dock,l.grid,dock_alpha,&saved.edge)
+        }else{original};
         tile(
             c,
             a,
@@ -801,7 +1200,15 @@ pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
         c.clip = root_clip;
         return;
     };
-    let header_alpha = bounded((p - 0.23) * 2.5);
+    // The Tauri grid is an inset child of the animated panel.
+    let classic_slide = nav.is_none() && matches!(mode, "classic" | "");
+    let slide_x = if classic_slide { panel.x - l.grid.x } else { 0. };
+    let slide_y = if classic_slide { panel.y - l.grid.y } else { 0. };
+    let fade_ms = if mode == "fasade" { 230. } else { 185. };
+    let header_alpha = if outgoing {1.-fade(t,0.,0.55)}
+        else if nav.is_some() {fade(t,0.22,0.65)}
+        else if opening {fade(t,45./420.,fade_ms/420.)}
+        else {1.-fade(t,0.,140./325.)};
     let font = 13. * s;
     let max = (l.grid.w - 2. * l.gs.px - l.gs.title - 30. * s).max(font);
     let title_w = a.measure(&folder.name, font, true, max);
@@ -816,8 +1223,8 @@ pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
     c.text(
         a,
         &folder.name,
-        icon_rect.right() + 8. * s + title_w / 2.,
-        title_y + l.gs.title / 2. + font * 0.35,
+        icon_rect.right() + 8. * s + title_w / 2. + if classic_slide {(panel.w-l.grid.w)/2.+slide_x} else {0.},
+        title_y + l.gs.title / 2. + font * 0.35 + slide_y,
         font,
         max,
         header_alpha,
@@ -827,8 +1234,8 @@ pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
         c.text(
             a,
             "‹",
-            l.back.cx(),
-            l.back.y + 21. * s,
+            l.back.cx() + slide_x,
+            l.back.y + 21. * s + slide_y,
             19. * s,
             l.back.w,
             header_alpha,
@@ -836,8 +1243,28 @@ pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
         );
     }
     let panel_clip = root_clip.intersect(panel);
-    let grid_clip = panel_clip.intersect(l.grid_clip);
-    let max_distance = l.grid_clip.w.hypot(l.grid_clip.h) / 2.;
+    let viewport = if classic_slide {
+        Rect::new(l.grid_clip.x + slide_x, l.grid_clip.y + slide_y,
+            (l.grid_clip.w + panel.w - l.grid.w).max(0.),
+            (l.grid_clip.h + panel.h - l.grid.h).max(0.))
+    } else { l.grid_clip };
+    let grid_clip = panel_clip.intersect(viewport);
+    let score = |tile: &Tile| {
+        let item = &folder.slots[tile.item];
+        if mode == "diagonal" { (item.r + item.c) as i32 }
+        else { -(tile.box_.cx()-l.grid_clip.cx()).hypot(tile.box_.cy()-l.grid_clip.cy()).round() as i32 }
+    };
+    let entrance = opening && !outgoing && t < 1.;
+    let mut groups = Vec::new();
+    if entrance && matches!(mode,"diagonal"|"outer"|"fly-in") {
+        groups.extend(l.grid_tiles.iter().map(score));
+        groups.sort_unstable();
+        groups.dedup();
+    }
+    let reach = (l.grid_clip.w.min(l.grid_clip.h)*0.27).clamp(22.*s,62.*s);
+    let anchor_x = if nav.is_some() {0.} else {panel.x-l.grid.x};
+    let anchor_y = if nav.is_some() {0.} else {panel.y-l.grid.y};
+
 
     let hovered_grid_item = match hover {
         Some(Hit::Grid(index)) => Some(index),
@@ -851,65 +1278,108 @@ pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
         Some(t.item) == hovered_grid_item
     });
 
+    if mode == "fasade" && opening && nav.is_none() && header_alpha == 0. {
+        if let Some(tile)=l.grid_tiles.iter().find(|tile| !a.entrance_tiles.contains_key(&(folder.id.clone(),tile.item,false))) {
+            let original_clip=c.clip;
+            c.clip=Rect::new(tile.box_.x,tile.box_.y,1.,1.);
+            entrance_tile(c,a,&folder.slots[tile.item],folder,*tile,tile.box_,l.gs,s,0.00001,thumb,false);
+            c.clip=original_clip;
+        }
+    }
     for &t in regular_tiles.chain(front_tile) {
         c.clip = if Some(t.item) == hovered_grid_item || hover_amount(Hit::Grid(t.item)) != 0. {
             panel_clip
         } else {
             grid_clip
         };
+        if mode == "fasade" && nav.is_none() && t.box_.intersect(c.clip).w * t.box_.intersect(c.clip).h <= 0. { continue; }
         let item = &folder.slots[t.item];
-        let d = (t.icon.cx() - l.grid_clip.cx()).hypot(t.icon.cy() - l.grid_clip.cy());
+        let order = groups.binary_search(&score(&t)).unwrap_or(0) as f32 / groups.len().saturating_sub(1).max(1) as f32;
+        let original=t;
         let mut t = t;
-        let mut caption_bottom = t.icon.bottom();
-        let alpha = match mode {
-            "diagonal" | "outer" => {
-                let order = if mode == "outer" {
-                    1. - bounded(d / max_distance.max(1.))
+        let mut size = 1.;
+        let (mut dx,mut dy) = (slide_x,slide_y);
+        let mut alpha = header_alpha;
+        if entrance {
+            if matches!(mode,"diagonal"|"outer"|"fly-in") {
+                let fly = mode == "fly-in";
+                let (delay,span) = if fly {(0.28+order*0.22,0.50)} else {(0.36+order*0.23,0.4)};
+                let phase = bounded((clock.t-delay)/span);
+                if fly {
+                    let u = ease(phase,0.18,0.75,0.28,1.);
+                    let (offset,k) = if u < 0.82 {
+                        (mix(1.,-0.09,u/0.82),mix(0.72,1.045,u/0.82))
+                    } else { (mix(-0.09,0.,(u-0.82)/0.18),mix(1.045,1.,(u-0.82)/0.18)) };
+                    let vx=t.box_.cx()-l.grid_clip.cx(); let vy=t.box_.cy()-l.grid_clip.cy();
+                    let d=vx.hypot(vy);
+                    if d>1. {dx=reach*offset*vx/d; dy=reach*offset*vy/d;}
+                    size=k;
                 } else {
-                    (item.r + item.c) as f32 / (folder.rows + folder.cols - 2).max(1) as f32
-                };
-                let rank = bounded((p - 0.28 - order * 0.28) / 0.4);
-                t.icon = t.icon.square(t.icon.w * mix(0.82, 1., rank));
-                rank
+                    let u=ease(phase,0.2,0.7,0.28,1.);
+                    size=mix(if mode=="outer" {0.77} else {0.86},1.,u);
+                    if mode=="diagonal" {dx=-(9.*s).min(reach*0.24)*(1.-u);dy=dx;}
+                    alpha*=u;
+                }
+            } else if panel_mode {
+                let cw=(l.grid_clip.w+panel.w-l.grid.w).max(1.);
+                let ch=(l.grid_clip.h+panel.h-l.grid.h).max(1.);
+                dx=anchor_x;dy=anchor_y;
+                if mode=="center" {dx+=(cw-l.grid_clip.w)/2.;dy+=(ch-l.grid_clip.h)/2.;}
+                if mode=="together" {
+                    size=(cw/l.grid_clip.w.max(1.)).min(ch/l.grid_clip.h.max(1.)).clamp(0.06,1.);
+                    dx+=(cw-l.grid_clip.w*size)/2.+(t.box_.cx()-l.grid_clip.x)*(size-1.);
+                    dy+=(ch-l.grid_clip.h*size)/2.+(t.box_.cy()-l.grid_clip.y)*(size-1.);
+                }
+                c.clip=panel_clip;
             }
-            "fly-in" => {
-                let percent = bounded((p - 0.02) / 0.9);
-                let reach = (1. - percent) * 26. * s / d.max(1.);
-                let dx = (t.icon.cx() - l.grid_clip.cx()) * reach;
-                let dy = (t.icon.cy() - l.grid_clip.cy()) * reach;
-                t.icon.x += dx;
-                t.icon.y += dy;
-                t.box_.x += dx;
-                t.box_.y += dy;
-                caption_bottom += dy;
-                header_alpha
-            }
-            "classic" | "" => {
-                let progress = bounded((p - 0.23) / 0.77);
-                let eased = 1.0 - (1.0 - progress) * (1.0 - progress);
-                let size = t.icon.w * mix(0.80, 1.0, eased);
-                t.icon = t.icon.square(size);
-                header_alpha
-            }
-            _ => header_alpha,
-        };
+        }
+        let transform=|r:Rect| Rect::new(t.box_.cx()+(r.x-t.box_.cx())*size+dx,
+            t.box_.cy()+(r.y-t.box_.cy())*size+dy,r.w*size,r.h*size);
+        let icon=transform(t.icon);
+        t.box_=transform(t.box_);
+        t.icon=icon;
+        let caption_bottom=t.icon.bottom();
+        let mut skin=l.gs;
+        skin.font*=size; skin.reflect*=size;
+        let skip=nav.is_some_and(|n| n.slot==t.item && (outgoing==n.down));
+        if (mode == "fasade" && nav.is_none() && clock.t < 1.) || ((entrance || classic_slide) && (size != 1. || dx != 0. || dy != 0.)) {
+            entrance_tile(c,a,item,folder,original,t.box_,l.gs,s,alpha,thumb,skip);
+            continue;
+        }
         tile(
             c,
             a,
             item,
             t,
-            l.gs,
+            skin,
             s,
             alpha,
             false,
             hover == Some(Hit::Grid(t.item)),
             hover_amount(Hit::Grid(t.item)),
             thumb,
-            false,
+            skip,
             caption_bottom,
         );
     }
     c.clip = root_clip;
+    if let Some(n)=nav {
+        if outgoing {
+            if n.down {if let Some(img)=a.get(folder,thumb) {c.art(&img,icon_rect,l.gs.corner,0.,header_alpha,false);}}
+            return;
+        }
+        if !n.down {if let Some(img)=a.get(folder,thumb) {c.art(&img,icon_rect,l.gs.corner,0.,header_alpha,false);}}
+        let Some(old_folder)=saved.folder_at(&n.path) else {return};
+        let (moving, source, target)=if n.down {
+            (folder,n.old.grid_tiles.iter().find(|t|t.item==n.slot).map(|t|t.icon),Some(icon_rect))
+        } else {
+            (old_folder,Some(header_rect(a,old_folder,&n.old)),l.grid_tiles.iter().find(|t|t.item==n.slot).map(|t|t.icon))
+        };
+        if let (Some(from),Some(to),Some(img))=(source,target,a.get(moving,thumb)){
+            c.art(&img,flight_rect(from,to,nav_p,s),l.gs.corner,moving.icon_rotation.unwrap_or(0.),1.,false);
+        }
+        return;
+    }
     if let Some(img) = a.get(folder, thumb) {
         let anchor = l
             .dock_tiles
@@ -917,13 +1387,15 @@ pub fn frame(c: &mut Canvas, a: &mut Assets, v: View) {
             .find(|t| Some(t.item) == dock_index)
             .map(|t| t.icon);
         let fly = if path.len() == 1 {
-            anchor.map_or(icon_rect, |f| f.lerp(icon_rect, flight, flight))
+            anchor.map_or(icon_rect, |f| flight_rect(f,icon_rect,flight,s))
         } else {
             icon_rect
         };
         let opacity = if anchor.is_some() { 1. } else { header_alpha };
         let radius = mix(corner(folder, l.ds, true), l.gs.corner, flight);
-        let angle = folder.icon_rotation.unwrap_or(l.ds.rotation);
+        let source_angle = folder.icon_rotation.unwrap_or(l.ds.rotation);
+        let target_angle=folder.icon_rotation.unwrap_or(l.gs.rotation);
+        let angle=source_angle+((target_angle-source_angle+180.).rem_euclid(360.)-180.)*flight;
         c.art(&img, fly, radius, angle, opacity, false);
     }
 }
@@ -968,6 +1440,7 @@ mod tests {
                     &mut Canvas::new(&mut buffer, bounds.w as usize, bounds.h as usize, bounds),
                     &mut assets,
                     View {
+                        clock: Clock {t:p,opening:true}, nav:None,
                         saved: &saved,
                         layout: &l,
                         path: &[0],

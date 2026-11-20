@@ -473,6 +473,31 @@ dialog.sd-properties{width:min(860px,calc(100% - 24px))}
 </style>
 <link rel="stylesheet" href="/stack-dock-panels.css">
 <link rel="stylesheet" href="/stack-dock-settings-skin.css">
+<style>
+html.sd-settings-only #dialog.sd-properties[open]{
+ position:fixed!important;inset:0!important;margin:0!important;width:100vw!important;height:100vh!important;
+ max-width:none!important;max-height:none!important;transform:none!important;border:0!important;border-radius:0!important;box-shadow:none!important
+}
+html.sd-settings-only #dialog.sd-properties .dialogbody,html.sd-settings-only #dialog.sd-properties .sd-property-shell{flex:1;min-height:0}
+html.sd-settings-only #dialog.sd-properties form{width:100%;height:100%;max-height:none!important}
+html.sd-settings-only #dialog.sd-properties :is(.dialogtop,.sd-dialog-resize){display:none!important}
+/* The native title bar owns the heading and close button of backup prompts. */
+html.sd-settings-only #dialog.sd-backup-prompt[open]{
+ inset:0!important;margin:0!important;padding:0;width:min(440px,100vw)!important;
+ max-width:100vw;max-height:100dvh;border:0;border-radius:0;box-shadow:none;
+}
+#dialog.sd-backup-prompt form{display:flex;flex-direction:column;max-height:100dvh;overflow:auto}
+#dialog.sd-backup-prompt .dialogtop{padding:16px 18px;border:0;display:block}
+#dialog.sd-backup-prompt .dialogtop :is(h2,.close){display:none}
+#dialog.sd-backup-prompt .dialogtop p{margin:0;line-height:1.5;overflow-wrap:anywhere}
+#dialog.sd-backup-prompt .dialogbody:has(>.err:only-child[hidden]){display:none}
+#dialog.sd-backup-prompt .dialogfoot{padding:10px 14px}
+html.sd-settings-only #dialog.sd-backup-prompt.sd-backup-fitted[open]{width:100vw!important;height:100dvh!important}
+#dialog.sd-backup-fitted form{height:100%}
+#dialog.sd-backup-fitted .dialogfoot{margin-top:auto;flex:none}
+html.sd-menu-helper #menu {left:0!important;top:0!important;max-height:100vh;max-width:100vw;margin:0}
+html.sd-menu-helper {background:#211726}
+</style>
 </head>
 <body>
 <main class="desktop" id="desktop" aria-label="StackDock desktop">
@@ -549,6 +574,7 @@ const FOLDER_PICKER_KEYS=[...FOLDER_KEYS,'folder-stacked','folder-shortcuts','fo
  'folder-creative','folder-media','folder-tools','folder-web'];
 const GRID_ENTRANCES=[
  ['classic','Classic','Keep the original Grid Stack reveal.'],
+ ['fasade','Fasade','Keep the grid in place and gently fade the icons in.'],
  ['rows','Row Sweep','Bring in whole rows, from top to bottom.'],
  ['columns','Column Sweep','Bring in whole columns, from left to right.'],
  ['fly-in','Fly In','Icons glide inward from different directions and settle into their cells.'],
@@ -1282,15 +1308,15 @@ function playGridEntrance(entries,mode,duration,reach,preview=false){
   frames.push({opacity:1,transform:'none'});
   const together=mode==='together'||mode==='classic';
   return node.animate(frames,{
-   delay:live?duration*order*.2:duration*((preview ? .04 : .36)+(together ? 0 : order*(preview ? .37 : .23))),
-   duration:live?duration*.7:duration*(preview ? .53 : together ? .55 : .4),fill:'backwards',
+   delay:live?duration*(.28+order*.22):duration*((preview ? .04 : .36)+(together ? 0 : order*(preview ? .37 : .23))),
+   duration:live?duration*.50:duration*(preview ? .53 : together ? .55 : .4),fill:'backwards',
    easing:mode==='fly-in'?'cubic-bezier(.18,.75,.28,1)':'cubic-bezier(.2,.7,.28,1)'
   });
  });
 }
 function animateGridEntrance(view,preference,duration,skip=null){
  const mode=normalizeGridEntrance(preference);
- if(mode==='classic'||PANEL_ENTRANCES.has(mode)||reduced.matches)return [];
+ if(mode==='classic'||mode==='fasade'||PANEL_ENTRANCES.has(mode)||reduced.matches)return [];
  const scroll=view.querySelector('.scroll');
  if(!scroll)return [];
  // Snapshot the final, visible cells before applying the island's first
@@ -1367,7 +1393,13 @@ function morph(target,opening,finish){
  // Surface and content crossfade independently. The GS fill never uses dock opacity.
  const fadeG=a(gsGlass,gg,opening?1:0,{duration:opening?265:235,delay:0});
  const fadeD=a(dockGlass,dg,opening?0:1,{duration:opening?225:200,delay:opening?0:95});
- const fadeV=a(gsView,gv,opening?1:0,{duration:opening?185:140,delay:opening?45:0});
+ const fasade=f?.entryMotion==='fasade';
+ const fadeV=a(gsView,gv,opening?1:0,{duration:opening?(fasade?230:185):140,delay:opening?45:0});
+ if(fasade){
+  const gridBox=opening?target:from;
+  const pinned=box=>({transform:'translate('+(gridBox.x-box.x)+'px,'+(gridBox.y-box.y)+'px)',width:gridBox.w+'px',height:gridBox.h+'px'});
+  tileMotions.push(gsView.animate([pinned(from),pinned(target)],{duration,easing}));
+ }
  const fadeDock=a(dockView,dv,opening?0:1,{duration:opening?145:145,delay:opening?0:135});
  tracks=[hull,fadeG,fadeD,fadeV,fadeDock,...tileMotions,...(growth?growth.content:[])];
  if(iconMotion)tracks.push(iconMotion);
@@ -2346,7 +2378,9 @@ function buildGridEntrancePicker(pane,value,canAnimate,readSpeed){
   if(!canAnimate()){description.textContent='Enable window animations in General to play this preview.';return;}
   description.textContent=explain();
   const duration=460*100/clamp(readSpeed(),25,250);
-  const batch=sampleTracks=playGridEntrance(entries,choice.value,duration,25,true);
+  const batch=sampleTracks=choice.value==='fasade'
+   ? entries.map(({node})=>node.animate([{opacity:0},{opacity:1}],{duration:duration*230/420,delay:duration*45/420,easing:'ease-out',fill:'backwards'}))
+   : playGridEntrance(entries,choice.value,duration,25,true);
   void Promise.allSettled(batch.map(track=>track.finished)).then(()=>{if(sampleTracks===batch)sampleTracks=[];});
  }
  const replayButton=B('Replay preview','quiet',replay);
@@ -2882,7 +2916,7 @@ async function openDestination(t){
 }
 let resized=0;
 window.addEventListener('resize',()=>{
- if(nativeWindow)return;
+ if(nativeWindow||window.__SD_NATIVE_MENU__)return;
  clearTimeout(resized);resized=setTimeout(()=>{
   closeMenu();clearPointer();
   if(phase==='closing'){stopMotion();finishClose(false)}
@@ -2963,6 +2997,76 @@ const nativeReady = new Promise(resolve => {
       if (!dialog.open) void window.closeStackDockSettings();
     });
 
+    const ctx=window.__SD_NATIVE_MENU__;
+    if(ctx){
+      const win=nativeAPI.getCurrentWindow();
+      let finishing=false,shown=false;
+      const finish=async()=>{
+        if(finishing||settingsCommitPending)return;
+        finishing=true;await sharedLayoutSave;await nativeCore.invoke('finish_native_menu',{action:0});
+      };
+      window.closeStackDockSettings=finish;
+      const present=async()=>{
+        if(!dialog.open||shown)return;
+        shown=true;
+        const backup = ctx.action === 'Import layout…' || ctx.action === 'Export layout…';
+        const title = dialog.querySelector('h2')?.textContent || 'StackDock';
+        let width = 1000;
+        let height = dialog.classList.contains('sd-properties') ? 525 : 700;
+        if (backup) {
+          dialog.classList.add('sd-backup-prompt');
+          await document.fonts.ready;
+          width = Math.ceil(dialog.getBoundingClientRect().width);
+          height = Math.ceil(form.scrollHeight);
+        }
+        await nativeCore.invoke('native_menu_window',{editor:true,title,width,height});
+        if (backup) dialog.classList.add('sd-backup-fitted');
+        await win.show();await win.setFocus();
+      };
+      const folder=ctx.folder?folderPath(ctx.folder).at(-1):null;
+      if(ctx.folder&&folder?.id!==ctx.folder){await finish();return;}
+      if(folder){activeId=folder.id;setPhase('open');}else{setPhase('closed');}
+      const where={r:ctx.r,c:ctx.c},item=folder?entryAt(folder,where):dockEntries().find(e=>e.id===ctx.entry);
+      const action=ctx.action;
+      try{
+        if(!sharedLayoutWriteEnabled)throw Error('Could not read the shared layout.');
+        if(action==='move'){
+          if(folder){
+            const src=folder.slots.find(e=>e.id===ctx.source);if(!src)throw Error('The dragged item has moved.');
+            if(['left','right'].includes(ctx.grow)&&folder.cols<MAX_COLUMNS){
+              if(ctx.grow==='left')folder.slots.forEach(e=>e.c++);folder.cols++;where.c=ctx.grow==='left'?0:folder.cols-1;
+            }
+            if(['top','bottom'].includes(ctx.grow)&&folder.rows<MAX_ROWS){
+              if(ctx.grow==='top')folder.slots.forEach(e=>e.r++);folder.rows++;where.r=ctx.grow==='top'?0:folder.rows-1;
+            }
+            reposition(folder,src,where);
+          }else{const src=dockEntries().find(e=>e.id===ctx.source);if(src)reorderDock(src,ctx.slot);}
+        }else if(action==='drop'){
+          const entries=ctx.paths.length?await sdInspectDrop(ctx.paths):[];
+          for(const str of ctx.urls){const u=new URL(str);if(['https:','http:'].includes(u.protocol))entries.push({id:uid(),type:'item',name:u.hostname,target:u.href,kind:'url',icon:'web'});}
+          const count=folder?placeEntries(folder,where,entries):insertDockShortcuts(entries,ctx.slot);
+          if(count)persist();if(!count||count<entries.length)throw Error(count+' shortcuts added. Check the available space and targets.');
+        }else if(action.startsWith('position/')){const [,edge,align]=action.split('/');state.edge=edge;state.align=align;persist();}
+        else if(action==='Settings…')editSettings(null,'general');
+        else if(action==='Dock settings…')editSettings(null,'dock');
+        else if(action==='Find shortcut…')sdFindShortcut();
+        else if(action==='Export layout…'||action==='Import layout…')await sdBackupLayout(action==='Export layout…');
+        else if(action==='Open Destination')await openDestination(item);
+        else{
+          let command;
+          const savedShow=showMenu,savedMi=mi;
+          try{
+            showMenu=(x,y,build)=>build();
+            mi=(label,fn,options={})=>{if(label===action&&!options.disabled)command=fn;return B(label);};
+            if(folder)gridMenu(0,0,null,where);else dockMenu(0,0,item);
+          }finally{showMenu=savedShow;mi=savedMi;}
+          if(!command)throw Error('This command is unavailable for the selected item.');
+          await command({x:0,y:0});
+        }
+      }catch(error){dialogBuild('StackDock',String(error.message||error),'Close',()=>{},()=>{});}
+      if(dialog.open)await present();else await finish();
+      return;
+    }
     editSettings(null, "general");
 
     const windowHandle = nativeAPI.getCurrentWindow();
