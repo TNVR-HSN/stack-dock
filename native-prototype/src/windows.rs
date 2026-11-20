@@ -199,88 +199,202 @@ mod native_drop;
 #[link(name="user32")]
 unsafe extern "system" {fn SetCapture(hwnd:Handle)->Handle;fn ReleaseCapture()->i32;}
 
-fn context_menu(hwnd:Handle, keyboard:bool) {
-    let mut pt=Point{x:0,y:0};
-    if keyboard {
-        let rect=APP.with(|c|c.borrow().as_ref().and_then(App::focus_rect));
-        let Some(r)=rect else{return};pt=Point{x:r.cx() as i32,y:r.cy() as i32};
-    }else if unsafe{GetCursorPos(&mut pt)}==0{return;}
-    let Some((mut ctx,editable,nested,can_row,can_col,empty_row,empty_col))=APP.with(|cell|{
-        let state=cell.try_borrow().ok()?;let a=state.as_ref()?;
-        if a.motion.is_some()||a.indicator.is_some(){return None;}
-        let ctx=a.context(&pt);
-        let f=a.saved.folder_at(&a.path);
-        let r=ctx["r"].as_u64().unwrap_or(0) as usize;let c=ctx["c"].as_u64().unwrap_or(0) as usize;
-        Some((ctx,!a.settings_open&&a.settings.is_some(),a.path.len()>1,f.is_some_and(|v|v.rows<80),f.is_some_and(|v|v.cols<12),f.is_some_and(|v|v.rows>1&&!v.slots.iter().any(|t|t.r==r)),f.is_some_and(|v|v.cols>1&&!v.slots.iter().any(|t|t.c==c))))
-    }) else{return};
-    let grid=ctx["folder"].is_string();let item=ctx["entry"].is_string();let folder=ctx["isFolder"]==true;
-    let menu=unsafe{CreatePopupMenu()};if menu.is_null(){return;}
-    let mut labels=Vec::new();
-    // Let Windows track, dismiss, and navigate each submenu.
-    let groups=["Organize","Grid layout","StackDock"];
-    let mut sub=[null_mut();3];
-    let mut attached=[false;3];
-    use windows::Win32::{Graphics::Gdi::CreateBitmap,UI::WindowsAndMessaging::{SetMenuItemBitmaps,HMENU,MF_BYCOMMAND}};
-    let height=(unsafe{GetDpiForWindow(hwnd)}.max(96)*25/96) as i32;
-    let blank=vec![0xffu8;height as usize*2];
-    let spacer=unsafe{CreateBitmap(1,height,1,1,Some(blank.as_ptr().cast()))};
-    let mut add=|label:&str,on:bool|{
-        labels.push(label.to_string());
-        let group=if label.starts_with("Insert ")||label.starts_with("Remove empty"){Some(1)}
-            else if label.starts_with("Move ")||label.starts_with("Remove ")||label.starts_with("New ")||label.starts_with("Add "){Some(0)}
-            else if matches!(label,"Exit StackDock"|"Export layout…"|"Import layout…"|"Dock settings…"|"Find shortcut…"){Some(2)}
-            else{None};
-        let mut parent=menu;
-        if let Some(i)=group{
-            if !attached[i]{sub[i]=unsafe{CreatePopupMenu()};if !sub[i].is_null(){attached[i]=unsafe{AppendMenuW(menu,0x10,sub[i] as usize,wide(groups[i]).as_ptr())}!=0;}}
-            if attached[i]{parent=sub[i];}
+struct PopupMenu(Handle);
+
+impl PopupMenu {
+    fn new() -> Option<Self> {
+        let handle = unsafe { CreatePopupMenu() };
+        (!handle.is_null()).then_some(Self(handle))
+    }
+
+    fn item(&self, label: &str, id: usize, flags: u32) -> bool {
+        unsafe { AppendMenuW(self.0, flags, id, wide(&label.replace('&', "&&")).as_ptr()) != 0 }
+    }
+
+    fn separator(&self) {
+        unsafe { AppendMenuW(self.0, 0x0800, 0, null()); }
+    }
+
+    fn submenu(&self, label: &str, child: Self, enabled: bool) {
+        if self.item(label, child.0 as usize, 0x10 | u32::from(!enabled)) {
+            std::mem::forget(child);
         }
-        unsafe{AppendMenuW(parent,if on{0}else{1},labels.len(),wide(label).as_ptr());
-            if !spacer.0.is_null() {
-    let _ = SetMenuItemBitmaps(
-        HMENU(parent),
-        labels.len() as u32,
-        MF_BYCOMMAND,
-        Some(spacer),
-        Some(spacer),
-    );
+    }
 }
+
+impl Drop for PopupMenu {
+    fn drop(&mut self) {
+        unsafe { DestroyMenu(self.0); }
+    }
+}
+
+fn shortcut_is_link(entry: &Entry) -> bool {
+    if !entry.kind.is_empty() {
+        return matches!(entry.kind.as_str(), "url" | "uri");
+    }
+    entry.target.split_once("://").is_some_and(|(scheme, _)| {
+        scheme.len() >= 2 && scheme.as_bytes()[0].is_ascii_alphabetic()
+            && scheme.bytes().all(|ch| ch.is_ascii_alphanumeric() || b"+.-".contains(&ch))
+    })
+}
+
+fn context_menu(hwnd: Handle, keyboard: bool) {
+    let mut pt = Point { x: 0, y: 0 };
+    if keyboard {
+        let rect = APP.with(|c| c.borrow().as_ref().and_then(App::focus_rect));
+        let Some(r) = rect else { return };
+        pt = Point { x: r.cx() as i32, y: r.cy() as i32 };
+    } else if unsafe { GetCursorPos(&mut pt) } == 0 {
+        return;
+    }
+    let built = APP.with(|cell| {
+        let state = cell.try_borrow().ok()?;
+        let app = state.as_ref()?;
+        if app.motion.is_some() || app.indicator.is_some() { return None; }
+
+        let mut ctx = app.context(&pt);
+        let editable = !app.settings_open && app.settings.is_some();
+        let menu = PopupMenu::new()?;
+        let mut actions = Vec::new();
+        let mut add = |parent: &PopupMenu, label: &str, action: &str, enabled: bool, checked: bool| {
+            actions.push(action.to_string());
+            parent.item(label, actions.len(), u32::from(!enabled) | if checked { 8 } else { 0 });
+        };
+        if let Some(folder) = app.saved.folder_at(&app.path) {
+            let pointed = ctx["entry"].as_str().and_then(|id| folder.slots.iter().find(|e| e.id == id));
+            let row = pointed.map_or(ctx["r"].as_u64().unwrap_or(0) as usize, |e| e.r);
+            let col = pointed.map_or(ctx["c"].as_u64().unwrap_or(0) as usize, |e| e.c);
+            ctx["r"] = row.into();
+            ctx["c"] = col.into();
+            let entry = folder.slots.iter().find(|e| e.r == row && e.c == col);
+            let title = entry.map_or_else(|| format!("{} · Row {}, column {}", folder.name, row + 1, col + 1), |e| e.name.clone());
+            menu.item(&title, 0, 1);
+            match entry {
+                Some(e) if e.folder() => {
+                    add(&menu, "Open subfolder", "Open subfolder", true, false);
+                    add(&menu, "Folder settings…", "Folder settings…", editable, false);
+                    add(&menu, "Remove subfolder…", "Remove subfolder…", editable, false);
+                }
+                Some(e) => {
+                    add(&menu, "Shortcut properties…", "Shortcut properties…", editable, false);
+                    let label = if shortcut_is_link(e) { "Open Link" } else { "Open Destination" };
+                    add(&menu, label, label, shortcut_is_link(e) || editable, false);
+                    add(&menu, "Remove shortcut", "Remove shortcut", editable, false);
+                }
+                None => {
+                    add(&menu, "Add shortcut here…", "Add shortcut here…", editable, false);
+                    add(&menu, "New subfolder…", "New subfolder…", editable && app.path.len() < 12, false);
+                }
+            }
+            menu.separator();
+            add(&menu, "Insert row below", "Insert row below", editable && folder.rows < 80, false);
+            add(&menu, "Insert column right", "Insert column right", editable && folder.cols < 12, false);
+            if folder.rows > 1 && !folder.slots.iter().any(|e| e.r == row) {
+                add(&menu, "Remove empty row", "Remove empty row", editable, false);
+            }
+            if folder.cols > 1 && !folder.slots.iter().any(|e| e.c == col) {
+                add(&menu, "Remove empty column", "Remove empty column", editable, false);
+            }
+            menu.separator();
+            add(&menu, "Grid Stack settings…", "Grid Stack settings…", editable, false);
+            if app.path.len() > 1 {
+                add(&menu, "Back to parent", "Back to parent", true, false);
+            }
+            add(&menu, "Close grid", "Close grid", true, false);
+        } else {
+            let entries = app.saved.ordered();
+            let index = ctx["entry"].as_str().and_then(|id| entries.iter().position(|e| e.id == id));
+            let entry = index.map(|i| entries[i]);
+            let shortcut = entry.is_some_and(|e| !e.folder());
+            menu.item(entry.map_or("Dock", |e| e.name.as_str()), 0, 1);
+            if let Some(e) = entry.filter(|e| !e.folder()) {
+                add(&menu, "Shortcut properties…", "Shortcut properties…", editable, false);
+                let label = if shortcut_is_link(e) { "Open Link" } else { "Open Destination" };
+                add(&menu, label, label, shortcut_is_link(e) || editable, false);
+                menu.separator();
+            }
+            if entry.is_some_and(Entry::folder) {
+                add(&menu, "Folder settings…", "Folder settings…", editable, false);
+            } else {
+                add(&menu, "Settings…", "Settings…", editable, false);
+                add(&menu, "Dock settings…", "Dock settings…", editable, false);
+            }
+            if let Some(i) = index {
+                let kind = if shortcut { "shortcut" } else { "folder" };
+                let earlier = format!("Move {kind} earlier");
+                let later = format!("Move {kind} later");
+                add(&menu, &earlier, &earlier, editable && i > 0, false);
+                add(&menu, &later, &later, editable && i + 1 < entries.len(), false);
+                menu.separator();
+            }
+            let positions = PopupMenu::new()?;
+            positions.item("Screen position", 0, 1);
+            for (edge, label) in [("left", "Left"), ("right", "Right"), ("top", "Top"), ("bottom", "Bottom")] {
+                add(&positions, &format!("{label} Screen Edge"), &format!("position/{edge}/{}", app.saved.align), editable, app.saved.edge == edge);
+            }
+            positions.separator();
+            let alignments = if matches!(app.saved.edge.as_str(), "left" | "right") {
+                ["Top", "Middle", "Bottom"]
+            } else { ["Left", "Center", "Right"] };
+            for (align, label) in ["start", "center", "end"].into_iter().zip(alignments) {
+                add(&positions, &format!("Align {label}"), &format!("position/{}/{align}", app.saved.edge), editable, app.saved.align == align);
+            }
+            menu.submenu("Screen Position", positions, editable);
+            add(&menu, "New folder…", "New folder…", editable, false);
+            add(&menu, "Add shortcut to dock…", "Add shortcut to dock…", editable && app.saved.dock_shortcuts.len() < 160, false);
+            if shortcut || (entry.is_some() && app.saved.folders.len() > 1) {
+                menu.separator();
+                let label = if shortcut { "Remove shortcut" } else { "Remove folder…" };
+                add(&menu, label, label, editable, false);
+            }
+            menu.separator();
+            add(&menu, "Find shortcut…	Ctrl+F", "Find shortcut…", editable, false);
+            let stackdock = PopupMenu::new()?;
+            // stackdock.item("StackDock", 0, 1);
+            // add(&stackdock, "Back", "Back", true, false);
+            // stackdock.separator();
+            add(&stackdock, "Export layout…", "Export layout…", editable, false);
+            add(&stackdock, "Import layout…", "Import layout…", editable, false);
+            stackdock.separator();
+            add(&stackdock, "Exit", "Exit", true, false);
+            menu.submenu("StackDock", stackdock, true);
+        }
+        Some((menu, actions, ctx))
+    });
+    let Some((menu, actions, mut ctx)) = built else { return };
+    let action = loop {
+        let id = unsafe { TrackPopupMenuEx(menu.0, 0x0102, pt.x, pt.y, hwnd, null_mut()) };
+        match id.checked_sub(1).and_then(|i| actions.get(i as usize)) {
+            Some(action) if action == "Back" => continue,
+            Some(action) => break action,
+            None => return,
         }
     };
-    if item {
-        add("Open",true);
-        add(if folder{"Folder settings…"}else{"Shortcut properties…"},editable);
-        if !folder && ctx["link"]!=true {add("Open Destination",editable);}
-        if !grid{for direction in ["earlier","later"]{add(&format!("Move {} {}",if folder{"folder"}else{"shortcut"},direction),editable);}}
-        add(if folder&&grid{"Remove subfolder…"}else if folder{"Remove folder…"}else{"Remove shortcut"},editable);
+    if action == "Exit" {
+        unsafe { DestroyWindow(hwnd); }
+        return;
     }
-    if grid {
-        if ctx["valid"]==true{
-            if !item{add("Add shortcut here…",editable);add("New subfolder…",editable&&!nested);}
-            add("Insert row below",editable&&can_row);add("Insert column right",editable&&can_col);
-            if empty_row{add("Remove empty row",editable);}if empty_col{add("Remove empty column",editable);}
-        }
-        add("Grid Stack settings…",editable);if nested{add("Back to parent",true);}add("Close grid",true);
-    }else{
-        for name in ["Settings…","Dock settings…","New folder…","Add shortcut to dock…","Find shortcut…","Export layout…","Import layout…"]{add(name,editable);}
-    }
-    add("Exit StackDock",true);
-    if !grid {
-        let positions=unsafe{CreatePopupMenu()};
-        if !positions.is_null(){
-            for edge in ["top","left","bottom","right"]{for align in ["start","center","end"]{
-                labels.push(format!("position/{edge}/{align}"));
-                unsafe{AppendMenuW(positions,0,labels.len(),wide(&format!("{edge} · {align}")).as_ptr());}
-            }}
-            unsafe{AppendMenuW(menu,0x10|if editable{0}else{1},positions as usize,wide("Screen position").as_ptr());}
-        }
-    }
-    let id=unsafe{TrackPopupMenuEx(menu,0x0102,pt.x,pt.y,hwnd,null_mut())};unsafe{DestroyMenu(menu);if !spacer.0.is_null(){DeleteObject(spacer.0);}}
-    let Some(action)=id.checked_sub(1).and_then(|i|labels.get(i as usize))else{return};
-    if action=="Exit StackDock"{unsafe{DestroyWindow(hwnd)};return;}
+    let link_target = |target: Option<Target>| {
+        target.map(|mut target| {
+            if action == "Open Link" && target.kind.is_empty() {
+                target.kind = "uri".into();
+            }
+            target
+        })
+    };
     let result=APP.with(|cell|->Result<Option<Target>,String>{
         let mut st=cell.borrow_mut();let Some(a)=st.as_mut()else{return Ok(None)};
-        if action=="Open"{let b=a.bounds();if let Some(hit)=a.hit(pt.x-b.x as i32,pt.y-b.y as i32){return a.click(hit).map_err(|e|e.to_string());}}
+        if matches!(action.as_str(), "Open Link" | "Open subfolder") {
+            if let Some(folder) = a.saved.folder_at(&a.path) {
+                let row = ctx["r"].as_u64().unwrap_or(0) as usize;
+                let col = ctx["c"].as_u64().unwrap_or(0) as usize;
+                if let Some(i) = folder.slots.iter().position(|e| e.r == row && e.c == col) {
+                    return a.click(Hit::Grid(i)).map(link_target).map_err(|e| e.to_string());
+                }
+            } else if let Some(i) = a.saved.ordered().iter().position(|e| Some(e.id.as_str()) == ctx["entry"].as_str()) {
+                return a.click(Hit::Dock(i)).map(link_target).map_err(|e| e.to_string());
+            }
+        }
         else if action=="Back to parent"{a.back().map_err(|e|e.to_string())?;}
         else if action=="Close grid"{a.go(0.).map_err(|e|e.to_string())?;}
         else{ctx["action"]=action.clone().into();a.command(ctx)?;}
