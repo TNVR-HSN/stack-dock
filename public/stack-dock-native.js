@@ -915,6 +915,10 @@ loadStartupLayout = async () => {
     if (searchLaunchPending) return;
     searchLaunchPending = true;
     try {
+      if (window.finishStackDockSearch) {
+        await window.finishStackDockSearch(folder, item);
+        return;
+      }
       if (phase === 'open' && active() !== folder) {
         closeStack(false);
         if (!await waitForPhase('closed')) throw Error('Could not close the current grid.');

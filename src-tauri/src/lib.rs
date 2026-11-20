@@ -306,9 +306,36 @@ fn native_menu_window(window: tauri::WebviewWindow, editor: bool, title:String, 
     window.set_position(tauri::PhysicalPosition::new(px,py)).map_err(|e|e.to_string())?;
     window.set_size(tauri::PhysicalSize::new(w,h)).map_err(|e|e.to_string())
 }
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeSearchSelection {
+    folder_id: Option<String>,
+    entry_id: String,
+}
+
 #[tauri::command]
-fn finish_native_menu(app:tauri::AppHandle, action:u8) {
-    if std::env::var_os("SD_MENU_X").is_some(){app.exit(match action {1..=4=>20+i32::from(action),_=>0});}
+fn finish_native_menu(
+    app: tauri::AppHandle,
+    action: u8,
+    selection: Option<NativeSearchSelection>,
+) -> Result<(), String> {
+    if std::env::var_os("SD_MENU_X").is_none() {
+        return Ok(());
+    }
+    let status = if let Some(selection) = selection {
+        use std::io::Write;
+        let mut output = std::io::stdout().lock();
+        serde_json::to_writer(&mut output, &selection).map_err(|error| error.to_string())?;
+        output.flush().map_err(|error| error.to_string())?;
+        25
+    } else {
+        match action {
+            1..=4 => 20 + i32::from(action),
+            _ => 0,
+        }
+    };
+    app.exit(status);
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

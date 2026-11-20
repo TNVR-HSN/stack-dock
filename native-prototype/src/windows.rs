@@ -748,9 +748,39 @@ struct App {
     dwell:Option<(&'static str,Instant)>,
     key_focus: Option<Hit>,
     menu_hit: Option<Hit>,
+    search_selection: Option<std::sync::mpsc::Receiver<SearchSelection>>,
     settings_open: bool,
     settings_stamp: Option<(std::time::SystemTime, u64)>,
 }
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SearchSelection {
+    folder_id: Option<String>,
+    entry_id: String,
+}
+
+impl SearchSelection {
+    fn resolve(&self, saved: &Saved) -> Option<Target> {
+        fn find_folder<'a>(entries: &'a [Entry], id: &str) -> Option<&'a Entry> {
+            entries.iter().filter(|entry| entry.folder()).find_map(|entry| {
+                if entry.id == id {
+                    Some(entry)
+                } else {
+                    find_folder(&entry.slots, id)
+                }
+            })
+        }
+
+        let entries = match self.folder_id.as_deref() {
+            Some(id) => &find_folder(&saved.folders, id)?.slots,
+            None => &saved.dock_shortcuts,
+        };
+        entries.iter()
+            .find(|entry| !entry.folder() && entry.id == self.entry_id)
+            .map(Target::from)
+    }
+}
+
 impl App {
     fn new(hwnd: Handle, saved: Saved, settings: Option<SettingsLink>) -> io::Result<Self> {
         let (work, s) = desktop_rect(hwnd)?;
@@ -783,6 +813,7 @@ impl App {
             press:None,dragging:false,drag_at:None,dwell:None,strip:None,tip:None,tip_fade:Instant::now(),tip_leaving:false,
             key_focus: None,
             menu_hit: None,
+            search_selection: None,
             settings_open: false,
             settings_stamp: None,
         })
@@ -915,7 +946,13 @@ impl App {
         let initial_stamp = std::fs::metadata(&settings.layout_path)
             .ok()
             .and_then(|m| Some((m.modified().ok()?, m.len())));
+        let search = env.iter().any(|(key, value)| {
+            *key == "SD_COMMAND" && serde_json::from_str::<serde_json::Value>(value)
+                .is_ok_and(|context| context["action"] == "Find shortcut…")
+        });
+        let (send_selection, receive_selection) = std::sync::mpsc::channel();
         let mut child = Command::new(&settings.executable)
+            .stdout(if search { std::process::Stdio::piped() } else { std::process::Stdio::inherit() })
             .stdin(if env.is_empty(){std::process::Stdio::null()}else{std::process::Stdio::piped()})
             .envs(env.iter().filter(|(k,_)|*k!="SD_COMMAND").map(|(k,v)|(*k,v)))
             .arg("--settings-only")
@@ -929,14 +966,32 @@ impl App {
         // Wait on another thread so the native dock stays responsive.
         let hwnd = self.hwnd as usize;
         std::thread::spawn(move || {
-            let code=child.wait().ok().and_then(|s|s.code()).unwrap_or(-1);
-            let status=if menu_session && matches!(code,0|21..=24) { if code==0 {20} else {code as usize} } else {usize::from(code==0)};
+            let status = if search {
+                match child.wait_with_output() {
+                    Ok(output) if output.status.success() => 20,
+                    Ok(output) if output.status.code() == Some(25) => {
+                        if let Ok(selection) = serde_json::from_slice::<SearchSelection>(&output.stdout) {
+                            let _ = send_selection.send(selection);
+                        }
+                        25
+                    }
+                    _ => 0,
+                }
+            } else {
+                let code = child.wait().ok().and_then(|status| status.code()).unwrap_or(-1);
+                if menu_session && matches!(code, 0 | 21..=24) {
+                    if code == 0 { 20 } else { code as usize }
+                } else {
+                    usize::from(code == 0)
+                }
+            };
             unsafe {
                 PostMessageW(hwnd as Handle, WM_SETTINGS_CLOSED, status, 0);
             }
         });
         self.settings_open = true;
         self.settings_stamp = initial_stamp;
+        self.search_selection = search.then_some(receive_selection);
         if unsafe { SetTimer(self.hwnd, SETTINGS_TIMER, 250, null_mut()) } == 0 {
             return Err("Settings opened, but live Apply could not start its timer.".into());
         }
@@ -979,6 +1034,7 @@ impl App {
         unsafe { KillTimer(self.hwnd, SETTINGS_TIMER) };
         self.settings_open = false;
         self.settings_stamp = None;
+        self.search_selection = None;
         if !success {
             return Err(
                 "StackDock Settings exited with an error. The dock kept its previous layout."
@@ -1584,9 +1640,28 @@ unsafe extern "system" fn window_proc(hwnd: Handle, msg: u32, w: usize, l: isize
         context_menu(hwnd,l == -1);
         return 0;
     }
+    if msg == WM_SETTINGS_CLOSED && w == 25 {
+        let selected = APP.with(|cell| -> Result<Target, String> {
+            let mut state = cell.borrow_mut();
+            let app = state.as_mut().ok_or("StackDock is closing.")?;
+            let update = app.poll_settings();
+            unsafe { KillTimer(hwnd, SETTINGS_TIMER) };
+            app.settings_open = false;
+            app.settings_stamp = None;
+            let selection = app.search_selection.take().and_then(|receiver| receiver.try_recv().ok());
+            update.map_err(|error| error.to_string())?;
+            selection.and_then(|selection| selection.resolve(&app.saved))
+                .ok_or_else(|| "The selected shortcut is no longer available.".into())
+        });
+        if let Err(error) = selected.and_then(|target| launch(hwnd, target)) {
+            message(hwnd, &error);
+        }
+        return 0;
+    }
     if msg == WM_SETTINGS_CLOSED && (20..=24).contains(&w) {
         let result=APP.with(|cell|->io::Result<()> {
             let mut st=cell.borrow_mut(); let Some(a)=st.as_mut() else{return Ok(())};
+            a.search_selection = None;
             let hit=a.menu_hit.take();
             let changed=a.settings_stamp;
             let update=a.poll_settings();

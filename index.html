@@ -481,22 +481,48 @@ html.sd-settings-only #dialog.sd-properties[open]{
 html.sd-settings-only #dialog.sd-properties .dialogbody,html.sd-settings-only #dialog.sd-properties .sd-property-shell{flex:1;min-height:0}
 html.sd-settings-only #dialog.sd-properties form{width:100%;height:100%;max-height:none!important}
 html.sd-settings-only #dialog.sd-properties :is(.dialogtop,.sd-dialog-resize){display:none!important}
-/* The native title bar owns the heading and close button of backup prompts. */
-html.sd-settings-only #dialog.sd-backup-prompt[open]{
- inset:0!important;margin:0!important;padding:0;width:min(440px,100vw)!important;
- max-width:100vw;max-height:100dvh;border:0;border-radius:0;box-shadow:none;
-}
-#dialog.sd-backup-prompt form{display:flex;flex-direction:column;max-height:100dvh;overflow:auto}
-#dialog.sd-backup-prompt .dialogtop{padding:16px 18px;border:0;display:block}
-#dialog.sd-backup-prompt .dialogtop :is(h2,.close){display:none}
-#dialog.sd-backup-prompt .dialogtop p{margin:0;line-height:1.5;overflow-wrap:anywhere}
-#dialog.sd-backup-prompt .dialogbody:has(>.err:only-child[hidden]){display:none}
-#dialog.sd-backup-prompt .dialogfoot{padding:10px 14px}
-html.sd-settings-only #dialog.sd-backup-prompt.sd-backup-fitted[open]{width:100vw!important;height:100dvh!important}
-#dialog.sd-backup-fitted form{height:100%}
-#dialog.sd-backup-fitted .dialogfoot{margin-top:auto;flex:none}
 html.sd-menu-helper #menu {left:0!important;top:0!important;max-height:100vh;max-width:100vw;margin:0}
 html.sd-menu-helper {background:#211726}
+</style>
+<style id="sd-native-dialog-sizing">
+/* Fit native menu dialogs to the webview client area. */
+html.sd-settings-only #dialog.sd-native-dialog[open] {
+ position:fixed;inset:0;margin:0;padding:0;
+ max-width:none;max-height:100dvh;
+ border:0;border-radius:0;box-shadow:none;transform:none;animation:none;
+}
+html.sd-settings-only #dialog.sd-native-dialog[open]:not(.sd-native-fitted) {
+ width:min(var(--sd-native-dialog-width),100vw);height:auto;
+}
+html.sd-settings-only #dialog.sd-native-dialog.sd-native-fitted[open] {
+ width:100vw;height:100dvh;max-height:none;
+}
+#dialog.sd-native-dialog :is(.dialogtop .close,.sd-dialog-resize) {display:none}
+#dialog.sd-native-dialog.settings-dialog .dialogtop {display:none}
+#dialog.sd-native-dialog.settings-dialog form {width:100%;height:100%;max-height:none}
+#dialog.sd-native-dialog.sd-compact-dialog {overflow:auto}
+#dialog.sd-compact-dialog form {display:flex;flex-direction:column}
+#dialog.sd-compact-dialog.sd-native-fitted form {min-height:100%}
+#dialog.sd-compact-dialog .dialogtop {padding:14px 18px 10px;border:0;display:block}
+#dialog.sd-compact-dialog #dialogTitle {
+ position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;
+}
+#dialog.sd-compact-dialog .dialogtop p {line-height:1.5;overflow-wrap:anywhere}
+#dialog.sd-compact-dialog .dialogbody:has(> .err:only-child[hidden]) {display:none}
+#dialog.sd-compact-dialog .dialogfoot {margin-top:auto;padding:10px 14px;flex-wrap:wrap}
+#dialog.sd-compact-dialog .sd-search-result {min-height:44px}
+#dialog.sd-native-fitted.sd-compact-dialog form:has(.sd-search-results) {
+ height:100%;
+}
+#dialog.sd-native-fitted.sd-compact-dialog .dialogbody:has(.sd-search-results) {
+ display:flex;flex-direction:column;flex:1;min-height:0;
+}
+#dialog.sd-native-fitted.sd-compact-dialog :is(.dialogtop,.dialogfoot,.sd-search-input,.sd-search-summary,.err) {
+ flex:none;
+}
+#dialog.sd-native-fitted.sd-compact-dialog .sd-search-results {
+ flex:1;min-height:0;max-height:none;align-content:start;
+}
 </style>
 </head>
 <body>
@@ -3001,26 +3027,40 @@ const nativeReady = new Promise(resolve => {
     if(ctx){
       const win=nativeAPI.getCurrentWindow();
       let finishing=false,shown=false;
-      const finish=async()=>{
+      const finish=async(selection)=>{
         if(finishing||settingsCommitPending)return;
-        finishing=true;await sharedLayoutSave;await nativeCore.invoke('finish_native_menu',{action:0});
+        finishing=true;
+        await sharedLayoutSave;
+        await nativeCore.invoke('finish_native_menu',{action:0,selection});
       };
-      window.closeStackDockSettings=finish;
+      window.closeStackDockSettings=()=>finish();
+      if(ctx.action==='Find shortcut…'){
+        window.finishStackDockSearch=(folder,item)=>finish({folderId:folder?.id??null,entryId:item.id});
+      }
       const present=async()=>{
         if(!dialog.open||shown)return;
         shown=true;
-        const backup = ctx.action === 'Import layout…' || ctx.action === 'Export layout…';
-        const title = dialog.querySelector('h2')?.textContent || 'StackDock';
-        let width = 1000;
-        let height = dialog.classList.contains('sd-properties') ? 525 : 700;
-        if (backup) {
-          dialog.classList.add('sd-backup-prompt');
+        const heading = dialog.querySelector('h2');
+        const title = heading?.textContent || 'StackDock';
+        const settings = dialog.classList.contains('settings-dialog');
+        const properties = dialog.classList.contains('sd-properties');
+        const compact = !settings && !properties;
+        const search = compact && !!form.querySelector('.sd-search-input');
+        let width = compact ? (search ? 524 : 440) : 1000;
+        let height = properties ? 525 : 700;
+
+        dialog.classList.add('sd-native-dialog');
+        if (compact) {
+          dialog.classList.add('sd-compact-dialog');
+          dialog.style.setProperty('--sd-native-dialog-width', width + 'px');
           await document.fonts.ready;
+          if (!dialog.open) return;
           width = Math.ceil(dialog.getBoundingClientRect().width);
-          height = Math.ceil(form.scrollHeight);
+          height = Math.ceil(form.scrollHeight) + (title === 'New subfolder' ? 16 : 0);
         }
         await nativeCore.invoke('native_menu_window',{editor:true,title,width,height});
-        if (backup) dialog.classList.add('sd-backup-fitted');
+        if (!dialog.open) return;
+        dialog.classList.add('sd-native-fitted');
         await win.show();await win.setFocus();
       };
       const folder=ctx.folder?folderPath(ctx.folder).at(-1):null;
