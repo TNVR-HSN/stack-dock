@@ -873,7 +873,7 @@ impl App {
             ctx["folder"]=f.id.clone().into();
             let s=g.gs;
             let cw=if s.labels{s.icon.max(s.label_w)}else{s.icon};
-            let ch=s.icon+s.reflect+if s.labels{s.font*2.36+4.*g.s}else{0.};
+            let ch=s.icon+s.effects_height()+if s.labels{s.font*2.36+4.*g.s}else{0.};
             let col=((pos.x as f32-g.grid_clip.x+g.scroll.0+s.gx/2.)/(cw+s.gx)).floor() as usize;
             let row=((pos.y as f32-g.grid_clip.y+g.scroll.1+s.gy/2.)/(ch+s.gy)).floor() as usize;
             ctx["r"]=row.min(f.rows.saturating_sub(1)).into();ctx["c"]=col.min(f.cols.saturating_sub(1)).into();
@@ -1089,8 +1089,18 @@ impl App {
         self.stop();self.navigation=None;self.clear_hover();
         self.clock=Clock{t:0.,opening:true};self.progress=0.;self.icon_progress=0.;
         self.path.clear();self.dock_index=None;self.scroll=(0.,0.);self.relayout()?;
-        indicator.start=Instant::now();self.indicator=Some(indicator);
-        self.indicator_tick()
+        indicator.start = Instant::now();
+        self.indicator = Some(indicator);
+        self.indicator_tick()?;
+        if let Some(indicator) = &mut self.indicator {
+            indicator.start = Instant::now();
+            indicator.timer_delay = 16;
+            if unsafe { SetTimer(self.hwnd, 7, 16, null_mut()) } == 0 {
+                self.indicator = None;
+                return self.draw();
+            }
+        }
+        Ok(())
     }
     fn indicator_tick(&mut self)->io::Result<()>{
         let Some(i)=&mut self.indicator else{return Ok(())};let ms=i.start.elapsed().as_secs_f32()*1000.;
@@ -1103,8 +1113,12 @@ impl App {
         self.draw()
     }
     fn bounds(&self) -> Rect {
+        self.bounds_at(Instant::now())
+    }
+
+    fn bounds_at(&self, now: Instant) -> Rect {
         if let Some(i)=&self.indicator{
-            let ms=i.start.elapsed().as_secs_f32()*1000.;
+            let ms=now.duration_since(i.start).as_secs_f32()*1000.;
             return if ms<i.travel{i.from.union(i.card)}else if ms<i.travel+i.hold{i.card}else{i.card.union(self.layout.dock)};
         }
         if let Some(n)=&self.navigation {return n.old.grid.union(self.layout.grid);}
@@ -1113,7 +1127,7 @@ impl App {
     }
     fn draw(&mut self) -> io::Result<()> {
         let frame_started = Instant::now();
-        let bounds = self.bounds();
+        let bounds = self.bounds_at(frame_started);
         let (w, h) = (bounds.w as usize, bounds.h as usize);
         if self
             .surface
@@ -1127,7 +1141,7 @@ impl App {
         let surface = self.surface.as_mut().expect("surface allocated");
         let pixels = unsafe { slice::from_raw_parts_mut(surface.bits, w * h) };
         if let Some(i)=&self.indicator{
-            let ms=i.start.elapsed().as_secs_f32()*1000.;
+            let ms=frame_started.duration_since(i.start).as_secs_f32()*1000.;
             let enter=if i.travel>0.{ease_open((ms/i.travel).clamp(0.,1.))}else{1.};
             let exit=if ms<=i.travel+i.hold{0.}else if i.return_time>0.{ease_open(((ms-i.travel-i.hold)/i.return_time).clamp(0.,1.))}else{1.};
             let mut c=Canvas::new(pixels,w,h,bounds);
@@ -1161,7 +1175,7 @@ impl App {
             if ctx["valid"]==true && !self.path.is_empty(){
                 let skin=g.gs;let clip=g.grid_clip;overlay.clip=clip;
                 let cw=if skin.labels{skin.icon.max(skin.label_w)}else{skin.icon};
-                let ch=skin.icon+skin.reflect+if skin.labels{skin.font*2.36+4.*g.s}else{0.};
+                let ch=skin.icon+skin.effects_height()+if skin.labels{skin.font*2.36+4.*g.s}else{0.};
                 let col=ctx["c"].as_u64().unwrap_or(0) as f32;let row=ctx["r"].as_u64().unwrap_or(0) as f32;
                 overlay.drop_cell(Rect::new(clip.x+col*(cw+skin.gx)-g.scroll.0,clip.y+row*(ch+skin.gy)-g.scroll.1,cw,ch),g.s);
                 if let Some((edge,time))=self.dwell{
@@ -1273,7 +1287,14 @@ impl App {
             duration,
             icon_from: self.icon_progress,
         });
-        self.draw()
+        self.present_motion_start()
+    }
+    fn present_motion_start(&mut self) -> io::Result<()> {
+        self.draw()?;
+        if let Some(motion) = &mut self.motion {
+            motion.start = Instant::now();
+        }
+        Ok(())
     }
     fn tick(&mut self) -> io::Result<()> {
         let Some(m) = &self.motion else { return Ok(()) };
@@ -1401,7 +1422,8 @@ impl App {
                 }
             };
             let from = self.hover_levels[index].1;
-            if animations && skin.hover_mode != 0 && skin.hover_duration > 0.
+            if animations && (skin.hover_mode != 0 || skin.highlight_alpha > 0.)
+                && skin.hover_duration > 0.
                 && from != target
             {
                 self.hover_transitions.push(HoverTransition {
@@ -1459,7 +1481,7 @@ impl App {
                 self.key_focus=Some(Hit::Grid(i));
                 let e=&f.slots[i];let g=&self.layout;let s=g.gs;
                 let w=if s.labels{s.icon.max(s.label_w)}else{s.icon};
-                let h=s.icon+s.reflect+if s.labels{s.font*2.36+4.*g.s}else{0.};
+                let h=s.icon+s.effects_height()+if s.labels{s.font*2.36+4.*g.s}else{0.};
                 let x=e.c as f32*(w+s.gx);let y=e.r as f32*(h+s.gy);
                 self.scroll=((x+w-g.grid_clip.w).max(self.scroll.0.min(x)),(y+h-g.grid_clip.h).max(self.scroll.1.min(y)));
                 self.relayout()?;
@@ -1543,7 +1565,7 @@ impl App {
         let speed=self.saved.dock.motion_speed.unwrap_or(100.).clamp(25.,250.);
         self.motion=Some(Motion {start:Instant::now(),from:1.,to:1.,icon_from:1.,
             duration:Duration::from_secs_f32(32.5/speed)});
-        self.draw()
+        self.present_motion_start()
     }
     fn back(&mut self) -> io::Result<()> {
         self.key_focus=None;

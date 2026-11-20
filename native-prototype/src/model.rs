@@ -128,6 +128,19 @@ pub struct Style {
     hover_angle: Option<f32>,
     hover_duration: Option<f32>,
     hover_curve: Option<u8>,
+    highlight_enabled: Option<bool>,
+    highlight_soft: Option<bool>,
+    highlight_area: Option<f32>,
+    highlight_fill: Option<f32>,
+    highlight_corner: Option<f32>,
+    hover_opacity: Option<f32>,
+    ground_shadow: Option<bool>,
+    ground_shadow_intensity: Option<f32>,
+    ground_shadow_offset: Option<f32>,
+    folder_arrow: Option<bool>,
+    folder_arrow_x: Option<f32>,
+    folder_arrow_y: Option<f32>,
+    folder_arrow_rotation: Option<f32>,
     reflections: Option<bool>,
     reflection_area: Option<f32>,
     reflection_intensity: Option<f32>,
@@ -158,6 +171,44 @@ pub struct Skin {
     pub hover_curve: u8,
     pub reflect: f32,
     pub reflect_alpha: f32,
+    pub highlight_soft: bool,
+    pub highlight_area: f32,
+    pub highlight_fill: f32,
+    pub highlight_corner: Option<f32>,
+    pub highlight_alpha: f32,
+    pub ground_shadow_alpha: f32,
+    pub ground_shadow_y: f32,
+    pub ground_shadow_height: f32,
+    folder_arrow: ArrowOptions,
+}
+impl Skin {
+    pub fn effects_height(self) -> f32 {
+        let shadow = if self.ground_shadow_alpha > 0. {
+            self.ground_shadow_y + self.ground_shadow_height
+        } else {
+            0.
+        };
+        self.reflect.max(shadow)
+    }
+
+    pub fn folder_arrow(self, entry: &Entry) -> Option<(f32, f32, f32)> {
+        let own = entry.arrow_override.unwrap_or_default();
+        if !entry.folder() || !own.enabled.or(self.folder_arrow.enabled).unwrap_or(false) {
+            return None;
+        }
+        let x = own.x.or(self.folder_arrow.x).unwrap_or(84.).clamp(0., 100.) / 100.;
+        let y = own.y.or(self.folder_arrow.y).unwrap_or(16.).clamp(0., 100.) / 100.;
+        let rotation = own.rotation.or(self.folder_arrow.rotation).unwrap_or(0.);
+        Some((x, y, rotation))
+    }
+}
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[serde(default)]
+struct ArrowOptions {
+    enabled: Option<bool>,
+    x: Option<f32>,
+    y: Option<f32>,
+    rotation: Option<f32>,
 }
 fn hex(s: Option<&str>, fallback: u32) -> u32 {
     s.and_then(|v| v.strip_prefix('#'))
@@ -268,6 +319,28 @@ impl Style {
                 0.
             },
             reflect_alpha: self.reflection_intensity.unwrap_or(55.).clamp(0., 100.) / 100.,
+            highlight_alpha: if self.highlight_enabled.unwrap_or(true) {
+                self.hover_opacity.unwrap_or(40.).clamp(0., 100.) / 100.
+            } else {
+                0.
+            },
+            highlight_area: (self.highlight_area.unwrap_or(0.).clamp(0., 32.) * scale).round(),
+            highlight_fill: self.highlight_fill.unwrap_or(30.).clamp(0., 100.) / 100.,
+            highlight_soft: self.highlight_soft.unwrap_or(true),
+            highlight_corner: self.highlight_corner.map(|value| value.clamp(0., 50.) / 100.),
+            ground_shadow_alpha: if self.ground_shadow.unwrap_or(false) {
+                self.ground_shadow_intensity.unwrap_or(65.).clamp(0., 100.) / 100.
+            } else {
+                0.
+            },
+            ground_shadow_y: (self.ground_shadow_offset.unwrap_or(0.).clamp(-24., 48.) * scale).round(),
+            ground_shadow_height: (8. * scale).round().max(3.),
+            folder_arrow: ArrowOptions {
+                enabled: self.folder_arrow,
+                x: self.folder_arrow_x,
+                y: self.folder_arrow_y,
+                rotation: self.folder_arrow_rotation,
+            },
         }
     }
 }
@@ -301,6 +374,7 @@ pub struct Entry {
     pub dock_icon_corner: Option<f32>,
     pub folder_hover_labels:Option<bool>,
     pub dock_icon_shape: String,
+    arrow_override: Option<ArrowOptions>,
 }
 impl Entry {
     pub fn folder(&self) -> bool {
@@ -512,7 +586,7 @@ impl Layout {
                 };
                 (
                     size,
-                    size + (if ds.labels { 17. * s } else { 0. }) + ds.reflect,
+                    size + (if ds.labels { 17. * s } else { 0. }) + ds.effects_height(),
                 )
             })
             .collect::<Vec<_>>();
@@ -562,7 +636,7 @@ impl Layout {
             gs.icon
         };
         let cell_h = gs.icon
-            + gs.reflect
+            + gs.effects_height()
             + if gs.labels {
                 gs.font * 2.36 + 4. * s
             } else {

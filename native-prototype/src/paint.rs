@@ -90,7 +90,7 @@ impl<'a> Canvas<'a> {
             let order=saved.ordered();
             for &tile_rect in &layout.dock_tiles{
                 let moved=dock_motion(tile_rect,layout.dock,card,exit,&saved.edge);
-                tile(self,assets,order[moved.item],moved,dock,s,exit,true,false,0.,
+                tile(self,assets,order[moved.item],moved,dock,s,exit,true,0.,
                     saved.general.image_thumbnails.unwrap_or(true),false,moved.icon.bottom());
             }
         }
@@ -885,6 +885,106 @@ fn paint_stationary_icon(
         }
     }
 }
+fn rounded_distance(rect: Rect, radius: f32, x: f32, y: f32) -> f32 {
+    let dx = (x - rect.cx()).abs() - (rect.w * 0.5 - radius);
+    let dy = (y - rect.cy()).abs() - (rect.h * 0.5 - radius);
+    dx.max(0.).hypot(dy.max(0.)) + dx.max(dy).min(0.) - radius
+}
+
+fn highlight(
+    canvas: &mut Canvas, icon: Rect, corner: f32, skin: Skin, dpi: f32, opacity: f32,
+    neighbors: impl Iterator<Item = (Rect, f32)>,
+) {
+    let opacity = bounded(opacity) * skin.highlight_alpha;
+    if opacity <= 0. { return; }
+    let rect = icon.inset(-skin.highlight_area);
+    let visible = rect.intersect(canvas.clip);
+    if visible.w <= 0. || visible.h <= 0. { return; }
+    let radius = rect.w.min(rect.h) * skin.highlight_corner.unwrap_or(corner);
+    let mask: Vec<_> = neighbors.filter(|(icon, _)| {
+        let overlap = visible.intersect(*icon);
+        overlap.w > 0. && overlap.h > 0.
+    }).collect();
+    let fill = skin.highlight_fill;
+    let depth = rect.w.min(rect.h) * (0.12 + fill * 0.9) * 0.5;
+    for y in visible.y.floor() as i32..visible.bottom().ceil() as i32 {
+        for x in visible.x.floor() as i32..visible.right().ceil() as i32 {
+            let (px, py) = (x as f32 + 0.5, y as f32 + 0.5);
+            let distance = rounded_distance(rect, radius, px, py);
+            let outer = bounded(0.5 - distance);
+            if outer <= 0. { continue; }
+            let mut coverage = outer;
+            for &(neighbor, roundness) in &mask {
+                let radius = neighbor.w.min(neighbor.h) * roundness;
+                coverage *= bounded(rounded_distance(neighbor, radius, px, py) + 0.5);
+            }
+            if coverage <= 0. { continue; }
+            let edge = if skin.highlight_soft {
+                let fog = bounded(1. + distance / depth.max(1.)).powi(2);
+                let rim = bounded(dpi + distance + 0.5) * 0.3;
+                (0.34 + fill * 0.48) * fog + rim
+            } else {
+                let rim = bounded(2. * dpi + distance + 0.5);
+                fill + (1. - fill) * rim
+            };
+            let value = (255. * bounded(edge) * coverage * opacity).round() as u32;
+            canvas.put(x, y, pack(value, value, value, value));
+        }
+    }
+}
+
+fn ground_shadow(canvas: &mut Canvas, icon: Rect, skin: Skin, opacity: f32) {
+    let opacity = bounded(opacity) * skin.ground_shadow_alpha;
+    if opacity <= 0. { return; }
+    let rect = Rect::new(icon.x + icon.w * 0.05, icon.bottom() + skin.ground_shadow_y,
+        icon.w * 0.90, skin.ground_shadow_height);
+    let visible = rect.intersect(canvas.clip);
+    for y in visible.y.floor() as i32..visible.bottom().ceil() as i32 {
+        for x in visible.x.floor() as i32..visible.right().ceil() as i32 {
+            let dx = (x as f32 + 0.5 - rect.cx()) * 2. / rect.w;
+            let dy = (y as f32 + 0.5 - rect.cy()) * 2. / rect.h;
+            let radial = dx.hypot(dy);
+            let alpha = if radial < 0.42 {
+                mix(1., 0.53, radial / 0.42)
+            } else {
+                0.53 * bounded((0.73 - radial) / 0.31)
+            };
+            canvas.put(x, y, ((255. * alpha * opacity).round() as u32) << 24);
+        }
+    }
+}
+
+fn folder_arrow(canvas: &mut Canvas, skin: Skin, folder: &Entry, icon: Rect,
+    dpi: f32, opacity: f32, hover_rotation: f32) {
+    let Some((x, y, angle)) = skin.folder_arrow(folder) else { return; };
+    if opacity <= 0. { return; }
+    let size = (icon.w * 0.27).clamp(7. * dpi, 13. * dpi);
+    let center = (icon.x + icon.w * x, icon.y + icon.h * y);
+    let (sin, cos) = ((angle + hover_rotation).to_radians()).sin_cos();
+    let rect = Rect::new(center.0 - size, center.1 - size, 2. * size, 2. * size)
+        .intersect(canvas.clip);
+    let stroke = size * 1.25 / 16.;
+    let segment = |x: f32, y: f32| {
+        // Mirror the left half of the SVG chevron around its center.
+        let (x, y) = (x.abs(), y + size * 3. / 16.);
+        let d = size * 5. / 16.;
+        let t = bounded((x + y) / (2. * d));
+        (x - d * t).hypot(y - d * t)
+    };
+    for y in rect.y.floor() as i32..rect.bottom().ceil() as i32 {
+        for x in rect.x.floor() as i32..rect.right().ceil() as i32 {
+            let dx = x as f32 + 0.5 - center.0;
+            let dy = y as f32 + 0.5 - center.1;
+            let distance = segment(dx * cos + dy * sin, -dx * sin + dy * cos);
+            let shadow = segment(dx * cos + (dy - dpi) * sin, -dx * sin + (dy - dpi) * cos);
+            let shade = (160. * bounded(opacity) * bounded(stroke + dpi - shadow)).round() as u32;
+            canvas.put(x, y, shade << 24);
+            let alpha = (255. * bounded(opacity) * bounded(stroke + 0.5 - distance)).round() as u32;
+            canvas.put(x, y, pack(alpha, alpha, alpha, alpha));
+        }
+    }
+}
+
 fn tile(
     c: &mut Canvas,
     a: &mut Assets,
@@ -894,7 +994,6 @@ fn tile(
     scale: f32,
     p: f32,
     dock: bool,
-    hover: bool,
     hover_amount: f32,
     thumb: bool,
     skip_icon: bool,
@@ -903,14 +1002,8 @@ fn tile(
     if p <= 0. {
         return;
     }
-    if hover {
-        c.rounded(
-            t.icon.inset(-2. * scale),
-            t.icon.w * corner(e, s, dock),
-            0x25ffffff,
-        );
-    }
     if !skip_icon {
+        ground_shadow(c, t.icon, s, p);
         if let Some(image) = a.get(e, thumb) {
             let mut artwork = t.icon;
             let mut angle = e.icon_rotation.unwrap_or(s.rotation);
@@ -937,6 +1030,9 @@ fn tile(
             } else {
                 c.art(&image, artwork, icon_corner, angle, p, false);
             }
+            if dock {
+                folder_arrow(c, s, e, artwork, scale, p, angle - e.icon_rotation.unwrap_or(s.rotation));
+            }
             if s.reflect > 0. {
                 let reflection=Rect::new(t.icon.x,t.icon.bottom(),t.icon.w,t.icon.h);
                 paint_reflection(c,a,&image,reflection,s.reflect,p*s.reflect_alpha);
@@ -944,7 +1040,7 @@ fn tile(
         }
     }
     if s.labels {
-        let y = caption_bottom + s.reflect + s.font + scale;
+        let y = caption_bottom + s.effects_height() + s.font + scale;
         if dock {
             c.text(a, &e.name, t.box_.cx(), y, s.font, t.box_.w, p, false);
         } else {
@@ -967,7 +1063,7 @@ fn entrance_tile(c: &mut Canvas, a: &mut Assets, item: &Entry, folder: &Entry,
     if alpha <= 0. || visible.w <= 0. || visible.h <= 0. { return; }
     let k=dest.w/original.box_.w.max(1.);
     let top=original.icon.y-original.box_.y;
-    let artwork=Rect::new(dest.x+(original.icon.x-original.box_.x)*k,dest.y+top*k,original.icon.w*k,(original.icon.h+skin.reflect)*k);
+    let artwork=Rect::new(dest.x+(original.icon.x-original.box_.x)*k,dest.y+top*k,original.icon.w*k,(original.icon.h+skin.effects_height())*k);
     if skin.labels{
         let baseline=(artwork.bottom()+skin.font+dpi).round();
         c.caption(a,&item.name,dest.cx().round(),baseline,skin.font,original.box_.w,alpha);
@@ -978,7 +1074,7 @@ fn entrance_tile(c: &mut Canvas, a: &mut Assets, item: &Entry, folder: &Entry,
     let key=(folder.id.clone(),original.item,skip);
     let sprite=if let Some(sprite)=a.entrance_tiles.get(&key) {Rc::clone(sprite)} else {
         let width=original.icon.w.ceil().max(1.) as usize;
-        let height=(original.icon.h+skin.reflect).ceil().max(1.) as usize;
+        let height=(original.icon.h+skin.effects_height()).ceil().max(1.) as usize;
         let mut pixels=vec![0; width*height];
         let origin=Rect::new(0.,0.,width as f32,height as f32);
         let mut local=original;
@@ -987,7 +1083,7 @@ fn entrance_tile(c: &mut Canvas, a: &mut Assets, item: &Entry, folder: &Entry,
         local.box_=origin;
         let mut skin=skin;skin.labels=false;
         tile(&mut Canvas::new(&mut pixels,width,height,origin),a,item,local,skin,dpi,1.,
-            false,false,0.,thumb,skip,local.icon.bottom());
+            false,0.,thumb,skip,local.icon.bottom());
         let sprite=Rc::new(TileSprite {pixels,width,height});
         if a.entrance_tiles.len() >= 256 {a.entrance_tiles.clear();}
         a.entrance_tiles.insert(key,Rc::clone(&sprite));
@@ -1012,7 +1108,7 @@ fn entrance_tile(c: &mut Canvas, a: &mut Assets, item: &Entry, folder: &Entry,
         }
         return;
     }
-    scaled_sprite(c,&sprite,dest,original.icon.w,original.icon.h+skin.reflect,opacity);
+    scaled_sprite(c,&sprite,dest,original.icon.w,original.icon.h+skin.effects_height(),opacity);
 }
 pub(crate) fn launch_sprite(assets:&mut Assets,item:&Entry,thumb:bool,side:f32)->Option<TileSprite>{
     let image=assets.get(item,thumb)?;
@@ -1181,21 +1277,30 @@ fn scene(c: &mut Canvas, a: &mut Assets, v: View, outgoing: bool, hull:bool) {
         let t=if current.is_some() && dock_index!=Some(original.item){
             dock_motion(original,l.dock,l.grid,dock_alpha,&saved.edge)
         }else{original};
+        let item = order[t.item];
+        let hover_value = hover_amount(Hit::Dock(t.item));
+        let ring = |canvas: &mut Canvas| highlight(
+            canvas, t.icon, corner(item, l.ds, true), l.ds, s, dock_alpha * hover_value,
+            l.dock_tiles.iter().filter(|other| other.item != t.item).map(|other|
+                (other.icon, corner(order[other.item], l.ds, true))),
+        );
+        let raised = l.ds.hover_mode != 0 && hover_value != 0.;
+        if raised { ring(c); }
         tile(
             c,
             a,
-            order[t.item],
+            item,
             t,
             l.ds,
             s,
             dock_alpha,
             true,
-            hover == Some(Hit::Dock(t.item)),
-            hover_amount(Hit::Dock(t.item)),
+            hover_value,
             thumb,
             current.is_some() && dock_index == Some(t.item),
             t.icon.bottom(),
         );
+        if !raised { ring(c); }
     }
     let Some(folder) = current else {
         c.clip = root_clip;
@@ -1370,12 +1475,23 @@ fn scene(c: &mut Canvas, a: &mut Assets, v: View, outgoing: bool, hull:bool) {
         t.icon=icon;
         let caption_bottom=t.icon.bottom();
         let mut skin=l.gs;
-        skin.font*=size; skin.reflect*=size;
+        skin.font *= size;
+        skin.reflect *= size;
+        skin.ground_shadow_y *= size;
+        skin.ground_shadow_height *= size;
         let skip=nav.is_some_and(|n| n.slot==t.item && (outgoing==n.down));
         if (mode == "fasade" && nav.is_none() && clock.t < 1.) || ((entrance || classic_slide) && (size != 1. || dx != 0. || dy != 0.)) {
             entrance_tile(c,a,item,folder,original,t.box_,l.gs,s,alpha,thumb,skip);
             continue;
         }
+        let hover_value = hover_amount(Hit::Grid(t.item));
+        let ring = |canvas: &mut Canvas| highlight(
+            canvas, t.icon, corner(item, skin, false), skin, s, alpha * hover_value,
+            l.grid_tiles.iter().filter(|other| other.item != t.item).map(|other|
+                (other.icon, corner(&folder.slots[other.item], skin, false))),
+        );
+        let raised = skin.hover_mode != 0 && hover_value != 0.;
+        if raised { ring(c); }
         tile(
             c,
             a,
@@ -1385,12 +1501,12 @@ fn scene(c: &mut Canvas, a: &mut Assets, v: View, outgoing: bool, hull:bool) {
             s,
             alpha,
             false,
-            hover == Some(Hit::Grid(t.item)),
-            hover_amount(Hit::Grid(t.item)),
+            hover_value,
             thumb,
             skip,
             caption_bottom,
         );
+        if !raised { ring(c); }
     }
     c.clip = root_clip;
     if let Some(n)=nav {
@@ -1427,6 +1543,10 @@ fn scene(c: &mut Canvas, a: &mut Assets, v: View, outgoing: bool, hull:bool) {
         let target_angle=folder.icon_rotation.unwrap_or(l.gs.rotation);
         let angle=source_angle+((target_angle-source_angle+180.).rem_euclid(360.)-180.)*flight;
         c.art(&img, fly, radius, angle, opacity, false);
+        if path.len() == 1 && anchor.is_some() {
+            let arrow_alpha = if opening { 1. - fade(t, 0.18, 0.82) } else { fade(t, 0., 0.82) };
+            folder_arrow(c, l.ds, folder, fly, s, opacity * arrow_alpha, 0.);
+        }
     }
 }
 pub fn ease_open(t: f32) -> f32 {
