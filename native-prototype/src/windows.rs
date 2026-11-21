@@ -896,11 +896,53 @@ impl App {
         }
         ctx
     }
+    fn layout_path(&self) -> io::Result<&Path> {
+        self.settings.as_ref()
+            .map(|settings| settings.layout_path.as_path())
+            .ok_or_else(|| io::Error::other("Missing layout path"))
+    }
+
+    fn read_layout(&self) -> io::Result<(Vec<u8>, serde_json::Value)> {
+        let original = std::fs::read(self.layout_path()?)?;
+        let data = serde_json::from_slice(&original)?;
+        Ok((original, data))
+    }
+
+    fn move_dock(&mut self, source: &str, slot: usize) -> io::Result<()> {
+        let mut ids: Vec<_> = self.saved.ordered().into_iter()
+            .map(|entry| entry.id.clone()).collect();
+        let from = ids.iter().position(|id| id == source)
+            .ok_or_else(|| io::Error::other("Dock entry moved or was removed"))?;
+        let to = slot.min(ids.len()).saturating_sub(usize::from(from < slot));
+        if from == to {
+            return Ok(());
+        }
+
+        let (original, mut data) = self.read_layout()?;
+        let on_disk = Saved::from_json(&original).map_err(io::Error::other)?;
+        if on_disk.ordered().into_iter().map(|entry| &entry.id).ne(ids.iter()) {
+            return Err(io::Error::other("Dock order changed during the move"));
+        }
+
+        let id = ids.remove(from);
+        ids.insert(to, id);
+        let positions: std::collections::HashMap<_, _> = ids.iter()
+            .enumerate().map(|(index, id)| (id.as_str(), index)).collect();
+        let layout = &mut data["layout"];
+        for key in ["folders", "dockShortcuts"] {
+            if let Some(entries) = layout[key].as_array_mut() {
+                entries.sort_by_key(|entry| {
+                    entry["id"].as_str().and_then(|id| positions.get(id).copied())
+                        .unwrap_or(usize::MAX)
+                });
+            }
+        }
+        layout["dockOrder"] = serde_json::to_value(&ids)?;
+        self.save_layout(&original, &data)
+    }
+
     fn move_grid(&mut self,ctx:&serde_json::Value)->io::Result<()>{
-        use std::io::Write;
-        let path=&self.settings.as_ref().ok_or_else(||io::Error::other("Missing layout path"))?.layout_path;
-        let original=std::fs::read(path)?;
-        let mut data:serde_json::Value=serde_json::from_slice(&original)?;
+        let (original, mut data) = self.read_layout()?;
         let (&root,sub)=self.path.split_first().ok_or_else(||io::Error::other("No open folder"))?;
         let mut folder=data["layout"]["folders"].get_mut(root).ok_or_else(||io::Error::other("Root folder changed"))?;
         for &idx in sub{folder=folder["slots"].get_mut(idx).ok_or_else(||io::Error::other("Subfolder changed"))?;}
@@ -922,17 +964,57 @@ impl App {
             items[dst]["r"]=old_r;items[dst]["c"]=old_c;
         }
         items[src]["r"]=r.into();items[src]["c"]=c.into();
-        let bytes=serde_json::to_vec(&data)?;
-        let updated=Saved::from_json(&bytes).map_err(io::Error::other)?;
-        let tmp=path.with_extension(format!("{}.{}.tmp",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos()));
-        let mut file=std::fs::OpenOptions::new().write(true).create_new(true).open(&tmp)?;
-        let write=file.write_all(&bytes);drop(file);
-        let result=write.and_then(|_|{if std::fs::read(path)?!=original{return Err(io::Error::other("Layout changed during the drag"));}std::fs::rename(&tmp,path)});
-        if let Err(err)=result{let _=std::fs::remove_file(tmp);return Err(err);}
-        self.saved=updated;self.assets.clear_entrance();self.relayout()
+        self.save_layout(&original, &data)
+    }
+
+    fn save_layout(&mut self, original: &[u8], data: &serde_json::Value) -> io::Result<()> {
+        use std::io::Write;
+
+        let bytes = serde_json::to_vec(data)?;
+        let saved = Saved::from_json(&bytes).map_err(io::Error::other)?;
+        let (work, dpi) = desktop_rect(self.hwnd)?;
+        let layout = Layout::new(
+            &saved, work, dpi, saved.folder_at(&self.path), self.scroll, self.dock_scroll,
+        );
+        let path = self.layout_path()?;
+        let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default().as_nanos();
+        let temporary = path.with_extension(format!("{}.{timestamp}.tmp", std::process::id()));
+        let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&temporary)?;
+        let written = file.write_all(&bytes);
+        drop(file);
+        let result = written.and_then(|_| {
+            if std::fs::read(path)? != original {
+                return Err(io::Error::other("Layout changed during the move"));
+            }
+            std::fs::rename(&temporary, path)
+        });
+        if let Err(error) = result {
+            let _ = std::fs::remove_file(temporary);
+            return Err(error);
+        }
+
+        self.saved = saved;
+        self.scroll = layout.scroll;
+        self.dock_scroll = layout.dock_scroll;
+        self.layout = layout;
+        self.assets.clear_entrance();
+        Ok(())
     }
     fn command(&mut self,ctx:serde_json::Value)->Result<(),String>{
         if self.settings_open || self.settings.is_none(){return Err("Close the editor and start the dock with --settings-exe before editing.".into());}
+        let step = match ctx["action"].as_str() {
+            Some("Move folder earlier" | "Move shortcut earlier") => Some(-1),
+            Some("Move folder later" | "Move shortcut later") => Some(2),
+            _ => None,
+        };
+        if let (Some(step), Some(id)) = (step, ctx["entry"].as_str()) {
+            let index = self.saved.ordered().iter().position(|entry| entry.id == id)
+                .ok_or("Dock entry moved or was removed")?;
+            let slot = index.saturating_add_signed(step);
+            return self.move_dock(id, slot).and_then(|()| self.draw())
+                .map_err(|error| error.to_string());
+        }
         self.start_helper(&[("SD_MENU_X",ctx["x"].to_string()),("SD_MENU_Y",ctx["y"].to_string()),("SD_COMMAND",ctx.to_string())])
     }
     fn start_helper(&mut self, env:&[(&str,String)]) -> Result<(),String> {
@@ -1716,6 +1798,7 @@ unsafe extern "system" fn window_proc(hwnd: Handle, msg: u32, w: usize, l: isize
         return 0;
     }
     let mut target = None;
+    let mut move_error = None;
     let outcome = APP.with(|cell| {
         // Layered window updates can send synchronous Win32 messages.
         let Ok(mut state) = cell.try_borrow_mut() else {
@@ -1742,7 +1825,7 @@ unsafe extern "system" fn window_proc(hwnd: Handle, msg: u32, w: usize, l: isize
             }
             WM_MOUSEMOVE if a.press.is_some() && w&1!=0 =>{
                 let b=a.bounds();let (x,y)=(coord(l,0)+b.x as i32,coord(l,16)+b.y as i32);let (_,sx,sy)=a.press.unwrap();
-                if matches!(a.press, Some((Hit::Grid(_) | Hit::Dock(_), _, _))) && !a.settings_open && !a.dragging && ((x-sx) as f32).hypot((y-sy) as f32)>7.*a.layout.s{
+                if matches!(a.press, Some((Hit::Grid(_) | Hit::Dock(_), _, _))) && a.settings.is_some() && !a.settings_open && !a.dragging && ((x-sx) as f32).hypot((y-sy) as f32)>7.*a.layout.s{
                     a.dragging=true;a.clear_hover();unsafe{SetTimer(hwnd,4,45,null_mut());}
                 }
                 if a.dragging{a.drag_at=Some((x,y));Some(a.draw())}else{Some(Ok(()))}
@@ -1756,7 +1839,20 @@ unsafe extern "system" fn window_proc(hwnd: Handle, msg: u32, w: usize, l: isize
 
                 let new_scroll=a.strip.as_ref().filter(|_|ctx["valid"]==true).map(|_|a.scroll);
                 a.clear_drag();if let Some(scroll)=new_scroll{a.scroll=scroll;}unsafe{ReleaseCapture()};
-                if ctx["valid"]==true && ctx["source"].is_string(){ctx["action"]="move".into();if ctx["folder"].is_string(){if let Err(e)=a.move_grid(&ctx){return Some(Err(e));}}else if let Err(e)=a.command(ctx){return Some(Err(io::Error::other(e)));}}
+                if ctx["valid"] == true {
+                    if let Some(source) = ctx["source"].as_str() {
+                        let result = if ctx["folder"].is_string() {
+                            a.move_grid(&ctx)
+                        } else if let Some(slot) = ctx["slot"].as_u64() {
+                            a.move_dock(source, slot as usize)
+                        } else {
+                            Ok(())
+                        };
+                        if let Err(error) = result {
+                            move_error = Some(format!("Could not save the move: {error}"));
+                        }
+                    }
+                }
                 Some(a.draw())
             }
             WM_KEYDOWN if w==27 && a.dragging=>{a.clear_drag();unsafe{ReleaseCapture()};Some(a.draw())}
@@ -1830,6 +1926,9 @@ unsafe extern "system" fn window_proc(hwnd: Handle, msg: u32, w: usize, l: isize
     });
     match outcome {
         Some(Ok(())) => {
+            if let Some(error) = move_error {
+                message(hwnd, &error);
+            }
             if let Some(target) = target {
                 if let Err(err) = launch(hwnd, target) {
                     message(hwnd, &err)
