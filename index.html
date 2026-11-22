@@ -217,8 +217,6 @@ dialog:is(.settings-dialog,.sd-properties) .err{margin:0;padding:8px 17px;backgr
  background:linear-gradient(145deg,#e9b8ff,#9a50b8);color:#281032;box-shadow:inset 0 1px 0 #ffffff66,0 3px 12px #bf7fdf38;
 }
 .sd-panel-mark svg,.settings-tabs svg,.sd-panel-search svg{width:16px;height:16px;flex:none}
-#dialog .sd-panel-mark.sd-app-mark:has(img:not([hidden])){background:none;box-shadow:none}
-.sd-app-mark img{width:100%;height:100%;object-fit:contain}
 .sd-panel-brand strong{display:block;font-size:13px;line-height:1.1}
 .settings-dialog .sd-panel-brand h2{font-size:10px;margin:4px 0 0;letter-spacing:.09em;color:#bc9ecb;text-transform:uppercase}
 .sd-ui-card{margin:0;padding:0;min-width:0;background:var(--ui-card);border:1px solid var(--ui-line);border-radius:14px;overflow:hidden}
@@ -287,7 +285,6 @@ dialog.settings-dialog form{height:min(770px,calc(100dvh - var(--sd-caption-gutt
 #dialog .settings-center.sd-about-center+.settings-monitor{display:none}
 .sd-about-pane{max-width:670px}
 .sd-about-hero{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;padding:15px 17px}
-.sd-about-hero img{display:block;flex:none;width:54px;height:54px;object-fit:contain}
 .sd-about-copy{flex:1 1 185px;min-width:0}
 .sd-about-copy strong{display:block;font-size:17px}
 .sd-about-copy .note,.sd-about-note{margin:4px 0 0}
@@ -2045,15 +2042,14 @@ function dialogBuildHere(title,desc,submit,build,save,settings=false){
  const head=E('div','dialogtop'),text=E('div'),h=E('h2','',title);h.id='dialogTitle';
  if(settings||properties){
   const brand=E('div','sd-panel-brand');
-  const mark=E('span','sd-panel-mark');
-  if(settings){
-   mark.classList.add('sd-app-mark');
-   const logo=E('img');logo.alt='';logo.src='/stackdock-app-icon.png';logo.draggable=false;
-   mark.append(logo);
-  }else panelGlyph(mark,'properties');
   if(settings)text.append(E('strong','','StackDock'),h);
-  else text.append(h,E('p','',desc));
-  brand.append(mark,text);
+  else{
+   const mark=E('span','sd-panel-mark');
+   panelGlyph(mark,'properties');
+   text.append(h,E('p','',desc));
+   brand.append(mark);
+  }
+  brand.append(text);
   head.append(brand);
  }else{ text.append(h,E('p','',desc));head.append(text); }
  const cancelX=B('×','close',()=>dialog.close());cancelX.setAttribute('aria-label','Cancel dialog');head.append(cancelX);
@@ -2432,14 +2428,13 @@ const STACKDOCK_ABOUT_LINKS=[
  ['MIT License','Read the MIT license terms.','https://opensource.org/license/mit']
 ];
 function buildAboutPane(pane){
- const hero=E('section','sd-ui-card sd-about-hero'),logo=E('img'),copy=E('div','sd-about-copy');
- logo.src='/stackdock-app-icon.png';logo.alt='';logo.draggable=false;
+ const hero=E('section','sd-ui-card sd-about-hero'),copy=E('div','sd-about-copy');
  copy.append(E('strong','','StackDock'),E('p','note','A customizable Windows dock for organizing shortcuts into Grid Stacks.'));
  const app=window.__TAURI__?.app;
  const canReadVersion=typeof app?.getVersion==='function';
  const version=E('span','sd-about-version',canReadVersion?'Reading version…':nativeCore?'Version unavailable':'Browser preview');
  version.setAttribute('aria-live','polite');
- hero.append(logo,copy,version);
+ hero.append(copy,version);
  const resources=E('section','sd-ui-card');
  const title=E('h4','','Project links');title.id='sd-about-links-title';resources.setAttribute('aria-labelledby',title.id);
  const links=E('div','sd-about-links'),status=E('p','note sd-about-note');
@@ -2649,7 +2644,7 @@ function editSettings(selected=null,initial='dock',creating=false){
     originalStartup=startupInput.checked=status.enabled;
     startupInput.disabled=!status.canEnable&&!status.enabled;
     startupInfo.textContent=status.canEnable?'Applies to this Windows account.':
-      'Use an installed or release build to enable startup.';
+      'Open Settings from the native dock to enable sign-in startup.';
    }).catch(()=>{startupInfo.textContent='Windows startup settings could not be read.';});
   }else startupInfo.textContent='Available in the Windows desktop app.';
   applyStartup=()=>{
@@ -3120,6 +3115,5 @@ const nativeReady = new Promise(resolve => {
 </script>
 <script src="/stack-dock-panels.js"></script>
 <script src="/stack-dock-native.js"></script>
-<script src="/stack-dock-widget.js"></script>
 </body>
 </html>

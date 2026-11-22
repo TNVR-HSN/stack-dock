@@ -128,6 +128,7 @@ unsafe extern "system" {
     fn ShowWindow(hwnd: Handle, cmd: i32) -> i32;
     fn IsWindow(hwnd: Handle) -> i32;
     fn LoadCursorW(instance: Handle, name: *const u16) -> Handle;
+    fn LoadIconW(instance: Handle, name: *const u16) -> Handle;
     fn MessageBoxW(hwnd: Handle, text: *const u16, caption: *const u16, flags: u32) -> i32;
     fn GetCursorPos(point: *mut Point) -> i32;
     fn CreatePopupMenu() -> Handle;
@@ -1394,11 +1395,14 @@ impl App {
                 .is_ok_and(|context| context["action"] == "Find shortcut…")
         });
         let (send_selection, receive_selection) = std::sync::mpsc::channel();
+        let native_exe = std::env::current_exe()
+            .map_err(|error| format!("Could not locate the native StackDock executable: {error}"))?;
         let mut child = Command::new(&settings.executable)
             .stdout(if search { std::process::Stdio::piped() } else { std::process::Stdio::inherit() })
             .stdin(if env.is_empty(){std::process::Stdio::null()}else{std::process::Stdio::piped()})
             .envs(env.iter().filter(|(k,_)|*k!="SD_COMMAND").map(|(k,v)|(*k,v)))
             .arg("--settings-only")
+            .env("SD_NATIVE_EXE", native_exe)
             .spawn()
             .map_err(|error| format!("Could not open StackDock Settings: {error}"))?;
         if let Some((_,json))=env.iter().find(|(k,_)|*k=="SD_COMMAND"){
@@ -2424,12 +2428,12 @@ fn run_window(saved: Saved, smoke: bool, settings: Option<SettingsLink>) -> io::
         class_extra: 0,
         win_extra: 0,
         instance,
-        icon: null_mut(),
+        icon: unsafe { LoadIconW(instance, 1usize as *const u16) },
         cursor: unsafe { LoadCursorW(null_mut(), 32512usize as *const u16) },
         background: null_mut(),
         menu: null(),
         name: name.as_ptr(),
-        small_icon: null_mut(),
+        small_icon: unsafe { LoadIconW(instance, 1usize as *const u16) },
     };
     if unsafe { RegisterClassExW(&class) } == 0 {
         return Err(io::Error::last_os_error());

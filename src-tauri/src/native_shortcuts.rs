@@ -40,7 +40,6 @@ pub async fn pick_shortcut_path(
     .await
     .map_err(|e| e.to_string())?
 }
-
 #[cfg(windows)]
 mod windows_icons {
     use std::{ffi::c_void, os::windows::ffi::OsStrExt, path::Path, ptr};
@@ -550,12 +549,4 @@ pub async fn stack_dock_layout_backup(
     })
     .await
     .map_err(|e| e.to_string())?
-}
-
-pub fn keep_dock_open(window: &tauri::Window, event: &tauri::WindowEvent) {
-    if window.label() == "main" {
-        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-            api.prevent_close();
-        }
-    }
 }

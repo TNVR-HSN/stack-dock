@@ -1,17 +1,16 @@
 # StackDock native compatibility preview
 
-This native preview reuses StackDock's layout format and built-in artwork. The normal Tauri executable and installer are unchanged. With the optional Settings connection enabled, the native dock starts WebView2 only when you choose **Settings…**.
+This native preview reuses StackDock's layout format and built-in artwork. `StackDock.exe` always opens Settings; the native dock is a separate executable. With the optional Settings connection enabled, the native dock starts WebView2 only when you choose **Settings…**.
 
 ## Connect to your Phase2 Settings
 
-Use the local `Phase2` build that already supports `--settings-only` and the shared layout file. Build it without making an installer. From the project root in PowerShell:
+Build Settings without making an installer. The `--settings-only` argument remains accepted for compatibility, but is no longer required. From the project root in PowerShell:
 
 ```powershell
-Remove-Item Env:STACKDOCK_SETTINGS_ONLY -ErrorAction SilentlyContinue
 npm run tauri build -- --no-bundle
 ```
 
-Exit the normal dock and any older native preview. Use the EXE path the build printed. It is normally:
+Close StackDock Settings and any older native preview. Use the EXE path the build printed. It is normally:
 
 ```powershell
 $settingsExe = (Resolve-Path .\src-tauri\target\release\StackDock.exe).Path
@@ -20,7 +19,7 @@ cargo run --locked --release --manifest-path .\native-prototype\Cargo.toml -- --
 
 Right-click the native dock and select **Settings…**. Change the dock edge, then select **Done**. The Settings window should close and the native dock should move without restarting. **Apply** saves inside the Settings window, but the native preview refreshes only when the window exits. Use **Cancel** to discard unapplied edits. Test the two modes one at a time.
 
-This mode reads `%LOCALAPPDATA%\com.stackdock.launcher\layout.json` directly, rather than an export copied next to the EXE. It expects the standard StackDock application identifier and a helper built from your Phase2 code. If the shared file is missing, start your normal Phase2 dock once, save its Settings, then try again. To return to your normal app, use **Exit native prototype** and run StackDock as usual.
+This mode reads `%LOCALAPPDATA%\com.stackdock.launcher\layout.json` directly, rather than an export copied next to the EXE. It expects the standard StackDock application identifier and a Settings helper built from this checkout. If `StackDock.exe` is beside the native dock, the dock finds it automatically; `--settings-exe` remains available to select an explicit helper path. Settings opened by the native dock receive its executable path so the sign-in toggle registers the native dock.
 
 ## Open your actual StackDock layout
 
@@ -42,7 +41,7 @@ If you do not provide an export, the preview starts with the exact **empty start
 - **The animation uses the existing dock-to-title behavior.** The folder icon travels into the grid title while the panel expands. Opening and closing use the original timings and easing curves, with the exported animation speed. The visual implementation is native and not pixel-identical to the web version. Nested navigation is immediate. The native Classic, Row/Column Sweep, Fly In, Diagonal, and Outer Ring behaviors are approximations, and Center Out and All at Once do not have their own native implementations yet.
 - **Read-only export mode.** Opening a JSON snapshot with `--layout` does not change your saved layout or launch any of its shortcuts. Launches happen when you click an item, so only test trusted layouts.
 
-Without `--settings-exe`, the preview remains a read-only layout viewer that can launch shortcuts. With the flag, the normal Settings code edits the shared layout in a separate, temporary process. The native preview still does not include the complete shortcut editor, hover, arrow, launch-indicator, drag-and-drop, or accessibility behavior. Do not replace your installed build with this EXE.
+Without a sibling `StackDock.exe` or `--settings-exe`, the preview remains a read-only layout viewer that can launch shortcuts. With a helper, the normal Settings code edits the shared layout in a separate, temporary process. The native preview still does not include the complete shortcut editor, hover, arrow, launch-indicator, drag-and-drop, or accessibility behavior. Do not replace your installed build with this EXE.
 
 ## Build and test
 

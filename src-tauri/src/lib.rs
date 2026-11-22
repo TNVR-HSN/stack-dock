@@ -1,7 +1,5 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod native_shortcuts;
-mod desktop_widget;
-mod file_drop;
 mod layout_store;
 
 #[tauri::command]
@@ -262,26 +260,213 @@ struct StartupStatus {
     can_enable: bool,
 }
 
+#[cfg(windows)]
+mod windows_startup {
+    use std::{
+        mem::size_of,
+        path::{Path, PathBuf},
+    };
+    use windows::{
+        Win32::{
+            Foundation::WIN32_ERROR,
+            System::Registry::{
+                HKEY, HKEY_CURRENT_USER, KEY_QUERY_VALUE, KEY_SET_VALUE, REG_SZ, RegCloseKey,
+                RegCreateKeyW, RegDeleteValueW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
+            },
+        },
+        core::PCWSTR,
+    };
+
+    const RUN_KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+    const VALUE_NAME: &str = "stack-dock";
+
+    struct RegistryKey(HKEY);
+
+    impl RegistryKey {
+        fn open(
+            access: windows::Win32::System::Registry::REG_SAM_FLAGS,
+        ) -> Result<Option<Self>, String> {
+            let path: Vec<u16> = RUN_KEY.encode_utf16().chain([0]).collect();
+            let mut key = HKEY::default();
+            let error = unsafe {
+                RegOpenKeyExW(
+                    HKEY_CURRENT_USER,
+                    PCWSTR(path.as_ptr()),
+                    None,
+                    access,
+                    &mut key,
+                )
+            };
+            if error.0 == 2 {
+                return Ok(None);
+            }
+            if error.0 != 0 {
+                return Err(registry_error(error));
+            }
+            Ok(Some(Self(key)))
+        }
+
+        fn create() -> Result<Self, String> {
+            let path: Vec<u16> = RUN_KEY.encode_utf16().chain([0]).collect();
+            let mut key = HKEY::default();
+            let error =
+                unsafe { RegCreateKeyW(HKEY_CURRENT_USER, PCWSTR(path.as_ptr()), &mut key) };
+            if error.0 != 0 {
+                return Err(registry_error(error));
+            }
+            Ok(Self(key))
+        }
+    }
+
+    impl Drop for RegistryKey {
+        fn drop(&mut self) {
+            let error = unsafe { RegCloseKey(self.0) };
+            if error.0 != 0 {
+                eprintln!(
+                    "[StackDock] Could not close the Windows startup registry key: {}",
+                    std::io::Error::from_raw_os_error(error.0 as i32)
+                );
+            }
+        }
+    }
+
+    fn registry_error(error: WIN32_ERROR) -> String {
+        format!(
+            "Windows startup registry operation failed: {}",
+            std::io::Error::from_raw_os_error(error.0 as i32)
+        )
+    }
+
+    fn value_name() -> Vec<u16> {
+        VALUE_NAME.encode_utf16().chain([0]).collect()
+    }
+
+    fn read_registration() -> Result<Option<String>, String> {
+        let Some(key) = RegistryKey::open(KEY_QUERY_VALUE)? else {
+            return Ok(None);
+        };
+        let name = value_name();
+        let mut kind = REG_SZ;
+        let mut byte_len = 0u32;
+        let error = unsafe {
+            RegQueryValueExW(
+                key.0,
+                PCWSTR(name.as_ptr()),
+                None,
+                Some(&mut kind),
+                None,
+                Some(&mut byte_len),
+            )
+        };
+        if error.0 == 2 {
+            return Ok(None);
+        }
+        if error.0 != 0 {
+            return Err(registry_error(error));
+        }
+        if kind != REG_SZ || byte_len as usize % size_of::<u16>() != 0 {
+            return Err("The StackDock Windows startup entry has an unsupported format.".into());
+        }
+
+        let mut bytes = vec![0; byte_len as usize];
+        let error = unsafe {
+            RegQueryValueExW(
+                key.0,
+                PCWSTR(name.as_ptr()),
+                None,
+                Some(&mut kind),
+                Some(bytes.as_mut_ptr()),
+                Some(&mut byte_len),
+            )
+        };
+        if error.0 != 0 {
+            return Err(registry_error(error));
+        }
+        let wide = bytes[..byte_len as usize]
+            .chunks_exact(size_of::<u16>())
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .take_while(|&unit| unit != 0)
+            .collect::<Vec<_>>();
+        String::from_utf16(&wide)
+            .map(Some)
+            .map_err(|error| format!("The StackDock Windows startup path is invalid: {error}"))
+    }
+
+    fn native_executable() -> Result<Option<PathBuf>, String> {
+        let Some(path) = std::env::var_os("SD_NATIVE_EXE").filter(|path| !path.is_empty()) else {
+            return Ok(None);
+        };
+        let path = PathBuf::from(path)
+            .canonicalize()
+            .map_err(|error| format!("Could not find the native StackDock executable: {error}"))?;
+        if !path.is_file()
+            || !path.file_name().is_some_and(|name| {
+                name.eq_ignore_ascii_case("stack-dock-native.exe")
+            })
+        {
+            return Err("SD_NATIVE_EXE must refer to stack-dock-native.exe.".into());
+        }
+        Ok(Some(path))
+    }
+
+    fn register(path: &Path) -> Result<(), String> {
+        let key = RegistryKey::create()?;
+        let name = value_name();
+        let command = format!("\"{}\"", path.display());
+        let data: Vec<u16> = command.encode_utf16().chain([0]).collect();
+        let bytes = unsafe {
+            std::slice::from_raw_parts(data.as_ptr().cast::<u8>(), data.len() * size_of::<u16>())
+        };
+        let error =
+            unsafe { RegSetValueExW(key.0, PCWSTR(name.as_ptr()), None, REG_SZ, Some(bytes)) };
+        if error.0 != 0 {
+            return Err(registry_error(error));
+        }
+        Ok(())
+    }
+
+    fn unregister() -> Result<(), String> {
+        let Some(key) = RegistryKey::open(KEY_SET_VALUE)? else {
+            return Ok(());
+        };
+        let name = value_name();
+        let error = unsafe { RegDeleteValueW(key.0, PCWSTR(name.as_ptr())) };
+        if error.0 != 0 && error.0 != 2 {
+            return Err(registry_error(error));
+        }
+        Ok(())
+    }
+
+    pub fn update(enabled: Option<bool>) -> Result<(bool, bool), String> {
+        let executable = native_executable()?;
+        if let Some(enabled) = enabled {
+            if enabled {
+                if cfg!(debug_assertions) {
+                    return Err("Use a release build to enable Windows sign-in startup.".into());
+                }
+                let path = executable
+                    .as_ref()
+                    .ok_or("Start Settings from the native dock to enable sign-in startup.")?;
+                register(path)?;
+            } else {
+                unregister()?;
+            }
+        }
+        let registered = read_registration()?.is_some();
+        Ok((registered, !cfg!(debug_assertions) && executable.is_some()))
+    }
+}
+
 #[tauri::command]
-fn stack_dock_startup(app: tauri::AppHandle, enabled: Option<bool>) -> Result<StartupStatus, String> {
+fn stack_dock_startup(enabled: Option<bool>) -> Result<StartupStatus, String> {
     #[cfg(windows)]
     {
-        use tauri_plugin_autostart::ManagerExt;
-        let launcher = app.autolaunch();
-        let can_enable = !cfg!(debug_assertions);
-        if let Some(enabled) = enabled {
-            if enabled && !can_enable {
-                return Err("Use an installed or release build to enable startup.".into());
-            }
-            let result = if enabled { launcher.enable() } else { launcher.disable() };
-            result.map_err(|e| format!("Could not update Windows startup: {e}"))?;
-        }
-        let enabled = launcher.is_enabled().map_err(|e| e.to_string())?;
+        let (enabled, can_enable) = windows_startup::update(enabled)?;
         Ok(StartupStatus { enabled, can_enable })
     }
     #[cfg(not(windows))]
     {
-        let _ = (app, enabled);
+        let _ = enabled;
         Ok(StartupStatus { enabled: false, can_enable: false })
     }
 }
@@ -340,32 +525,23 @@ fn finish_native_menu(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-        use tauri::Manager as _;
+    use tauri::Manager as _;
 
-    let settings_only = std::env::args_os()
+    let _settings_only_compat = std::env::args_os()
         .any(|arg| arg.as_os_str() == std::ffi::OsStr::new("--settings-only"))
         || std::env::var("STACKDOCK_SETTINGS_ONLY").as_deref() == Ok("1");
 
     let mut context = tauri::generate_context!();
 
-    if settings_only {
-        for window in &mut context.config_mut().app.windows {
-            window.create = false;
-        }
+    // Always run in settings-only mode for StackDock.exe
+    for window in &mut context.config_mut().app.windows {
+        window.create = false;
     }
+
     let builder = tauri::Builder::default();
-    #[cfg(windows)]
-    let builder = builder.plugin(tauri_plugin_autostart::init(
-        tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-        None,
-    ));
     builder.plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-                .setup(move |app| {
-            if !settings_only {
-                return Ok(());
-            }
-
+        .setup(move |app| {
             let mut config = app
                 .config()
                 .app
@@ -383,7 +559,7 @@ pub fn run() {
             config.skip_taskbar = false;
             config.visible = false;
 
-            let mut init=String::from("window.__STACKDOCK_SETTINGS_ONLY__ = true;");
+            let mut init = String::from("window.__STACKDOCK_SETTINGS_ONLY__ = true;");
             if std::env::var_os("SD_MENU_X").is_some() {
                 use std::io::Read;
                 let mut payload=String::new();
@@ -411,37 +587,22 @@ pub fn run() {
             native_menu_window, finish_native_menu,
             native_shortcuts::exit_stack_dock,
             native_shortcuts::stack_dock_layout_backup,
-            desktop_widget::dock_taskbar_rects,
-            desktop_widget::dock_drag_button_held,
-            file_drop::sync_dock_file_drop,
-            desktop_widget::start_desktop_widget,
             layout_store::load_shared_layout,
             layout_store::save_shared_layout,
         ])
-                .on_window_event(move |window, event| {
-            if settings_only {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    if let Some(webview) = window.get_webview_window("main") {
-                        if webview
-                            .eval("void window.closeStackDockSettings?.()")
-                            .is_ok()
-                        {
-                            api.prevent_close();
-                        }
+                .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if let Some(webview) = window.get_webview_window("main") {
+                    if webview
+                        .eval("void window.closeStackDockSettings?.()")
+                        .is_ok()
+                    {
+                        api.prevent_close();
                     }
                 }
-                return;
             }
-            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
-                file_drop::unregister_all();
-            }
-            native_shortcuts::keep_dock_open(window, event);
         })
         .build(context)
         .expect("error while building tauri application")
-        .run(|_, event| {
-            if matches!(event, tauri::RunEvent::Exit) {
-                file_drop::unregister_all();
-            }
-        });
+        .run(|_, _| {});
 }
