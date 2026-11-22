@@ -493,6 +493,7 @@ const WM_LBUTTONUP: u32 = 0x0202;
 const WM_MOUSELEAVE: u32 = 0x02A3;
 const WM_DPICHANGED: u32 = 0x02E0;
 const WM_SETTINGS_CLOSED: u32 = 0x8001; // WM_APP + 1
+const REMOVAL_TIMER: usize = 11;
 const ANIMATION_TIMER: usize = 1;
 const HOVER_TIMER: usize = 2;
 const SETTINGS_TIMER: usize = 3;
@@ -829,6 +830,7 @@ struct App {
     surface: Option<Surface>,
     motion: Option<Motion>,
     navigation: Option<Navigation>,
+    removal: Option<(crate::paint::RemovalFrame, Instant, Duration)>,
     clock: Clock,
     hover: Option<Hit>,
     hover_transitions: Vec<HoverTransition>,
@@ -904,6 +906,7 @@ impl App {
             surface: None,
             motion: None,
             navigation: None,
+            removal: None,
             clock: Clock { t:0.,opening:true },
             hover: None,
             hover_transitions: Vec::new(),
@@ -931,12 +934,12 @@ impl App {
         let outside=edges.iter().any(|(_,d)|*d < -8.*scale);
         edges.sort_by(|a,b|a.1.abs().total_cmp(&b.1.abs()));let (edge,d)=edges[0];
         if outside || d.abs()>18.*scale{if self.dwell.take().is_some(){return self.draw();}return Ok(());}
-        if grid && self.dragging {
+        if grid {
             let f=self.saved.folder_at(&self.path).expect("active grid");
             let horizontal=matches!(edge,"left"|"right");
             if (horizontal&&f.cols<12)||(!horizontal&&f.rows<80){
                 if self.dwell.is_none_or(|v|v.0!=edge){self.dwell=Some((edge,Instant::now()));}
-                if self.dwell.is_some_and(|v|v.1.elapsed()>=Duration::from_secs(1)) && rect.contains(x as f32,y as f32){
+                if self.dwell.is_some_and(|v|v.1.elapsed()>=Duration::from_secs(1)) {
                     let before=self.context(&Point{x,y});
                     let mut row=before["r"].as_u64().unwrap_or(0) as usize;
                     let mut col=before["c"].as_u64().unwrap_or(0) as usize;
@@ -1042,13 +1045,7 @@ impl App {
         self.save_layout(&original, &data)
     }
 
-    fn move_grid(&mut self,ctx:&serde_json::Value)->io::Result<()>{
-        let (original, mut data) = self.read_layout()?;
-        let (&root,sub)=self.path.split_first().ok_or_else(||io::Error::other("No open folder"))?;
-        let mut folder=data["layout"]["folders"].get_mut(root).ok_or_else(||io::Error::other("Root folder changed"))?;
-        for &idx in sub{folder=folder["slots"].get_mut(idx).ok_or_else(||io::Error::other("Subfolder changed"))?;}
-        if folder["id"]!=ctx["folder"]{return Err(io::Error::other("The open folder changed during this drag"));}
-        let r=ctx["r"].as_u64().unwrap_or(0);let c=ctx["c"].as_u64().unwrap_or(0);
+    fn grow_grid(folder: &mut serde_json::Value, ctx: &serde_json::Value) {
         for (axis,dim,early,late,max) in [("r","rows","top","bottom",80),("c","cols","left","right",12)]{
             let n=folder[dim].as_u64().unwrap_or(1);let edge=ctx["grow"].as_str();
             if n<max && (edge==Some(early)||edge==Some(late)){
@@ -1057,6 +1054,15 @@ impl App {
                 folder[dim]=(n+1).into();
             }
         }
+    }
+    fn move_grid(&mut self,ctx:&serde_json::Value)->io::Result<()>{
+        let (original, mut data) = self.read_layout()?;
+        let (&root,sub)=self.path.split_first().ok_or_else(||io::Error::other("No open folder"))?;
+        let mut folder=data["layout"]["folders"].get_mut(root).ok_or_else(||io::Error::other("Root folder changed"))?;
+        for &idx in sub{folder=folder["slots"].get_mut(idx).ok_or_else(||io::Error::other("Subfolder changed"))?;}
+        if folder["id"]!=ctx["folder"]{return Err(io::Error::other("The open folder changed during this drag"));}
+        let r=ctx["r"].as_u64().unwrap_or(0);let c=ctx["c"].as_u64().unwrap_or(0);
+        Self::grow_grid(folder,ctx);
         let items=folder["slots"].as_array_mut().ok_or_else(||io::Error::other("Missing grid slots"))?;
         let src=items.iter().position(|e|e["id"]==ctx["source"]).ok_or_else(||io::Error::other("Shortcut moved or removed"))?;
         if let Some(dst)=items.iter().position(|e|e["r"]==r && e["c"]==c){
@@ -1219,7 +1225,18 @@ impl App {
                 order.retain(|item| item.as_str() != Some(id));
             }
         }
+        let frame = if self.saved.dock.motion.unwrap_or(true) && motion_enabled() {
+            crate::paint::RemovalFrame::capture(&mut self.assets,&self.saved,&self.layout,
+                                                &self.path,self.dock_index,id)
+        } else { None };
         self.save_layout(&original, &data).map_err(|error| error.to_string())?;
+        if let Some(frame) = frame {
+            let speed = self.saved.dock.motion_speed.unwrap_or(100.).clamp(25.,250.);
+            let duration = Duration::from_secs_f32((20.5/speed).clamp(0.080,0.650));
+            if unsafe { SetTimer(self.hwnd,REMOVAL_TIMER,15,null_mut()) } != 0 {
+                self.removal = Some((frame,Instant::now(),duration));
+            }
+        }
         self.key_focus = None;
         self.clear_hover();
         self.draw().map_err(|error| error.to_string())
@@ -1265,6 +1282,9 @@ impl App {
 
         let count = if ctx["folder"].is_string() {
             let (grid, rows, cols) = self.current_grid_data(ctx, layout, &stored)?;
+            Self::grow_grid(grid, ctx);
+            let rows = grid["rows"].as_u64().map_or(rows, |n| n as usize);
+            let cols = grid["cols"].as_u64().map_or(cols, |n| n as usize);
             let row = ctx["r"].as_u64().unwrap_or(u64::MAX) as usize;
             let col = ctx["c"].as_u64().unwrap_or(u64::MAX) as usize;
             if row >= rows || col >= cols {
@@ -1564,6 +1584,7 @@ impl App {
     }
 
     fn bounds_at(&self, now: Instant) -> Rect {
+        if let Some((frame,_,_)) = &self.removal { return frame.bounds; }
         if let Some(i)=&self.indicator{
             let ms=now.duration_since(i.start).as_secs_f32()*1000.;
             return if ms<i.travel{i.from.union(i.card)}else if ms<i.travel+i.hold{i.card}else{i.card.union(self.layout.dock)};
@@ -1587,6 +1608,10 @@ impl App {
         let destination=self.drag_at.map(|(x,y)|self.context(&Point{x,y}));
         let surface = self.surface.as_mut().expect("surface allocated");
         let pixels = unsafe { slice::from_raw_parts_mut(surface.bits, w * h) };
+        if let Some((frame,start,duration)) = &self.removal {
+            frame.paint(pixels,bounded(start.elapsed().as_secs_f32()/duration.as_secs_f32()));
+            return surface.present(self.hwnd,bounds);
+        }
         if let Some(i)=&self.indicator{
             let ms=frame_started.duration_since(i.start).as_secs_f32()*1000.;
             let enter=if i.travel>0.{ease_open((ms/i.travel).clamp(0.,1.))}else{1.};
@@ -2245,7 +2270,19 @@ unsafe extern "system" fn window_proc(hwnd: Handle, msg: u32, w: usize, l: isize
             return None;
         };
         let a = state.as_mut()?;
+        if a.removal.is_some() && matches!(msg, 0x0201 | 0x0204 | WM_KEYDOWN | WM_DISPLAYCHANGE | WM_DPICHANGED | WM_SETTINGCHANGE) {
+            a.removal = None;
+            unsafe { KillTimer(hwnd,REMOVAL_TIMER); }
+            let _ = a.draw();
+        }
         match msg {
+            WM_TIMER if w==REMOVAL_TIMER => {
+                if a.removal.as_ref().is_none_or(|(_,start,duration)|start.elapsed() >= *duration) {
+                    a.removal = None;
+                    unsafe { KillTimer(hwnd,REMOVAL_TIMER); }
+                }
+                Some(a.draw())
+            }
             WM_TIMER if w==9=>{unsafe{KillTimer(hwnd,9)};Some(a.update_tip(true).and_then(|_|a.draw()))}
             WM_TIMER if w==10=>{
                 if a.tip_fade.elapsed()>=Duration::from_millis(70){

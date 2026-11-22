@@ -212,6 +212,37 @@ fn launch_program(target: String, arguments: String, start_in: String) -> Result
 }
 
 #[tauri::command]
+fn set_settings_window_icon(
+    window: tauri::WebviewWindow,
+    icon_png: String,
+) -> Result<(), String> {
+    use base64::Engine as _;
+
+    let encoded = icon_png
+        .strip_prefix("data:image/png;base64,")
+        .ok_or("The Settings icon must be a PNG data URL.")?;
+    if encoded.len() > 262_144 {
+        return Err("The Settings icon image is too large.".into());
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|error| format!("Could not decode the Settings icon: {error}"))?;
+    let image = image::load_from_memory(&bytes)
+        .map_err(|error| format!("Could not read the Settings icon: {error}"))?;
+    if image.width() != 128 || image.height() != 128 {
+        return Err("The Settings icon must be 128 by 128 pixels.".into());
+    }
+    let rgba = image.into_rgba8();
+    window
+        .set_icon(tauri::image::Image::new_owned(
+            rgba.into_raw(),
+            128,
+            128,
+        ))
+        .map_err(|error| format!("Could not update the Settings window icon: {error}"))
+}
+
+#[tauri::command]
 fn open_shortcut_path(app: tauri::AppHandle, target: String) -> Result<(), String> {
     use std::path::Path;
     use tauri_plugin_opener::OpenerExt;
@@ -393,12 +424,16 @@ mod windows_startup {
     }
 
     fn native_executable() -> Result<Option<PathBuf>, String> {
-        let Some(path) = std::env::var_os("SD_NATIVE_EXE").filter(|path| !path.is_empty()) else {
-            return Ok(None);
+        let path = match std::env::var_os("SD_NATIVE_EXE").filter(|p| !p.is_empty()) {
+            Some(path) => PathBuf::from(path),
+            None => {
+                let sibling = std::env::current_exe().map_err(|e| e.to_string())?
+                    .with_file_name("stack-dock-native.exe");
+                if !sibling.is_file() { return Ok(None); }
+                sibling
+            }
         };
-        let path = PathBuf::from(path)
-            .canonicalize()
-            .map_err(|error| format!("Could not find the native StackDock executable: {error}"))?;
+        if !path.is_absolute() { return Err("Expected an absolute startup path.".into()); }
         if !path.is_file()
             || !path.file_name().is_some_and(|name| {
                 name.eq_ignore_ascii_case("stack-dock-native.exe")
@@ -409,10 +444,24 @@ mod windows_startup {
         Ok(Some(path))
     }
 
+    fn startup_command(path: &Path) -> Result<String, String> {
+        let raw = path.to_str().ok_or("Startup path contains invalid Unicode.")?;
+        let path = if let Some(share) = raw.strip_prefix(r"\\?\UNC\") {
+            format!(r"\\{share}")
+        } else {
+            raw.strip_prefix(r"\\?\").unwrap_or(raw).to_owned()
+        };
+        let command = format!("\"{path}\"");
+        if command.encode_utf16().count() >= 260 {
+            return Err("Move the portable folder to a shorter path to enable Windows startup.".into());
+        }
+        Ok(command)
+    }
+
     fn register(path: &Path) -> Result<(), String> {
         let key = RegistryKey::create()?;
         let name = value_name();
-        let command = format!("\"{}\"", path.display());
+        let command = startup_command(path)?;
         let data: Vec<u16> = command.encode_utf16().chain([0]).collect();
         let bytes = unsafe {
             std::slice::from_raw_parts(data.as_ptr().cast::<u8>(), data.len() * size_of::<u16>())
@@ -452,7 +501,13 @@ mod windows_startup {
                 unregister()?;
             }
         }
-        let registered = read_registration()?.is_some();
+        let registration = read_registration()?;
+        let registered = match (registration, executable.as_deref()) {
+            (Some(actual), Some(path)) => startup_command(path)
+                .is_ok_and(|expected| actual.eq_ignore_ascii_case(&expected)),
+            (Some(_), None) => true,
+            _ => false,
+        };
         Ok((registered, !cfg!(debug_assertions) && executable.is_some()))
     }
 }
@@ -576,6 +631,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             set_dock_bounds,
             set_dock_region,
+            set_settings_window_icon,
             stack_dock_startup,
             launch_program,
             open_shortcut_path,

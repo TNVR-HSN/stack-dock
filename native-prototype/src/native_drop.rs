@@ -94,10 +94,32 @@ struct Target {allowed:Cell<DROPEFFECT>}
 fn feedback(p:Option<&POINTL>)->bool{
     APP.with(|c|{
         let Ok(mut state)=c.try_borrow_mut()else{return false};let Some(a)=state.as_mut()else{return false};
-        let pt=p.filter(|p|a.settings.is_some() && a.indicator.is_none() && !a.settings_open && a.motion.is_none() && a.context(&Point{x:p.x,y:p.y})["valid"]==true);
-        a.drag_at=pt.map(|p|(p.x,p.y));
-        if pt.is_some(){let _=a.drag_tick();}else{a.dwell=None;}let _=a.draw();
-        pt.is_some()
+        let pt = p.filter(|p| {
+            let clip = a.layout.grid_clip;
+            let margin = 8. * a.layout.s;
+            let edge = !a.path.is_empty() && a.layout.grid.contains(p.x as f32, p.y as f32)
+                && (p.x as f32) >= clip.x - margin && (p.x as f32) <= clip.right() + margin
+                && (p.y as f32) >= clip.y - margin && (p.y as f32) <= clip.bottom() + margin;
+            a.settings.is_some() && a.indicator.is_none() && !a.settings_open && a.motion.is_none()
+                && (edge || a.context(&Point{x:p.x,y:p.y})["valid"] == true)
+        });
+        match pt {
+            Some(p) => {
+                if a.drag_at.is_none() {
+                    unsafe { super::SetTimer(a.hwnd,4,45,ptr::null_mut()); }
+                }
+                if a.drag_at != Some((p.x,p.y)) {
+                    a.drag_at = Some((p.x,p.y));
+                    let _ = a.draw();
+                }
+                a.context(&Point{x:p.x,y:p.y})["valid"] == true
+            }
+            None => {
+                a.clear_drag();
+                let _ = a.draw();
+                false
+            }
+        }
     })
 }
 #[allow(non_snake_case)]
@@ -128,6 +150,9 @@ impl IDropTarget_Impl for Target_Impl{
                     if ctx["valid"] != true {
                         return Err(String::from("Drop the files inside StackDock."));
                     }
+                    let scroll = app.strip.as_ref().map(|_| app.scroll);
+                    app.clear_drag();
+                    if let Some(scroll) = scroll { app.scroll = scroll; }
                     if direct {
                         app.add_dropped_paths(&ctx, &paths).map(|added| {
                             (added < count).then(|| format!(

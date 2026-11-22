@@ -117,9 +117,57 @@ function uiThemeTokens(value){
     warning,'warning-text':uiLegible(c.danger,warning),'warning-border':uiLegible(c.danger,c.card,3)
   };
 }
+const settingsIconSource=new Image();
+let settingsIconAccent=null,settingsIconDataUrl='',settingsIconRevision=0;
+let settingsIconQueue=Promise.resolve();
+function settingsGearIcon(className=''){
+  const mark=E('img',className);
+  mark.classList.add('sd-settings-mark');
+  mark.alt='';mark.setAttribute('aria-hidden','true');
+  mark.src=settingsIconDataUrl||'/settings.png';
+  return mark;
+}
+function updateSettingsIcon(accent){
+  settingsIconAccent=accent;
+  if(!settingsIconSource.complete||!settingsIconSource.naturalWidth)return;
+  let dataUrl;
+  try{
+    const canvas=E('canvas');canvas.width=canvas.height=128;
+    const context=canvas.getContext('2d',{willReadFrequently:true});
+    if(!context)throw Error('Could not create the Settings icon canvas.');
+    context.drawImage(settingsIconSource,0,0,128,128);
+    const pixels=context.getImageData(0,0,128,128),data=pixels.data;
+    const tile=uiRgb(accent),gearColor=uiContrast('#ffffff',accent)>=uiContrast('#000000',accent)?[255,255,255]:[0,0,0];
+    for(let i=0;i<data.length;i+=4){
+      const gear=Math.max(0,Math.min(1,(data[i]-32)/223));
+      for(let channel=0;channel<3;channel++){
+        data[i+channel]=Math.round(tile[channel]*(1-gear)+gearColor[channel]*gear);
+      }
+    }
+    context.putImageData(pixels,0,0);
+    dataUrl=canvas.toDataURL('image/png');
+  }catch(error){
+    console.error('Could not render the StackDock Settings icon:',error);
+    return;
+  }
+  if(dataUrl===settingsIconDataUrl)return;
+  settingsIconDataUrl=dataUrl;
+  document.querySelectorAll('.sd-settings-mark').forEach(mark=>{mark.src=dataUrl;});
+  if(!settingsOnly||!nativeCore?.invoke)return;
+  const revision=++settingsIconRevision;
+  settingsIconQueue=settingsIconQueue.then(()=>{
+    if(revision!==settingsIconRevision)return;
+    return nativeCore.invoke('set_settings_window_icon',{iconPng:dataUrl});
+  }).catch(error=>console.error('Could not update the StackDock Settings window icon:',error));
+}
+settingsIconSource.addEventListener('load',()=>{if(settingsIconAccent)updateSettingsIcon(settingsIconAccent);});
+settingsIconSource.addEventListener('error',error=>console.error('Could not load public/settings.png:',error));
+settingsIconSource.src='/settings.png';
 function applyUiTheme(value){
   const css=document.documentElement.style;
-  for(const [name,color] of Object.entries(uiThemeTokens(value)))css.setProperty('--sd-ui-'+name,color);
+  const tokens=uiThemeTokens(value);
+  for(const [name,color] of Object.entries(tokens))css.setProperty('--sd-ui-'+name,color);
+  updateSettingsIcon(tokens.accent);
 }
 function buildUiThemeSettings(general,onPreview=()=>{}){
   let draft=normalizeUiTheme(state.uiTheme);

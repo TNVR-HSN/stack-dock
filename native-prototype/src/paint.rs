@@ -1197,6 +1197,69 @@ fn entrance_tile(c: &mut Canvas, a: &mut Assets, item: &Entry, folder: &Entry,
     }
     scaled_sprite(c,&sprite,dest,original.icon.w,original.icon.h+skin.effects_height(),opacity);
 }
+pub(crate) struct RemovalFrame {
+    pub bounds: Rect,
+    background: Vec<u32>,
+    cell: Rect,
+    clip: Rect,
+    sprite: TileSprite,
+    dpi: f32,
+}
+
+impl RemovalFrame {
+    pub fn capture(assets: &mut Assets, saved: &Saved, layout: &Layout, path: &[usize],
+                   dock_index: Option<usize>, id: &str) -> Option<Self> {
+        let mut background_layout = layout.clone();
+        let dock = path.is_empty();
+        let (index, entry, tiles, skin, clip) = if dock {
+            let order = saved.ordered();
+            let index = order.iter().position(|item| item.id == id)?;
+            (index, order[index], &mut background_layout.dock_tiles, layout.ds, layout.dock)
+        } else {
+            let folder = saved.folder_at(path)?;
+            let index = folder.slots.iter().position(|item| item.id == id)?;
+            (index, &folder.slots[index], &mut background_layout.grid_tiles, layout.gs, layout.grid_clip)
+        };
+        let position = tiles.iter().position(|t| t.item == index)?;
+        let removed = tiles.remove(position);
+        let cell = removed.box_;
+        let width = cell.w.ceil() as usize;
+        let height = cell.h.ceil() as usize;
+        if width == 0 || height == 0 { return None; }
+        let mut pixels = vec![0; width * height];
+        tile(&mut Canvas::new(&mut pixels, width, height, cell), assets, entry, removed,
+             skin, layout.s, 1., dock, 0., saved.general.image_thumbnails.unwrap_or(true),
+             false, removed.icon.bottom());
+        let p = if dock { 0. } else { 1. };
+        let bounds = layout.envelope(p, false);
+        let (w,h) = (bounds.w as usize, bounds.h as usize);
+        let mut background = vec![0; w*h];
+        frame(&mut Canvas::new(&mut background,w,h,bounds), assets, View {
+            clock: Clock { t:p, opening:true }, nav:None, saved, layout:&background_layout,
+            path, dock_index, p, a:p, hover:None, hover_levels:&[],
+        });
+        Some(Self { bounds, background, cell, clip, sprite:TileSprite { pixels,width,height }, dpi:layout.s })
+    }
+
+    pub fn paint(&self, pixels: &mut [u32], t: f32) {
+        pixels.copy_from_slice(&self.background);
+        let mut canvas = Canvas::overlay(pixels, self.bounds.w as usize, self.bounds.h as usize, self.bounds);
+        canvas.clip = self.clip;
+        let t = ease(t,0.32,0.04,0.64,1.);
+        let (scale,dy,alpha) = if t < 0.42 {
+            let u = t / 0.42;
+            (mix(1.,0.77,u),2.*u,mix(1.,0.75,u))
+        } else {
+            let u = (t-0.42)/0.58;
+            (mix(0.77,0.28,u),mix(2.,6.,u),mix(0.75,0.,u))
+        };
+        let cell = self.cell;
+        let dest = Rect::new(cell.cx()-cell.w*scale/2.,cell.cy()-cell.h*scale/2.+dy*self.dpi,
+                             cell.w*scale,cell.h*scale);
+        scaled_sprite(&mut canvas,&self.sprite,dest,cell.w,cell.h,alpha);
+    }
+}
+
 pub(crate) fn launch_sprite(assets:&mut Assets,item:&Entry,thumb:bool,side:f32)->Option<TileSprite>{
     let image=assets.get(item,thumb)?;
     let side=side.ceil().clamp(1.,512.) as usize;
@@ -1342,7 +1405,8 @@ fn glass_color(base:u32, grid:u32, dock_alpha:f32, grid_alpha:f32)->u32 {
 }
 
 fn header_rect(a: &mut Assets, folder: &Entry, l: &Layout) -> Rect {
-    let max = (l.grid.w - 2.*l.gs.px - l.gs.title - 30.*l.s).max(13.*l.s);
+    let controls = if l.settings_gear.is_some() { 64. } else { 30. };
+    let max = (l.grid.w - 2.*l.gs.px - l.gs.title - controls*l.s).max(13.*l.s);
     let width = a.measure(&folder.name, 13.*l.s, true, max);
     Rect::new(l.grid.cx()-(l.gs.title+8.*l.s+width)/2., l.grid.y+l.gs.py, l.gs.title,l.gs.title)
 }
@@ -1459,7 +1523,7 @@ fn scene(c: &mut Canvas, a: &mut Assets, v: View, outgoing: bool, hull:bool) {
             true,
             hover_value,
             thumb,
-            current.is_some() && dock_index == Some(t.item),
+            path.len() == 1 && dock_index == Some(t.item),
             t.icon.bottom(),
         );
         if !raised { ring(c); }
@@ -1690,6 +1754,7 @@ fn scene(c: &mut Canvas, a: &mut Assets, v: View, outgoing: bool, hull:bool) {
     }
     c.clip = root_clip;
     if let Some(n)=nav {
+        c.clip = root_clip.intersect(panel);
         if outgoing {
             if n.down {if let Some(img)=a.get(folder,thumb) {c.art(&img,icon_rect,l.gs.corner,0.,header_alpha,false);}}
             return;
@@ -1717,7 +1782,8 @@ fn scene(c: &mut Canvas, a: &mut Assets, v: View, outgoing: bool, hull:bool) {
         } else {
             icon_rect
         };
-        let opacity = if anchor.is_some() { 1. } else { header_alpha };
+        let opacity = if path.len() == 1 && anchor.is_some() { 1. } else { header_alpha };
+        if path.len() > 1 { c.clip = root_clip.intersect(panel); }
         let radius = mix(corner(folder, l.ds, true), l.gs.corner, flight);
         let source_angle = folder.icon_rotation.unwrap_or(l.ds.rotation);
         let target_angle=folder.icon_rotation.unwrap_or(l.gs.rotation);

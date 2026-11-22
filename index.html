@@ -216,6 +216,7 @@ dialog:is(.settings-dialog,.sd-properties) .err{margin:0;padding:8px 17px;backgr
  display:grid;place-items:center;flex:none;width:31px;height:31px;border-radius:9px;
  background:linear-gradient(145deg,#e9b8ff,#9a50b8);color:#281032;box-shadow:inset 0 1px 0 #ffffff66,0 3px 12px #bf7fdf38;
 }
+.sd-panel-mark.sd-settings-mark{display:block;background:none;box-shadow:none;object-fit:contain}
 .sd-panel-mark svg,.settings-tabs svg,.sd-panel-search svg{width:16px;height:16px;flex:none}
 .sd-panel-brand strong{display:block;font-size:13px;line-height:1.1}
 .settings-dialog .sd-panel-brand h2{font-size:10px;margin:4px 0 0;letter-spacing:.09em;color:#bc9ecb;text-transform:uppercase}
@@ -285,6 +286,7 @@ dialog.settings-dialog form{height:min(770px,calc(100dvh - var(--sd-caption-gutt
 #dialog .settings-center.sd-about-center+.settings-monitor{display:none}
 .sd-about-pane{max-width:670px}
 .sd-about-hero{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;padding:15px 17px}
+.sd-about-mark{width:48px;height:48px;flex:none;border-radius:14px;object-fit:contain}
 .sd-about-copy{flex:1 1 185px;min-width:0}
 .sd-about-copy strong{display:block;font-size:17px}
 .sd-about-copy .note,.sd-about-note{margin:4px 0 0}
@@ -2042,7 +2044,7 @@ function dialogBuildHere(title,desc,submit,build,save,settings=false){
  const head=E('div','dialogtop'),text=E('div'),h=E('h2','',title);h.id='dialogTitle';
  if(settings||properties){
   const brand=E('div','sd-panel-brand');
-  if(settings)text.append(E('strong','','StackDock'),h);
+  if(settings){brand.append(settingsGearIcon('sd-panel-mark'));text.append(E('strong','','StackDock'),h);}
   else{
    const mark=E('span','sd-panel-mark');
    panelGlyph(mark,'properties');
@@ -2434,7 +2436,7 @@ function buildAboutPane(pane){
  const canReadVersion=typeof app?.getVersion==='function';
  const version=E('span','sd-about-version',canReadVersion?'Reading version…':nativeCore?'Version unavailable':'Browser preview');
  version.setAttribute('aria-live','polite');
- hero.append(copy,version);
+ hero.append(settingsGearIcon('sd-about-mark'),copy,version);
  const resources=E('section','sd-ui-card');
  const title=E('h4','','Project links');title.id='sd-about-links-title';resources.setAttribute('aria-labelledby',title.id);
  const links=E('div','sd-about-links'),status=E('p','note sd-about-note');
@@ -3065,15 +3067,17 @@ const nativeReady = new Promise(resolve => {
       const action=ctx.action;
       try{
         if(!sharedLayoutWriteEnabled)throw Error('Could not read the shared layout.');
+        if(folder && (action==='move' || action==='drop')){
+            if(['left','right'].includes(ctx.grow)&&folder.cols<MAX_COLUMNS){
+              if(ctx.grow==='left')folder.slots.forEach(e=>e.c++);folder.cols++;
+            }
+            if(['top','bottom'].includes(ctx.grow)&&folder.rows<MAX_ROWS){
+              if(ctx.grow==='top')folder.slots.forEach(e=>e.r++);folder.rows++;
+            }
+        }
         if(action==='move'){
           if(folder){
             const src=folder.slots.find(e=>e.id===ctx.source);if(!src)throw Error('The dragged item has moved.');
-            if(['left','right'].includes(ctx.grow)&&folder.cols<MAX_COLUMNS){
-              if(ctx.grow==='left')folder.slots.forEach(e=>e.c++);folder.cols++;where.c=ctx.grow==='left'?0:folder.cols-1;
-            }
-            if(['top','bottom'].includes(ctx.grow)&&folder.rows<MAX_ROWS){
-              if(ctx.grow==='top')folder.slots.forEach(e=>e.r++);folder.rows++;where.r=ctx.grow==='top'?0:folder.rows-1;
-            }
             reposition(folder,src,where);
           }else{const src=dockEntries().find(e=>e.id===ctx.source);if(src)reorderDock(src,ctx.slot);}
         }else if(action==='drop'){
