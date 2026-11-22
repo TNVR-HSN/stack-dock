@@ -78,17 +78,104 @@ fn load(path: Option<PathBuf>) -> Result<Saved, String> {
     }
     Saved::from_json(STARTER.as_bytes())
 }
+
+#[cfg(windows)]
+fn sibling_settings_exe() -> Option<PathBuf> {
+    let executable = std::env::current_exe().ok()?;
+    let executable = executable.canonicalize().ok()?;
+    let settings = executable.with_file_name("StackDock.exe");
+    let settings = settings.canonicalize().ok()?;
+    (settings.is_file() && settings != executable).then_some(settings)
+}
+
+#[cfg(windows)]
+fn is_settings_override_for_running_executable(settings: &std::path::Path) -> bool {
+    let Ok(executable) = std::env::current_exe() else {
+        return false;
+    };
+    let (Ok(executable), Ok(settings)) = (executable.canonicalize(), settings.canonicalize()) else {
+        return false;
+    };
+    executable == settings
+}
+
+#[cfg(windows)]
+fn load_shared_layout(path: &std::path::Path) -> Result<Saved, String> {
+    use std::{
+        fs::{self, OpenOptions},
+        io::{self, ErrorKind, Write},
+        sync::atomic::{AtomicU64, Ordering},
+    };
+    static NEXT_SEED: AtomicU64 = AtomicU64::new(0);
+
+    let seed = || -> io::Result<()> {
+        let directory = path.parent().ok_or_else(|| {
+            io::Error::new(ErrorKind::InvalidInput, "The layout path has no parent directory")
+        })?;
+        fs::create_dir_all(directory)?;
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let number = NEXT_SEED.fetch_add(1, Ordering::Relaxed);
+        let temporary = directory.join(format!(
+            "layout-seed-{}-{nonce}-{number}.tmp",
+            std::process::id()
+        ));
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)?;
+        let written = file
+            .write_all(STARTER.as_bytes())
+            .and_then(|_| file.sync_all());
+        drop(file);
+
+        // Publish the complete file without replacing a layout another process just saved.
+        let published = written.and_then(|_| match fs::hard_link(&temporary, path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => Ok(()),
+            Err(error) => Err(error),
+        });
+        let _ = fs::remove_file(&temporary);
+        published
+    };
+
+    match fs::symlink_metadata(path) {
+        Ok(_) => {}
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            Saved::from_json(STARTER.as_bytes())?;
+            seed().map_err(|error| format!("Could not create {}: {error}", path.display()))?;
+        }
+        Err(error) => return Err(format!("Could not access {}: {error}", path.display())),
+    }
+    Saved::load(path).map_err(|error| format!("Could not load the shared StackDock layout: {error}"))
+}
+
 #[cfg(windows)]
 fn main() -> ExitCode {
     match args().and_then(|p| {
         if p.layout.is_some() && p.settings_exe.is_some() {
             return Err("Use --layout for an exported snapshot, or --settings-exe for the shared layout, not both.".into());
         }
-        let settings = p.settings_exe.map(windows::SettingsLink::new).transpose()?;
+        let settings_exe = match p.settings_exe {
+            Some(settings) => {
+                if is_settings_override_for_running_executable(&settings) {
+                    return Err("The --settings-exe path must refer to a Settings helper, not the running native executable.".into());
+                }
+                Some(settings)
+            }
+            None => {
+                if p.layout.is_none() && !p.smoke {
+                    sibling_settings_exe()
+                } else {
+                    None
+                }
+            }
+        };
+        let settings = settings_exe.map(windows::SettingsLink::new).transpose()?;
         let saved = match &settings {
-            Some(link) => Saved::load(&link.layout_path).map_err(|error| {
-                format!("Could not load the shared StackDock layout. Open the Phase2 dock and save its Settings first.\n\n{error}")
-            })?,
+            Some(link) => load_shared_layout(&link.layout_path)?,
             None => load(p.layout)?,
         };
         Ok((saved, p.smoke, settings))
@@ -141,7 +228,6 @@ fn render(saved: Saved, out: PathBuf) -> Result<(), Box<dyn std::error::Error>> 
                 p: progress,
                 a: progress,
                 hover: None,
-                hover_levels: &[],
             },
         );
         let mut rgba = Vec::with_capacity(w * h * 4);
@@ -165,4 +251,42 @@ fn render(saved: Saved, out: PathBuf) -> Result<(), Box<dyn std::error::Error>> 
         )?;
     }
     Ok(())
+}
+
+#[cfg(all(test, windows))]
+mod startup_tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temporary_layout() -> (PathBuf, PathBuf) {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "stack-dock-startup-test-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        (directory.join("layout.json"), directory)
+    }
+
+    #[test]
+    fn seeds_missing_shared_layout() {
+        let (path, directory) = temporary_layout();
+        let saved = load_shared_layout(&path).unwrap();
+        assert!(!saved.folders.is_empty());
+        assert!(path.is_file());
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn preserves_and_reports_invalid_shared_layout() {
+        let (path, directory) = temporary_layout();
+        std::fs::write(&path, b"{invalid").unwrap();
+        let error = load_shared_layout(&path).unwrap_err();
+        assert!(error.contains("Could not load the shared StackDock layout"));
+        assert_eq!(std::fs::read(&path).unwrap(), b"{invalid");
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 }
