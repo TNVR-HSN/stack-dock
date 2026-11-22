@@ -238,6 +238,11 @@ fn shortcut_is_link(entry: &Entry) -> bool {
     })
 }
 
+thread_local! {
+    static CONFIRMING_REMOVAL: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+}
+
 fn context_menu(hwnd: Handle, keyboard: bool) {
     let mut pt = Point { x: 0, y: 0 };
     if keyboard {
@@ -275,6 +280,7 @@ fn context_menu(hwnd: Handle, keyboard: bool) {
             ctx["r"] = row.into();
             ctx["c"] = col.into();
             let entry = folder.slots.iter().find(|e| e.r == row && e.c == col);
+            ctx["entry"] = entry.map_or(serde_json::Value::Null, |entry| entry.id.clone().into());
             let title = entry.map_or_else(|| format!("{} · Row {}, column {}", folder.name, row + 1, col + 1), |e| e.name.clone());
             menu.item(&title, 0, 1);
             match entry {
@@ -286,7 +292,7 @@ fn context_menu(hwnd: Handle, keyboard: bool) {
                 Some(e) => {
                     add(&menu, "Shortcut properties…", "Shortcut properties…", editable, false);
                     let label = if shortcut_is_link(e) { "Open Link" } else { "Open Destination" };
-                    add(&menu, label, label, shortcut_is_link(e) || editable, false);
+                    add(&menu, label, label, true, false);
                     add(&menu, "Remove shortcut", "Remove shortcut", editable, false);
                 }
                 None => {
@@ -318,7 +324,7 @@ fn context_menu(hwnd: Handle, keyboard: bool) {
             if let Some(e) = entry.filter(|e| !e.folder()) {
                 add(&menu, "Shortcut properties…", "Shortcut properties…", editable, false);
                 let label = if shortcut_is_link(e) { "Open Link" } else { "Open Destination" };
-                add(&menu, label, label, shortcut_is_link(e) || editable, false);
+                add(&menu, label, label, true, false);
                 menu.separator();
             }
             if entry.is_some_and(Entry::folder) {
@@ -390,6 +396,70 @@ fn context_menu(hwnd: Handle, keyboard: bool) {
             target
         })
     };
+    if action == "Open Destination" {
+        let target = APP.with(|cell| {
+            let state = cell.borrow();
+            let app = state.as_ref()?;
+            let entry = if let Some(folder_id) = ctx["folder"].as_str() {
+                let folder = app.saved.folder_at(&app.path)?;
+                if folder.id.as_str() != folder_id {
+                    return None;
+                }
+                let row = ctx["r"].as_u64()? as usize;
+                let col = ctx["c"].as_u64()? as usize;
+                folder.slots.iter().find(|entry| entry.r == row && entry.c == col)
+            } else {
+                let id = ctx["entry"].as_str()?;
+                app.saved.dock_shortcuts.iter().find(|entry| entry.id.as_str() == id)
+            }?;
+            (!entry.folder() && !shortcut_is_link(entry)).then(|| entry.target.clone())
+        });
+        let result = target.ok_or_else(|| String::from("The selected shortcut is no longer available."))
+            .and_then(|target| open_destination(hwnd, &target));
+        if let Err(error) = result {
+            message(hwnd, &error);
+        }
+        return;
+    }
+    if matches!(action.as_str(), "Remove folder…" | "Remove subfolder…") {
+        let name = APP.with(|cell| {
+            let state = cell.borrow();
+            let app = state.as_ref()?;
+            let id = ctx["entry"].as_str()?;
+            let entries = if action == "Remove subfolder…" {
+                &app.saved.folder_at(&app.path)?.slots
+            } else {
+                &app.saved.folders
+            };
+            entries.iter().find(|entry| entry.folder() && entry.id.as_str() == id)
+                .map(|entry| entry.name.clone())
+        });
+        let Some(name) = name else {
+            message(hwnd, "The selected folder is no longer available.");
+            return;
+        };
+        let title = wide(&format!("Remove {name}?"));
+        let description = wide("Remove this folder and its shortcuts from StackDock? Your original files are kept.");
+        // Yes/No, question icon, No selected by default.
+        let accepted = CONFIRMING_REMOVAL.with(|flag| {
+            flag.set(true);
+
+            // A pending focus-loss timer can otherwise close the grid
+            // while the confirmation dialog is waiting for an answer.
+            unsafe { KillTimer(hwnd, 6); }
+
+            let answer = unsafe {
+                MessageBoxW(hwnd, description.as_ptr(), title.as_ptr(), 0x0000_0124)
+            };
+
+            flag.set(false);
+            answer == 6
+        });
+
+        if !accepted {
+            return;
+        }
+    }
     let result=APP.with(|cell|->Result<Option<Target>,String>{
         let mut st=cell.borrow_mut();let Some(a)=st.as_mut()else{return Ok(None)};
         if matches!(action.as_str(), "Open Link" | "Open subfolder") {
@@ -684,6 +754,28 @@ fn launch_target(hwnd: Handle, entry: &Target) -> Result<(), String> {
         }
     }
 }
+fn open_destination(hwnd: Handle, target: &str) -> Result<(), String> {
+    let path = Path::new(target.trim().trim_matches('"'));
+    if !path.is_absolute() {
+        return Err("Enter a full file or folder path.".into());
+    }
+    let folder = if path.is_dir() {
+        path
+    } else {
+        path.parent().ok_or("This shortcut has no containing folder.")?
+    };
+    if !folder.is_dir() {
+        return Err(format!("Destination folder not found: {}", folder.display()));
+    }
+
+    let folder = wide(&folder.to_string_lossy());
+    let status = unsafe { ShellExecuteW(hwnd, null(), folder.as_ptr(), null(), null(), 1) } as isize;
+    if status <= 32 {
+        return Err(format!("Windows could not open the destination (ShellExecute status {status})."));
+    }
+    Ok(())
+}
+
 fn message(hwnd: Handle, text: &str) {
     let text = wide(text);
     let title = wide("StackDock native preview");
@@ -1066,8 +1158,200 @@ impl App {
         self.save_layout(&original, &data)
     }
 
+    fn current_grid_data<'a>(
+        &self,
+        ctx: &serde_json::Value,
+        layout: &'a mut serde_json::Value,
+        stored: &Saved,
+    ) -> Result<(&'a mut serde_json::Value, usize, usize), String> {
+        let changed = || String::from("The open grid changed. Reopen its menu and try again.");
+        let active = self.saved.folder_at(&self.path).ok_or_else(changed)?;
+        let current = stored.folder_at(&self.path).ok_or_else(changed)?;
+        if ctx["folder"].as_str() != Some(active.id.as_str())
+            || active.id != current.id || active.cols != current.cols || active.rows != current.rows
+        {
+            return Err(changed());
+        }
+        let (&root, nested) = self.path.split_first().ok_or_else(changed)?;
+        let mut raw = &mut layout["folders"][root];
+        let mut entry = &stored.folders[root];
+        for &index in nested {
+            entry = entry.slots.get(index).ok_or_else(changed)?;
+            raw = raw["slots"].as_array_mut()
+                .and_then(|slots| slots.iter_mut().find(|slot| slot["id"].as_str() == Some(entry.id.as_str())))
+                .ok_or_else(changed)?;
+        }
+        Ok((raw, current.rows, current.cols))
+    }
+
+    fn remove_entry(&mut self, ctx: &serde_json::Value, action: &str) -> Result<(), String> {
+        let missing = || String::from("The selected entry is no longer available.");
+        let id = ctx["entry"].as_str().ok_or_else(missing)?;
+        let (original, mut data) = self.read_layout().map_err(|error| error.to_string())?;
+        let stored = Saved::from_json(&original)?;
+        let layout = &mut data["layout"];
+        let in_grid = ctx["folder"].is_string();
+        let items = if in_grid {
+            if action == "Remove folder…" {
+                return Err(missing());
+            }
+            let (grid, _, _) = self.current_grid_data(ctx, layout, &stored)?;
+            grid["slots"].as_array_mut().ok_or_else(missing)?
+        } else if self.path.is_empty() {
+            let key = match action {
+                "Remove shortcut" => "dockShortcuts",
+                "Remove folder…" if stored.folders.len() > 1 => "folders",
+                "Remove folder…" => return Err("Keep at least one folder in the dock.".into()),
+                _ => return Err(missing()),
+            };
+            layout[key].as_array_mut().ok_or_else(missing)?
+        } else {
+            return Err(missing());
+        };
+        let index = items.iter().position(|item| {
+            item["id"].as_str() == Some(id)
+                && (item["type"] == "item") == (action == "Remove shortcut")
+        }).ok_or_else(missing)?;
+        items.remove(index);
+        if !in_grid {
+            if let Some(order) = layout["dockOrder"].as_array_mut() {
+                order.retain(|item| item.as_str() != Some(id));
+            }
+        }
+        self.save_layout(&original, &data).map_err(|error| error.to_string())?;
+        self.key_focus = None;
+        self.clear_hover();
+        self.draw().map_err(|error| error.to_string())
+    }
+
+    fn add_dropped_paths(
+        &mut self, ctx: &serde_json::Value, paths: &[String],
+    ) -> Result<usize, String> {
+        let (original, mut data) = self.read_layout().map_err(|error| error.to_string())?;
+        let stored = Saved::from_json(&original)?;
+        let layout = &mut data["layout"];
+        let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default().as_nanos();
+        let mut entries = Vec::new();
+        for (index, target) in paths.iter().take(64).enumerate() {
+            let path = Path::new(target);
+            if !path.is_absolute() { continue; }
+            let Ok(metadata) = path.metadata() else { continue; };
+            let is_program = metadata.is_file()
+                && path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("exe"));
+            let name = (if is_program { path.file_stem() } else { path.file_name() })
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_else(|| target.to_owned());
+            let (kind, local_type, icon) = if metadata.is_dir() {
+                ("local", "folder", "folder")
+            } else if is_program {
+                ("program", "file", "program")
+            } else {
+                ("local", "file", "file")
+            };
+            entries.push(serde_json::json!({
+                "id": format!("drop-{:x}-{nonce:x}-{index:x}", std::process::id()),
+                "type": "item",
+                "target": target,
+                "name": name,
+                "kind": kind,
+                "localType": local_type,
+                "icon": icon,
+                "args": "",
+                "cwd": "",
+            }));
+        }
+
+        let count = if ctx["folder"].is_string() {
+            let (grid, rows, cols) = self.current_grid_data(ctx, layout, &stored)?;
+            let row = ctx["r"].as_u64().unwrap_or(u64::MAX) as usize;
+            let col = ctx["c"].as_u64().unwrap_or(u64::MAX) as usize;
+            if row >= rows || col >= cols {
+                return Err("Drop the files inside the open grid.".into());
+            }
+            if grid["slots"].is_null() { grid["slots"] = serde_json::json!([]); }
+            let slots = grid["slots"].as_array_mut().ok_or("Invalid grid slots")?;
+            slots.retain(|slot| slot["type"] != "spacer");
+            let occupied: std::collections::HashSet<_> = slots.iter().map(|slot| {
+                slot["r"].as_u64().unwrap_or(0) as usize * cols
+                    + slot["c"].as_u64().unwrap_or(0) as usize
+            }).collect();
+            let mut count = 0;
+            let mut needed_rows = rows;
+            let cells = (row * cols + col..80 * cols).filter(|cell| !occupied.contains(cell));
+            for (mut entry, cell) in entries.into_iter().zip(cells) {
+                entry["r"] = (cell / cols).into();
+                entry["c"] = (cell % cols).into();
+                needed_rows = needed_rows.max(cell / cols + 1);
+                slots.push(entry);
+                count += 1;
+            }
+            grid["rows"] = needed_rows.into();
+            count
+        } else {
+            let mut order: Vec<_> = stored.ordered().into_iter().map(|entry| entry.id.clone()).collect();
+            if !order.iter().map(String::as_str).eq(self.saved.ordered().iter().map(|entry| entry.id.as_str())) {
+                return Err("The dock order changed during the drop.".into());
+            }
+            let slot = (ctx["slot"].as_u64().unwrap_or(order.len() as u64) as usize).min(order.len());
+            if layout["dockShortcuts"].is_null() { layout["dockShortcuts"] = serde_json::json!([]); }
+            let shortcuts = layout["dockShortcuts"].as_array_mut().ok_or("Invalid dock shortcuts")?;
+            entries.truncate(160usize.saturating_sub(shortcuts.len()));
+            let count = entries.len();
+            let ids = entries.iter().map(|entry| entry["id"].as_str().unwrap_or_default().to_owned());
+            drop(order.splice(slot..slot, ids));
+            shortcuts.extend(entries);
+            layout["dockOrder"] = serde_json::to_value(order).map_err(|error| error.to_string())?;
+            count
+        };
+        if count == 0 {
+            return Err("No shortcuts added. Check the available space and targets.".into());
+        }
+        self.save_layout(&original, &data).map_err(|error| error.to_string())?;
+        self.drag_base.clear();
+        self.draw().map_err(|error| error.to_string())?;
+        Ok(count)
+    }
+
     fn command(&mut self,ctx:serde_json::Value)->Result<(),String>{
         if self.settings_open || self.settings.is_none(){return Err("Close the editor and start the dock with --settings-exe before editing.".into());}
+        match ctx["action"].as_str() {
+            Some(action @ ("Remove shortcut" | "Remove folder…" | "Remove subfolder…")) => {
+                return self.remove_entry(&ctx, action);
+            }
+            _ => {}
+        }
+        if let Some(position) = ctx["action"].as_str()
+            .and_then(|action| action.strip_prefix("position/"))
+        {
+            let (edge, align) = position.split_once('/').ok_or("Invalid dock position")?;
+            if !matches!(edge, "top" | "bottom" | "left" | "right") {
+                return Err("Invalid screen edge".into());
+            }
+            let align = match align {
+                "" => "center",
+                "start" | "center" | "end" => align,
+                _ => return Err("Invalid dock alignment".into()),
+            };
+            if !self.path.is_empty() {
+                return Err("Close the grid before changing the dock position.".into());
+            }
+
+            let (original, mut data) = self.read_layout().map_err(|error| error.to_string())?;
+            let layout = &mut data["layout"];
+            if layout["edge"].as_str() != Some(self.saved.edge.as_str())
+                || layout["align"].as_str().unwrap_or_default() != self.saved.align.as_str()
+            {
+                return Err("The saved dock position changed. Reopen StackDock and try again.".into());
+            }
+            if layout["edge"].as_str() == Some(edge) && layout["align"].as_str() == Some(align) {
+                return Ok(());
+            }
+            layout["edge"] = edge.into();
+            layout["align"] = align.into();
+            return self.save_layout(&original, &data).and_then(|()| self.draw())
+                .map_err(|error| error.to_string());
+        }
         let axis_edit = match ctx["action"].as_str() {
             Some("Insert row below") => Some(("r", "rows", 80, true)),
             Some("Insert column right") => Some(("c", "cols", 12, true)),
@@ -1382,17 +1666,7 @@ impl App {
                 overlay.rounded(edge,1.,0xffe4b5ff);
             }
         }
-        let paint_ms = frame_started.elapsed().as_secs_f64() * 1000.0;
-        let result = surface.present(self.hwnd, bounds);
-        let total_ms = frame_started.elapsed().as_secs_f64() * 1000.0;
-
-        if total_ms >= 20.0 {
-            eprintln!(
-                "[slow frame] total={total_ms:.1} ms  before_present={paint_ms:.1} ms  present={:.1} ms",
-                total_ms - paint_ms
-            );
-        }
-        result
+        surface.present(self.hwnd, bounds)
     }
     fn stop(&mut self) {
         self.motion = None;
@@ -2072,6 +2346,7 @@ unsafe extern "system" fn window_proc(hwnd: Handle, msg: u32, w: usize, l: isize
             WM_TIMER if w == SETTINGS_TIMER => Some(a.poll_settings()),
             WM_ACTIVATE
                 if w & 0xffff == 0
+                    && !CONFIRMING_REMOVAL.with(|flag| flag.get())
                     && !a.settings_open
                     && a.saved.general.collapse_on_focus_loss.unwrap_or(true)
                     && !a.path.is_empty() =>
@@ -2082,7 +2357,12 @@ unsafe extern "system" fn window_proc(hwnd: Handle, msg: u32, w: usize, l: isize
                 use windows::Win32::UI::{Input::KeyboardAndMouse::GetAsyncKeyState,WindowsAndMessaging::GetForegroundWindow};
                 let active=unsafe{GetForegroundWindow()}.0==hwnd;
                 let held=unsafe{GetAsyncKeyState(1)}<0;
-                if active||a.path.is_empty()||a.settings_open||!a.saved.general.collapse_on_focus_loss.unwrap_or(true){
+                if CONFIRMING_REMOVAL.with(|flag| flag.get())
+                    || active
+                    || a.path.is_empty()
+                    || a.settings_open
+                    || !a.saved.general.collapse_on_focus_loss.unwrap_or(true)
+                {
                     unsafe{KillTimer(hwnd,6)};Some(Ok(()))
                 }else if held||a.drag_at.is_some(){Some(Ok(()))}
                 else{unsafe{KillTimer(hwnd,6)};Some(a.go(0.))}

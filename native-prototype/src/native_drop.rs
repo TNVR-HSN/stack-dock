@@ -116,9 +116,40 @@ impl IDropTarget_Impl for Target_Impl{
         if allowed.0!=0&&feedback(Some(p)){if let Some(s)=data.as_ref(){
             let paths=paths_from(s);let urls=if paths.is_empty(){links(s)}else{vec![]};
             if !paths.is_empty()||!urls.is_empty(){
-                let result=APP.with(|c|{let mut state=c.borrow_mut();let a=state.as_mut().ok_or("Dock closed")?;
-                    let mut ctx=a.context(&Point{x:p.x,y:p.y});ctx["action"]="drop".into();ctx["paths"]=paths.into();ctx["urls"]=urls.into();a.command(ctx)});
-                match result{Ok(())=>*e=allowed,Err(err)=>super::message(ptr::null_mut(),&err)}
+                let count = paths.len();
+                let direct = urls.is_empty() && !paths.iter().any(|path| {
+                    Path::new(path).extension().is_some_and(|extension|
+                        extension.eq_ignore_ascii_case("lnk") || extension.eq_ignore_ascii_case("url"))
+                });
+                let result = APP.with(|cell| {
+                    let mut state = cell.borrow_mut();
+                    let app = state.as_mut().ok_or("Dock closed")?;
+                    let mut ctx = app.context(&Point { x: p.x, y: p.y });
+                    if ctx["valid"] != true {
+                        return Err(String::from("Drop the files inside StackDock."));
+                    }
+                    if direct {
+                        app.add_dropped_paths(&ctx, &paths).map(|added| {
+                            (added < count).then(|| format!(
+                                "{added} shortcuts added. Check the available space and targets."
+                            ))
+                        })
+                    } else {
+                        ctx["action"] = "drop".into();
+                        ctx["paths"] = paths.into();
+                        ctx["urls"] = urls.into();
+                        app.command(ctx).map(|()| None)
+                    }
+                });
+                match result {
+                    Ok(notice) => {
+                        *e = allowed;
+                        if let Some(notice) = notice {
+                            super::message(ptr::null_mut(), &notice);
+                        }
+                    }
+                    Err(error) => super::message(ptr::null_mut(), &error),
+                }
             }
         }}
         if e.0!=0{APP.with(|c|{if let Some(a)=c.borrow().as_ref(){unsafe{super::KillTimer(a.hwnd,6)};}});}

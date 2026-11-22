@@ -235,7 +235,71 @@ impl<'a> Canvas<'a> {
             }
         }
     }
-    fn caption(
+        fn caption(
+        &mut self,
+        assets: &mut Assets,
+        name: &str,
+        x: f32,
+        y: f32,
+        font: f32,
+        width: f32,
+        opacity: f32,
+    ) {
+        if opacity <= 0.0 || name.is_empty() || width < font || font <= 0.0 {
+            return;
+        }
+
+        // Keep the same center and first-line baseline as the live renderer.
+        // Leave room for glyph overhang, descenders, and the second-line shadow.
+        let half_width = (width * 0.5 + font).ceil() as usize;
+        let baseline = (font * 1.5).ceil() as usize;
+        let bitmap_width = 2 * half_width;
+        let bitmap_height = baseline + (font * 2.0).ceil() as usize + 2;
+
+        let dest = Rect::new(
+            x.round() - half_width as f32,
+            y.round() - baseline as f32,
+            bitmap_width as f32,
+            bitmap_height as f32,
+        );
+        let visible = dest.intersect(self.clip).intersect(self.origin);
+        if visible.w <= 0.0 || visible.h <= 0.0 {
+            return;
+        }
+
+        let key = (name.to_owned(), font.to_bits(), width.to_bits());
+        if let Some(pixels) = assets.caption_pixels.get(&key) {
+            self.fade_snapshot(pixels, dest, opacity);
+            return;
+        }
+
+        // Bound cache memory and fall back to the original drawing path for
+        // unusually large captions.
+        let pixel_count = bitmap_width.saturating_mul(bitmap_height);
+        if pixel_count > 32_768 {
+            self.paint_caption(assets, name, x, y, font, width, opacity);
+            return;
+        }
+
+        let mut pixels = vec![0; pixel_count];
+        let origin = Rect::new(0.0, 0.0, bitmap_width as f32, bitmap_height as f32);
+        Canvas::new(&mut pixels, bitmap_width, bitmap_height, origin).paint_caption(
+            assets,
+            name,
+            half_width as f32,
+            baseline as f32,
+            font,
+            width,
+            1.0,
+        );
+
+        self.fade_snapshot(&pixels, dest, opacity);
+        if assets.caption_pixels.len() >= 256 {
+            assets.caption_pixels.clear();
+        }
+        assets.caption_pixels.insert(key, pixels);
+    }
+    fn paint_caption(
         &mut self,
         assets: &mut Assets,
         name: &str,
@@ -373,8 +437,6 @@ impl<'a> Canvas<'a> {
         if alpha <= 0.0 || max < size || assets.font.is_none() {
             return;
         }
-        let w = assets.measure(value, size, strong, max);
-        let mut ox = dx - w / 2.;
         let mut remaining = String::new();
         let mut occupied = 0.;
         for ch in value.chars().filter(|ch| !ch.is_control()).take(128) {
@@ -397,9 +459,12 @@ impl<'a> Canvas<'a> {
             occupied += advance;
             remaining.push(ch);
         }
-                let start_x = ox;
+        // Measure the actual displayed line, including any ellipsis.
+        let line_width = assets.measure(&remaining, size, strong, max);
+        let start_x = (dx.round() - line_width * 0.5).floor();
+
         for shadow in [true, false] {
-            ox = start_x;
+            let mut ox = start_x;
 
             for ch in remaining.chars() {
                 let Some(g) = assets.glyph(ch, size, strong) else {
@@ -407,12 +472,27 @@ impl<'a> Canvas<'a> {
                 };
 
                 let (m, bits) = (&g.0, &g.1);
-                let left = ox.round() as i32 + m.xmin;
-                let top = dy as i32 - m.ymin - m.height as i32;
+                let left = ox.floor() as i32 + m.xmin;
+                let fraction = ox - ox.floor();
+                let top = dy.round() as i32 - m.ymin - m.height as i32;
 
                 for y in 0..m.height {
-                    for x in 0..m.width {
-                        let coverage = bits[y * m.width + x] as f32 * alpha;
+                    let row = y * m.width;
+
+                    for x in 0..=m.width {
+                        let current = if x < m.width {
+                            bits[row + x] as f32
+                        } else {
+                            0.0
+                        };
+
+                        let previous = if x > 0 {
+                            bits[row + x - 1] as f32
+                        } else {
+                            0.0
+                        };
+
+                        let coverage = (current + fraction * (previous - current)) * alpha;
                         let px = left + x as i32;
                         let py = top + y as i32;
 
@@ -484,6 +564,7 @@ impl HoverTip{
     }
 }
 pub struct Assets {
+    caption_pixels: HashMap<(String, u32, u32), Vec<u32>>,
     warm:Option<std::sync::mpsc::Receiver<(String,Option<RgbaImage>)>>,
     entrance_tiles: HashMap<(String,usize,bool), Rc<TileSprite>>,
     font: Option<Font>,
@@ -498,6 +579,7 @@ impl Assets {
     pub fn clear_entrance(&mut self) { self.entrance_tiles.clear(); }
 
     pub fn clear_layout_images(&mut self) {
+        self.caption_pixels.clear();
         self.warm=None;self.images.clear();
         self.entrance_tiles.clear();
         self.painted_icons.clear();
@@ -521,6 +603,7 @@ impl Assets {
             painted_icons: HashMap::new(),
             reflections: HashMap::new(),
             glyphs: HashMap::new(),
+            caption_pixels: HashMap::new(),
         }
     }
     fn glyph(&mut self, ch: char, px: f32, strong: bool) -> Option<Rc<Glyph>> {
@@ -1057,6 +1140,31 @@ pub enum Hit {
 }
 // Rasterize the complete cell once per entrance, then transform the cached
 // premultiplied pixels, including captions and reflections, as a single layer.
+fn entrance_sprite(a: &mut Assets, item: &Entry, folder: &Entry,
+    original: Tile, skin: Skin, dpi: f32, thumb: bool) -> Rc<TileSprite> {
+    let key=(folder.id.clone(), original.item, false);
+    if let Some(sprite)=a.entrance_tiles.get(&key) {
+        return Rc::clone(sprite);
+    }
+
+    let width=original.icon.w.ceil().max(1.) as usize;
+    let height=(original.icon.h+skin.effects_height()).ceil().max(1.) as usize;
+    let mut pixels=vec![0; width*height];
+    let origin=Rect::new(0.,0.,width as f32,height as f32);
+    let mut local=original;
+    local.icon.x=0.;
+    local.icon.y=0.;
+    local.box_=origin;
+    let mut skin=skin;
+    skin.labels=false;
+    tile(&mut Canvas::new(&mut pixels,width,height,origin),a,item,local,skin,dpi,1.,
+        false,0.,thumb,false,local.icon.bottom());
+    let sprite=Rc::new(TileSprite {pixels,width,height});
+    if a.entrance_tiles.len() >= 256 {a.entrance_tiles.clear();}
+    a.entrance_tiles.insert(key,Rc::clone(&sprite));
+    sprite
+}
+
 fn entrance_tile(c: &mut Canvas, a: &mut Assets, item: &Entry, folder: &Entry,
     original: Tile, dest: Rect, skin: Skin, dpi: f32, alpha: f32, thumb: bool, skip: bool) {
     let visible = dest.intersect(c.clip);
@@ -1065,47 +1173,26 @@ fn entrance_tile(c: &mut Canvas, a: &mut Assets, item: &Entry, folder: &Entry,
     let top=original.icon.y-original.box_.y;
     let artwork=Rect::new(dest.x+(original.icon.x-original.box_.x)*k,dest.y+top*k,original.icon.w*k,(original.icon.h+skin.effects_height())*k);
     if skin.labels{
-        let baseline=(artwork.bottom()+skin.font+dpi).round();
+        let baseline = artwork.bottom() + skin.font + dpi;
         c.caption(a,&item.name,dest.cx().round(),baseline,skin.font,original.box_.w,alpha);
     }
     let dest=artwork;
     let visible=dest.intersect(c.clip);
     if skip || visible.w<=0. || visible.h<=0.{return;}
-    let key=(folder.id.clone(),original.item,skip);
-    let sprite=if let Some(sprite)=a.entrance_tiles.get(&key) {Rc::clone(sprite)} else {
-        let width=original.icon.w.ceil().max(1.) as usize;
-        let height=(original.icon.h+skin.effects_height()).ceil().max(1.) as usize;
-        let mut pixels=vec![0; width*height];
-        let origin=Rect::new(0.,0.,width as f32,height as f32);
-        let mut local=original;
-        local.icon.x=0.;
-        local.icon.y=0.;
-        local.box_=origin;
-        let mut skin=skin;skin.labels=false;
-        tile(&mut Canvas::new(&mut pixels,width,height,origin),a,item,local,skin,dpi,1.,
-            false,0.,thumb,skip,local.icon.bottom());
-        let sprite=Rc::new(TileSprite {pixels,width,height});
-        if a.entrance_tiles.len() >= 256 {a.entrance_tiles.clear();}
-        a.entrance_tiles.insert(key,Rc::clone(&sprite));
-        sprite
-    };
+    let sprite=entrance_sprite(a,item,folder,original,skin,dpi,thumb);
     let opacity=bounded(alpha);
     // Fasade has a fixed cell rectangle. Copy its cached premultiplied pixels directly.
     if (k-1.).abs()<0.0001 {
-        let fade=(opacity*255.).round() as u32;
-        let left=dest.x.round() as i32; let top=dest.y.round() as i32;
-        for y in visible.y.floor() as i32..visible.bottom().ceil() as i32 {
-            let sy=y-top;
-            if sy<0 || sy>=sprite.height as i32 {continue;}
-            for x in visible.x.floor() as i32..visible.right().ceil() as i32 {
-                let sx=x-left;
-                if sx<0 || sx>=sprite.width as i32 {continue;}
-                let px=sprite.pixels[sy as usize*sprite.width+sx as usize];
-                if px==0 {continue;}
-                let ch=|n:u32|mul255((px>>n)&255,fade);
-                c.put(x,y,if fade==255 {px} else {pack(ch(24),ch(16),ch(8),ch(0))});
-            }
-        }
+        let sprite_rect = Rect::new(
+            dest.x.round(),
+            dest.y.round(),
+            sprite.width as f32,
+            sprite.height as f32,
+        );
+        let previous_clip = c.clip;
+        c.clip = c.clip.intersect(dest);
+        c.fade_snapshot(&sprite.pixels, sprite_rect, opacity);
+        c.clip = previous_clip;
         return;
     }
     scaled_sprite(c,&sprite,dest,original.icon.w,original.icon.h+skin.effects_height(),opacity);
@@ -1118,26 +1205,101 @@ pub(crate) fn launch_sprite(assets:&mut Assets,item:&Entry,thumb:bool,side:f32)-
     Canvas::new(&mut pixels,side,side,rect).art(&image,rect,0.,item.icon_rotation.unwrap_or(0.),1.,false);
     Some(TileSprite{width:side,height:side,pixels})
 }
-fn scaled_sprite(c:&mut Canvas,sprite:&TileSprite,dest:Rect,width:f32,height:f32,opacity:f32){
-    let visible=dest.intersect(c.clip);
-    if visible.w<=0. || visible.h<=0. || opacity<=0.{return;}
-    for y in visible.y.floor() as i32..visible.bottom().ceil() as i32 {
-        let sy=((y as f32+0.5-dest.y)*height/dest.h-0.5).clamp(0.,(sprite.height-1) as f32);
-        let row=sy as usize;let next=(row+1).min(sprite.height-1);
-        for x in visible.x.floor() as i32..visible.right().ceil() as i32 {
-            let sx=((x as f32+0.5-dest.x)*width/dest.w-0.5).clamp(0.,(sprite.width-1) as f32);
-            let col=sx as usize;let right=(col+1).min(sprite.width-1);
-            let get=|cx:usize,cy:usize|sprite.pixels[cy*sprite.width+cx];
-            let (tl,tr,bl,br)=(get(col,row),get(right,row),get(col,next),get(right,next));
-            if (tl|tr|bl|br)==0 {continue;}
-            let channel=|shift:u32|{
-                let byte=|pixel:u32|((pixel>>shift)&255) as f32;
-                (opacity*mix(mix(byte(tl),byte(tr),sx.fract()),mix(byte(bl),byte(br),sx.fract()),sy.fract())).round() as u32
-            };
-            c.put(x,y,pack(channel(24),channel(16),channel(8),channel(0)));
+#[inline]
+fn blend_sprite_pixels(first: u32, second: u32, weight: u32) -> u32 {
+    // Interpolate two byte lanes at once. Each weighted sum fits in 16 bits.
+    const LANES: u32 = 0x00ff_00ff;
+    let inverse = 256 - weight;
+
+    let rb = ((first & LANES) * inverse
+        + (second & LANES) * weight
+        + 0x0080_0080) >> 8;
+
+    let ag = (((first >> 8) & LANES) * inverse
+        + ((second >> 8) & LANES) * weight
+        + 0x0080_0080) >> 8;
+
+    (rb & LANES) | ((ag & LANES) << 8)
+}
+
+fn scaled_sprite(
+    c: &mut Canvas,
+    sprite: &TileSprite,
+    dest: Rect,
+    width: f32,
+    height: f32,
+    opacity: f32,
+) {
+    if dest.w <= 0.0 || dest.h <= 0.0 || sprite.width == 0 || sprite.height == 0 {
+        return;
+    }
+
+    let visible = dest.intersect(c.clip).intersect(c.origin);
+    let fade = (opacity.clamp(0.0, 1.0) * 256.0).round() as u32;
+    if visible.w <= 0.0 || visible.h <= 0.0 || fade == 0 {
+        return;
+    }
+
+    let left = (visible.x - 0.5).ceil() as i32;
+    let right = (visible.right() - 0.5).ceil() as i32;
+    let top = (visible.y - 0.5).ceil() as i32;
+    let bottom = (visible.bottom() - 0.5).ceil() as i32;
+    let step_x = width / dest.w;
+    let step_y = height / dest.h;
+    let last_x = sprite.width - 1;
+    let last_y = sprite.height - 1;
+    if right <= left || bottom <= top {
+        return;
+    }
+
+    let mut columns = Vec::with_capacity((right - left).max(0) as usize);
+    for x in left..right {
+        let sx = ((x as f32 + 0.5 - dest.x) * step_x - 0.5)
+            .clamp(0.0, last_x as f32);
+        let x0 = sx as usize;
+        let x1 = (x0 + 1).min(last_x);
+        let wx = ((sx - x0 as f32) * 256.0).round() as u32;
+        columns.push((x0, x1, wx));
+    }
+
+    for y in top..bottom {
+        let sy = ((y as f32 + 0.5 - dest.y) * step_y - 0.5)
+            .clamp(0.0, last_y as f32);
+        let y0 = sy as usize;
+        let y1 = (y0 + 1).min(last_y);
+        let wy = ((sy - y0 as f32) * 256.0).round() as u32;
+        let upper = &sprite.pixels[y0 * sprite.width..][..sprite.width];
+        let lower = &sprite.pixels[y1 * sprite.width..][..sprite.width];
+        let dy = y - c.origin.y as i32;
+        let dx = left - c.origin.x as i32;
+        let span = (right - left) as usize;
+        if dy < 0 || dy >= c.height as i32 || dx < 0
+            || span > c.width.saturating_sub(dx as usize)
+        {
+            continue;
+        }
+        let start = dy as usize * c.width + dx as usize;
+        let Some(destination_row) = c.pixels.get_mut(start..start + span) else {
+            continue;
+        };
+
+        for (&(x0, x1, wx), destination) in columns.iter().zip(destination_row) {
+            let (a, b, d, e) = (upper[x0], upper[x1], lower[x0], lower[x1]);
+            if (a | b | d | e) == 0 {
+                continue;
+            }
+
+            let upper_pixel = blend_sprite_pixels(a, b, wx);
+            let lower_pixel = blend_sprite_pixels(d, e, wx);
+            let mut pixel = blend_sprite_pixels(upper_pixel, lower_pixel, wy);
+            if fade < 256 {
+                pixel = blend_sprite_pixels(0, pixel, fade);
+            }
+            *destination = over(pixel, *destination);
         }
     }
 }
+
 
 // Progress on the animation clock, before panel easing.
 #[derive(Clone, Copy)]
@@ -1413,12 +1575,12 @@ fn scene(c: &mut Canvas, a: &mut Assets, v: View, outgoing: bool, hull:bool) {
         Some(t.item) == hovered_grid_item
     });
 
-    if mode == "fasade" && opening && nav.is_none() && header_alpha == 0. {
+    if entrance && nav.is_none()
+        && (header_alpha <= 0.0
+            || (matches!(mode, "diagonal" | "outer") && t < 0.36))
+    {
         if let Some(tile)=l.grid_tiles.iter().find(|tile| !a.entrance_tiles.contains_key(&(folder.id.clone(),tile.item,false))) {
-            let original_clip=c.clip;
-            c.clip=Rect::new(tile.box_.x,tile.box_.y,1.,1.);
-            entrance_tile(c,a,&folder.slots[tile.item],folder,*tile,tile.box_,l.gs,s,0.00001,thumb,false);
-            c.clip=original_clip;
+            entrance_sprite(a,&folder.slots[tile.item],folder,*tile,l.gs,s,thumb);
         }
     }
     for &t in regular_tiles.chain(front_tile) {
@@ -1474,9 +1636,15 @@ fn scene(c: &mut Canvas, a: &mut Assets, v: View, outgoing: bool, hull:bool) {
         t.box_=transform(t.box_);
         t.icon=icon;
         let caption_bottom=t.icon.bottom();
-        let mut skin=l.gs;
-        skin.font *= size;
+        let mut skin = l.gs;
         skin.reflect *= size;
+
+        let animated_caption = size != 1.0 && skin.labels;
+        if animated_caption {
+            skin.labels = false;
+        }
+
+        skin.font *= size;
         skin.ground_shadow_y *= size;
         skin.ground_shadow_height *= size;
         let skip=nav.is_some_and(|n| n.slot==t.item && (outgoing==n.down));
@@ -1506,6 +1674,18 @@ fn scene(c: &mut Canvas, a: &mut Assets, v: View, outgoing: bool, hull:bool) {
             skip,
             caption_bottom,
         );
+
+        if animated_caption {
+            c.caption(
+                a,
+                &item.name,
+                t.box_.cx(),
+                caption_bottom + skin.reflect + skin.font + s,
+                skin.font,
+                original.box_.w,
+                alpha,
+            );
+        }
         if !raised { ring(c); }
     }
     c.clip = root_clip;
