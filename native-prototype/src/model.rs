@@ -210,6 +210,18 @@ struct ArrowOptions {
     y: Option<f32>,
     rotation: Option<f32>,
 }
+impl Skin {
+    pub fn dock_entry_dims(self, entry: &Entry, scale: f32) -> (f32, f32) {
+        let width = if entry.trigger_size > 0. {
+            entry.trigger_size.clamp(24., 74.) * scale
+        } else {
+            self.icon
+        };
+        let label = if self.labels { 17. * scale } else { 0. };
+        (width, width + label + self.effects_height())
+    }
+}
+
 fn hex(s: Option<&str>, fallback: u32) -> u32 {
     s.and_then(|v| v.strip_prefix('#'))
         .filter(|v| v.len() == 6)
@@ -576,20 +588,7 @@ impl Layout {
         let vertical = saved.orientation == "vertical"
             || saved.orientation != "horizontal"
                 && ["left", "right"].contains(&saved.edge.as_str());
-        let dims = order
-            .iter()
-            .map(|f| {
-                let size = if f.trigger_size > 0. {
-                    f.trigger_size.clamp(24., 74.) * s
-                } else {
-                    ds.icon
-                };
-                (
-                    size,
-                    size + (if ds.labels { 17. * s } else { 0. }) + ds.effects_height(),
-                )
-            })
-            .collect::<Vec<_>>();
+        let dims = order.iter().map(|entry| ds.dock_entry_dims(entry, s)).collect::<Vec<_>>();
         let gaps = (dims.len().saturating_sub(1)) as f32;
         let total_w = if vertical {
             dims.iter().map(|t| t.0).fold(0., f32::max)

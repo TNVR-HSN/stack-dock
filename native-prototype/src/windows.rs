@@ -241,7 +241,15 @@ fn shortcut_is_link(entry: &Entry) -> bool {
 fn context_menu(hwnd: Handle, keyboard: bool) {
     let mut pt = Point { x: 0, y: 0 };
     if keyboard {
-        let rect = APP.with(|c| c.borrow().as_ref().and_then(App::focus_rect));
+        let rect = APP.with(|cell| {
+            let state = cell.borrow();
+            let app = state.as_ref()?;
+            if matches!(app.key_focus, Some(Hit::Dock(_) | Hit::Grid(_))) {
+                app.focus_rect()
+            } else {
+                None
+            }
+        });
         let Some(r) = rect else { return };
         pt = Point { x: r.cx() as i32, y: r.cy() as i32 };
     } else if unsafe { GetCursorPos(&mut pt) } == 0 {
@@ -1001,8 +1009,77 @@ impl App {
         self.assets.clear_entrance();
         Ok(())
     }
+    fn edit_grid_axis(
+        &mut self,
+        ctx: &serde_json::Value,
+        coordinate: &str,
+        dimension: &str,
+        limit: u64,
+        insert: bool,
+    ) -> io::Result<()> {
+        let changed = || io::Error::other("The open grid changed. Reopen its menu and try again.");
+        let active = self.saved.folder_at(&self.path).ok_or_else(changed)?;
+        if Some(active.id.as_str()) != ctx["folder"].as_str() {
+            return Err(changed());
+        }
+        let at = ctx[coordinate].as_u64().ok_or_else(changed)?;
+        let (original, mut data) = self.read_layout()?;
+        let on_disk = Saved::from_json(&original).map_err(io::Error::other)?;
+        let (root, nested) = self.path.split_first().ok_or_else(changed)?;
+        let mut entry = on_disk.folders.get(*root).ok_or_else(changed)?;
+        let mut folder = &mut data["layout"]["folders"][*root];
+        for &index in nested {
+            entry = entry.slots.get(index).ok_or_else(changed)?;
+            folder = folder["slots"].as_array_mut().and_then(|slots| {
+                slots.iter_mut().find(|slot| slot["id"].as_str() == Some(entry.id.as_str()))
+            }).ok_or_else(changed)?;
+        }
+        if entry.id != active.id || entry.rows != active.rows || entry.cols != active.cols {
+            return Err(changed());
+        }
+
+        let count = folder[dimension].as_u64().ok_or_else(changed)?;
+        if at >= count || (insert && count >= limit) || (!insert && count <= 1) {
+            return Err(io::Error::other("That grid row or column cannot be changed."));
+        }
+        if !insert && entry.slots.iter().any(|slot| {
+            let position = if coordinate == "r" { slot.r } else { slot.c };
+            position as u64 == at
+        }) {
+            return Err(io::Error::other("Only an empty row or column can be removed."));
+        }
+
+        if let Some(slots) = folder["slots"].as_array_mut() {
+            if !insert {
+                // Legacy spacer entries do not occupy cells in the current grid.
+                slots.retain(|slot| {
+                    slot["type"] != "spacer" || slot[coordinate].as_u64() != Some(at)
+                });
+            }
+            for slot in slots {
+                if let Some(position) = slot[coordinate].as_u64().filter(|position| *position > at) {
+                    slot[coordinate] = (if insert { position + 1 } else { position - 1 }).into();
+                }
+            }
+        }
+        folder[dimension] = (if insert { count + 1 } else { count - 1 }).into();
+        self.save_layout(&original, &data)
+    }
+
     fn command(&mut self,ctx:serde_json::Value)->Result<(),String>{
         if self.settings_open || self.settings.is_none(){return Err("Close the editor and start the dock with --settings-exe before editing.".into());}
+        let axis_edit = match ctx["action"].as_str() {
+            Some("Insert row below") => Some(("r", "rows", 80, true)),
+            Some("Insert column right") => Some(("c", "cols", 12, true)),
+            Some("Remove empty row") => Some(("r", "rows", 80, false)),
+            Some("Remove empty column") => Some(("c", "cols", 12, false)),
+            _ => None,
+        };
+        if let Some((coordinate, dimension, limit, insert)) = axis_edit {
+            return self.edit_grid_axis(&ctx, coordinate, dimension, limit, insert)
+                .and_then(|()| self.draw())
+                .map_err(|error| error.to_string());
+        }
         let step = match ctx["action"].as_str() {
             Some("Move folder earlier" | "Move shortcut earlier") => Some(-1),
             Some("Move folder later" | "Move shortcut later") => Some(2),
@@ -1540,43 +1617,128 @@ impl App {
         }
         self.draw()
     }
-    fn focus_rect(&self)->Option<Rect>{
-        let (tiles,index,clip)=match self.key_focus?{
-            Hit::Dock(i) if self.path.is_empty()=>(&self.layout.dock_tiles,i,self.layout.dock),
-            Hit::Grid(i) if !self.path.is_empty()=>(&self.layout.grid_tiles,i,self.layout.grid_clip),
-            _=>return None,
+    fn focus_rect(&self) -> Option<Rect> {
+        let layout = &self.layout;
+        let (tiles, index, clip) = match self.key_focus? {
+            Hit::Dock(i) if self.path.is_empty() => (&layout.dock_tiles, i, layout.dock),
+            Hit::Grid(i) if !self.path.is_empty() => (&layout.grid_tiles, i, layout.grid_clip),
+            Hit::Back if self.path.len() > 1 => return Some(layout.back),
+            Hit::SettingsGear if !self.path.is_empty() => return layout.settings_gear,
+            _ => return None,
         };
-        tiles.iter().find(|t|t.item==index).map(|t|t.box_.intersect(clip))
+        tiles.iter().find(|tile| tile.item == index).map(|tile| tile.box_.intersect(clip))
     }
-    fn arrow(&mut self,key:usize)->io::Result<()>{
+
+    fn focus_item(&mut self, hit: Hit) -> io::Result<()> {
         self.clear_hover();
-        if let Some(f)=self.saved.folder_at(&self.path){
-            let current=match self.key_focus{Some(Hit::Grid(i))=>f.slots.get(i),_=>None};
-            let next=if let Some(e)=current{
-                f.slots.iter().enumerate().filter_map(|(i,n)|{
-                    let dx=n.c as i32-e.c as i32;let dy=n.r as i32-e.r as i32;
-                    let (forward,side)=match key{37=>(-dx,dy),38=>(-dy,dx),39=>(dx,dy),_=>(dy,dx)};
-                    (forward>0).then_some(((side.abs(),forward),i))
-                }).min().map(|(_,i)|i)
-            }else{f.slots.iter().enumerate().min_by_key(|(_,e)|(e.r,e.c)).map(|(i,_)|i)};
-            if let Some(i)=next{
-                self.key_focus=Some(Hit::Grid(i));
-                let e=&f.slots[i];let g=&self.layout;let s=g.gs;
-                let w=if s.labels{s.icon.max(s.label_w)}else{s.icon};
-                let h=s.icon+s.effects_height()+if s.labels{s.font*2.36+4.*g.s}else{0.};
-                let x=e.c as f32*(w+s.gx);let y=e.r as f32*(h+s.gy);
-                self.scroll=((x+w-g.grid_clip.w).max(self.scroll.0.min(x)),(y+h-g.grid_clip.h).max(self.scroll.1.min(y)));
-                self.relayout()?;
+        self.key_focus = Some(hit);
+        let layout = &self.layout;
+        match hit {
+            Hit::Dock(index) => {
+                let vertical = self.saved.orientation == "vertical"
+                    || (self.saved.orientation != "horizontal"
+                        && matches!(self.saved.edge.as_str(), "left" | "right"));
+                let skin = layout.ds;
+                let gap = if vertical { skin.gy } else { skin.gx };
+                let mut start = if vertical { skin.py } else { skin.px };
+                for (i, entry) in self.saved.ordered().into_iter().enumerate() {
+                    let (width, height) = skin.dock_entry_dims(entry, layout.s);
+                    let size = if vertical { height } else { width };
+                    if i == index {
+                        let viewport = if vertical { layout.dock.h } else { layout.dock.w };
+                        self.dock_scroll = (start + size - viewport).max(self.dock_scroll.min(start));
+                        break;
+                    }
+                    start += size + gap;
+                }
             }
-        }else{
-            let count=self.saved.ordered().len();if count==0{return Ok(());}
-            let i=match self.key_focus{Some(Hit::Dock(i)) if key==37||key==38=>i.saturating_sub(1),Some(Hit::Dock(i))=>(i+1).min(count-1),_=>0};
-            self.key_focus=Some(Hit::Dock(i));
-            if self.focus_rect().is_none(){let step=self.layout.ds.icon+self.layout.ds.gx;
-                self.dock_scroll=if key==37||key==38{(self.dock_scroll-step).max(0.)}else{self.dock_scroll+step};self.relayout()?;}
+            Hit::Grid(index) => {
+                if let Some(entry) = self.saved.folder_at(&self.path).and_then(|f| f.slots.get(index)) {
+                    let skin = layout.gs;
+                    let w = if skin.labels { skin.icon.max(skin.label_w) } else { skin.icon };
+                    let h = skin.icon + skin.effects_height() + if skin.labels { skin.font * 2.36 + 4. * layout.s } else { 0. };
+                    let x = entry.c as f32 * (w + skin.gx);
+                    let y = entry.r as f32 * (h + skin.gy);
+                    self.scroll = (
+                        (x + w - layout.grid_clip.w).max(self.scroll.0.min(x)),
+                        (y + h - layout.grid_clip.h).max(self.scroll.1.min(y)),
+                    );
+                }
+            }
+            Hit::Back | Hit::SettingsGear => return self.draw(),
         }
+        self.relayout()?;
         self.draw()
     }
+
+    fn tab_focus(&mut self, backwards: bool) -> io::Result<()> {
+        let controls = if let Some(folder) = self.saved.folder_at(&self.path) {
+            let mut controls = Vec::new();
+            if self.path.len() > 1 {
+                controls.push(Hit::Back);
+            }
+            if self.layout.settings_gear.is_some() {
+                controls.push(Hit::SettingsGear);
+            }
+            let mut slots: Vec<_> = folder.slots.iter().enumerate().collect();
+            slots.sort_by_key(|(_, entry)| (entry.r, entry.c));
+            controls.extend(slots.into_iter().map(|(index, _)| Hit::Grid(index)));
+            controls
+        } else {
+            (0..self.saved.ordered().len()).map(Hit::Dock).collect()
+        };
+        if controls.is_empty() {
+            return Ok(());
+        }
+        let index = controls.iter().position(|hit| Some(*hit) == self.key_focus);
+        let next = match (index, backwards) {
+            (Some(i), true) => (i + controls.len() - 1) % controls.len(),
+            (Some(i), false) => (i + 1) % controls.len(),
+            (None, true) => controls.len() - 1,
+            (None, false) => 0,
+        };
+        self.focus_item(controls[next])
+    }
+
+    fn arrow(&mut self, key: usize) -> io::Result<()> {
+        if let Some(folder) = self.saved.folder_at(&self.path) {
+            let current = match self.key_focus {
+                Some(Hit::Grid(index)) => folder.slots.get(index),
+                _ => None,
+            };
+            let next = if let Some(entry) = current {
+                folder.slots.iter().enumerate().filter_map(|(i, neighbor)| {
+                    let dx = neighbor.c as i32 - entry.c as i32;
+                    let dy = neighbor.r as i32 - entry.r as i32;
+                    let (forward, side) = match key {
+                        37 => (-dx, dy),
+                        38 => (-dy, dx),
+                        39 => (dx, dy),
+                        _ => (dy, dx),
+                    };
+                    (forward > 0).then_some(((side.abs(), forward), i))
+                }).min().map(|(_, i)| i)
+            } else {
+                folder.slots.iter().enumerate().min_by_key(|(_, entry)| (entry.r, entry.c))
+                    .map(|(i, _)| i)
+            };
+            return match next {
+                Some(i) => self.focus_item(Hit::Grid(i)),
+                None => Ok(()),
+            };
+        }
+        let count = self.saved.ordered().len();
+        if count == 0 {
+            return Ok(());
+        }
+        let index = match self.key_focus {
+            Some(Hit::Dock(i)) if key == 37 || key == 38 => i.saturating_sub(1),
+            Some(Hit::Dock(i)) => (i + 1).min(count - 1),
+            _ => 0,
+        };
+        self.focus_item(Hit::Dock(index))
+    }
+
     fn click(&mut self, hit: Hit) -> io::Result<Option<Target>> {
         self.key_focus=None;
         match hit {
@@ -1884,8 +2046,16 @@ unsafe extern "system" fn window_proc(hwnd: Handle, msg: u32, w: usize, l: isize
                 Some(a.wheel(coord(w as isize, 16), msg == WM_MOUSEHWHEEL))
             }
             WM_KEYDOWN if a.motion.is_none() && !a.dragging && !a.settings_open && (37..=40).contains(&w)=>Some(a.arrow(w)),
-            WM_KEYDOWN if w==13 && a.motion.is_none() && !a.dragging && !a.settings_open=>{
-                Some(if let Some(hit)=a.key_focus{a.click(hit).map(|v|target=v)}else{Ok(())})
+            WM_KEYDOWN if w == 9 && a.motion.is_none() && a.press.is_none() && !a.settings_open => {
+                use windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState;
+                Some(a.tab_focus(unsafe { GetKeyState(16) } < 0))
+            }
+            WM_KEYDOWN if matches!(w, 13 | 32) && a.motion.is_none() && a.press.is_none() && !a.settings_open => {
+                let hit = a.key_focus.filter(|_| l & (1 << 30) == 0);
+                Some(match hit {
+                    Some(hit) => a.click(hit).map(|value| target = value),
+                    None => Ok(()),
+                })
             }
             WM_KEYDOWN if w==70 && !a.settings_open && !a.dragging && a.motion.is_none() &&
                 unsafe{windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState(17)}<0=>{
