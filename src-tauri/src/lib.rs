@@ -622,9 +622,18 @@ pub fn run() {
                 let data:serde_json::Value=serde_json::from_str(&payload)?;
                 init.push_str(&format!("window.__SD_NATIVE_MENU__={data};"));
             }
-            tauri::WebviewWindowBuilder::from_config(app, &config)?
+            let _settings_window = tauri::WebviewWindowBuilder::from_config(app, &config)?
                 .initialization_script(&init)
                 .build()?;
+            #[cfg(windows)]
+            if let (Ok(hwnd), Ok(path)) = (_settings_window.hwnd(), std::env::current_exe()) {
+                use std::os::windows::ffi::OsStrExt;
+                unsafe extern "C" {
+                    fn configure_settings_taskbar(hwnd: *mut std::ffi::c_void, exe: *const u16) -> i32;
+                }
+                let path: Vec<_> = path.as_os_str().encode_wide().chain([0]).collect();
+                unsafe { configure_settings_taskbar(hwnd.0.cast(), path.as_ptr()); }
+            }
 
             Ok(())
         })

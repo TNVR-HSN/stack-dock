@@ -2431,7 +2431,7 @@ const STACKDOCK_ABOUT_LINKS=[
 ];
 function buildAboutPane(pane){
  const hero=E('section','sd-ui-card sd-about-hero'),copy=E('div','sd-about-copy');
- copy.append(E('strong','','StackDock'),E('p','note','A customizable Windows dock for organizing shortcuts into Grid Stacks.'));
+ copy.append(E('strong','','StackDock Native'),E('p','note','A customizable Windows dock for organizing shortcuts into Grid Stacks.'));
  const app=window.__TAURI__?.app;
  const canReadVersion=typeof app?.getVersion==='function';
  const version=E('span','sd-about-version',canReadVersion?'Reading version…':nativeCore?'Version unavailable':'Browser preview');

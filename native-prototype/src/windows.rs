@@ -2457,7 +2457,7 @@ fn run_window(saved: Saved, smoke: bool, settings: Option<SettingsLink>) -> io::
         return Err(io::Error::last_os_error());
     }
     let name = wide("StackDock.NativePreview");
-    let title = wide("StackDock Native Preview");
+    let title = wide("StackDock Native");
     let class = WindowClass {
         size: size_of::<WindowClass>() as u32,
         style: 0,

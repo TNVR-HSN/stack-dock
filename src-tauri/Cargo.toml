@@ -1,6 +1,6 @@
 [package]
 name = "stack-dock"
-version = "0.1.0"
+version = "0.2.0-beta"
 description = "StackDock desktop shortcut organizer"
 edition = "2024"
 
@@ -14,6 +14,7 @@ name = "stack_dock_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
+cc = "1"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]

@@ -1,0 +1,32 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="StackDock Native" Manufacturer="Stackdock by Tanveer" Version="0.2.0"
+           Scope="perMachine" UpgradeCode="B52B1CA2-917A-4539-BD02-29BA02D0A6B2">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of StackDock Native is already installed."/>
+    <MediaTemplate EmbedCab="yes"/>
+    <Icon Id="DockIcon.exe" SourceFile="$(NativeIcon)"/>
+    <Property Id="ARPPRODUCTICON" Value="DockIcon.exe"/>
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="StackDock Native">
+        <Component Id="NativeDock" Guid="B8EABD62-7402-4E11-B00D-9C1BCF0B1ED5">
+          <RemoveFile Id="RemoveWizardDesktopLink" Directory="DesktopFolder" Name="StackDock Native.lnk" On="uninstall"/>
+          <File Id="DockExe" Source="$(Payload)/stack-dock-native.exe" KeyPath="yes">
+            <Shortcut Id="DockShortcut" Directory="ProgramMenuFolder" Name="StackDock Native"
+                      WorkingDirectory="INSTALLFOLDER" Advertise="yes" Icon="DockIcon.exe"/>
+          </File>
+        </Component>
+        <Component Id="Settings" Guid="09806824-BA4F-468B-9323-E9F218E9C59E">
+          <File Source="$(Payload)/StackDock.exe" KeyPath="yes"/>
+        </Component>
+        <Component Id="License" Guid="5E737D13-DE2F-4BEC-AEAD-916F924BBCEB">
+          <File Source="$(Payload)/LICENSE" KeyPath="yes"/>
+        </Component>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder"/>
+    <StandardDirectory Id="DesktopFolder"/>
+    <Property Id="INSTALLFOLDER" Secure="yes"/>
+    <Feature Id="Main" Title="StackDock Native" Level="1">
+      <ComponentRef Id="NativeDock"/><ComponentRef Id="Settings"/><ComponentRef Id="License"/>
+    </Feature>
+  </Package>
+</Wix>
